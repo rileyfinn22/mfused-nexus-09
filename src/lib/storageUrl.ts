@@ -75,32 +75,17 @@ export const sanitizeStorageFileName = (name: string) => {
 };
 
 export const triggerSignedFileDownload = async (signedUrl: string, fileName: string) => {
+  // The signed URL already carries `?download=<fileName>`, so let the browser
+  // stream directly instead of buffering the whole file into a blob first.
+  // Buffering added a multi-second delay before the download prompt appeared.
   const resolvedUrl = resolveStorageSignedUrl(signedUrl);
-
-  try {
-    const response = await fetch(resolvedUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch file: ${response.status}`);
-    }
-
-    const blob = await response.blob();
-    const objectUrl = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = objectUrl;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
-  } catch {
-    const fallbackLink = document.createElement("a");
-    fallbackLink.href = resolvedUrl;
-    fallbackLink.download = fileName;
-    fallbackLink.rel = "noopener noreferrer";
-    document.body.appendChild(fallbackLink);
-    fallbackLink.click();
-    document.body.removeChild(fallbackLink);
-  }
+  const link = document.createElement("a");
+  link.href = resolvedUrl;
+  link.download = fileName;
+  link.rel = "noopener noreferrer";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 };
 
 export const triggerBlobFileDownload = (blob: Blob, fileName: string) => {
