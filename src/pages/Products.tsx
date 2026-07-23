@@ -45,7 +45,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { AddProductDialog } from "@/components/AddProductDialog";
 import { AnalyzePOProductsDialog } from "@/components/AnalyzePOProductsDialog";
 import { QuickAddProductsDialog } from "@/components/QuickAddProductsDialog";
-import { ProductTemplateGrid } from "@/components/ProductTemplateGrid";
 import { TemplateProductsView } from "@/components/TemplateProductsView";
 import { AssignTemplateDropdown } from "@/components/AssignTemplateDropdown";
 import { useToast } from "@/hooks/use-toast";
@@ -153,8 +152,7 @@ const Products = () => {
   useEffect(() => {
     fetchProducts();
     fetchTemplates();
-    fetchArtworkStatus();
-    fetchArtworkThumbnails();
+    fetchArtworkMetadata();
     if (isVibeAdmin) {
       fetchCompanies();
     }
@@ -178,7 +176,7 @@ const Products = () => {
     try {
       let query = supabase
         .from('products')
-        .select('*, product_states(*)')
+        .select('*')
         .order('created_at', { ascending: false })
         .limit(50000);
 
@@ -242,19 +240,6 @@ const Products = () => {
         template_id: product.template_id,
       }));
 
-
-      const productsToUpdate = productsWithStates.filter(p => !p.item_id);
-      if (productsToUpdate.length > 0) {
-        for (const product of productsToUpdate) {
-          const tempSKU = `VB-${Math.floor(10000 + Math.random() * 90000)}`;
-          await supabase
-            .from('products')
-            .update({ item_id: tempSKU })
-            .eq('id', product.id);
-          product.item_id = tempSKU;
-        }
-      }
-      
       setProducts(productsWithStates);
     } catch (error) {
       console.error('Error fetching products:', error);
@@ -328,28 +313,7 @@ const Products = () => {
     }
   };
 
-  const fetchArtworkStatus = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('artwork_files')
-        .select('sku, is_approved')
-        .limit(50000);
-
-      if (error) throw error;
-
-      const statusMap: Record<string, boolean> = {};
-      data?.forEach(artwork => {
-        if (!statusMap[artwork.sku] || artwork.is_approved) {
-          statusMap[artwork.sku] = artwork.is_approved;
-        }
-      });
-      setArtworkStatus(statusMap);
-    } catch (error) {
-      console.error('Error fetching artwork status:', error);
-    }
-  };
-
-  const fetchArtworkThumbnails = async () => {
+  const fetchArtworkMetadata = async () => {
     try {
       const { data, error } = await supabase
         .from('artwork_files')
@@ -360,8 +324,13 @@ const Products = () => {
 
       if (error) throw error;
 
+      const statusMap: Record<string, boolean> = {};
       const thumbnailMap: Record<string, string> = {};
       data?.forEach((artwork) => {
+        if (!statusMap[artwork.sku] || artwork.is_approved) {
+          statusMap[artwork.sku] = artwork.is_approved;
+        }
+
         if (thumbnailMap[artwork.sku]) return;
 
         if (isUsableArtworkPreviewUrl(artwork.filename, artwork.preview_url)) {
@@ -373,9 +342,10 @@ const Products = () => {
           thumbnailMap[artwork.sku] = artwork.artwork_url;
         }
       });
+      setArtworkStatus(statusMap);
       setArtworkThumbnails(thumbnailMap);
     } catch (error) {
-      console.error('Error fetching artwork thumbnails:', error);
+      console.error('Error fetching artwork metadata:', error);
     }
   };
 
