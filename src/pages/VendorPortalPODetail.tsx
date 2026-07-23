@@ -320,26 +320,26 @@ export default function VendorPortalPODetail() {
         </CardHeader>
         <CardContent>
           {shipToLines.length > 0 && (
-            <div className="mb-4">
+            <div className="mb-5">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Ship To</div>
-              <div className="flex items-start gap-1.5 text-sm">
-                <MapPin className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
-                <div>{shipToLines.map((l, i) => <div key={i}>{l}</div>)}</div>
+              <div className="text-sm">
+                {shipToLines.map((l, i) => (
+                  <div key={i} className={i === 0 ? "font-medium" : "text-muted-foreground"}>{l}</div>
+                ))}
               </div>
             </div>
           )}
 
-          {/* Line items — standard PO document look (matches the PDF), with
-              Shipped Qty as the vendor's editable extra */}
-          <div className="rounded-md overflow-x-auto">
+          {/* Line items — standard invoice-style document table */}
+          <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[640px]">
               <thead>
-                <tr className="bg-[#4CAF50] text-white">
+                <tr className="border-b-2 border-border">
                   {["SKU", "Description", "Qty", "Unit Cost", "Amount"].map((h, i) => (
                     <th
                       key={h}
                       className={cn(
-                        "px-3 py-2 text-[11px] font-bold uppercase tracking-wide select-none",
+                        "px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground select-none",
                         i >= 2 ? "text-right" : "text-left"
                       )}
                     >
@@ -349,8 +349,8 @@ export default function VendorPortalPODetail() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((it, idx) => (
-                  <tr key={it.id} className={idx % 2 === 1 ? "bg-muted/40" : undefined}>
+                {items.map((it) => (
+                  <tr key={it.id} className="border-b border-border/60">
                     <td className="px-3 py-2 font-mono text-xs whitespace-nowrap align-top">{it.sku}</td>
                     <td className="px-3 py-2 align-top">
                       <div>{it.name}</div>
