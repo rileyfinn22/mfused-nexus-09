@@ -273,7 +273,7 @@ function SheetCell({ value, display, placeholder, editable, className, mono, onS
         }}
         onClick={(e) => e.stopPropagation()}
         className={cn(
-          "w-full resize-none overflow-hidden bg-background text-xs leading-5 px-1 py-0.5",
+          "w-full resize-none overflow-hidden bg-background text-[13px] leading-6 px-1.5 py-1",
           "border-0 outline-none ring-2 ring-primary rounded-none",
           mono && "font-mono",
           className
@@ -286,7 +286,7 @@ function SheetCell({ value, display, placeholder, editable, className, mono, onS
     <div
       onClick={editable ? (e) => { e.stopPropagation(); setEditing(true); } : undefined}
       className={cn(
-        "min-h-[1.5rem] h-full px-1 py-0.5 text-xs leading-5 whitespace-pre-wrap break-words",
+        "min-h-[1.9rem] h-full px-1.5 py-1 text-[13px] leading-6 whitespace-pre-wrap break-words",
         mono && "font-mono",
         editable && "cursor-text hover:bg-primary/5",
         !value && !display && "text-muted-foreground/40",
@@ -381,12 +381,12 @@ export default function OrdersSheet({
   const orderedRows = [...openRows, ...completedRows];
 
   // Sticky so the header stays visible while the sheet scrolls (solid bg — rows pass under it).
-  const th = "sticky top-0 z-20 relative px-2 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground border-b border-r border-border last:border-r-0 bg-muted select-none";
+  const th = "sticky top-0 z-20 relative px-2 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground border-b border-r border-border last:border-r-0 bg-muted select-none";
   const td = "relative p-0 align-top border-b border-r border-border/60 last:border-r-0";
 
   return (
     <div className="border border-border rounded-lg overflow-auto max-h-[calc(100vh-230px)]">
-      <table className="text-xs border-collapse table-fixed" style={{ width: tableWidth }}>
+      <table className="text-[13px] leading-6 border-collapse table-fixed" style={{ width: tableWidth }}>
         <colgroup>
           {cols.map((c) => (
             <col key={c.id} style={{ width: widths[c.id] || c.width }} />
@@ -452,34 +452,34 @@ export default function OrdersSheet({
                     />
                   );
                 case "vendor":
-                  return <div className="px-1 py-0.5 whitespace-pre-wrap break-words">{po.vendorName || "—"}</div>;
+                  return <div className="px-1.5 py-1 whitespace-pre-wrap break-words">{po.vendorName || "—"}</div>;
                 case "invoice":
                   return (
-                    <div className="px-1 py-0.5 font-mono whitespace-pre-wrap break-words">
+                    <div className="px-1.5 py-1 font-mono whitespace-pre-wrap break-words">
                       {(po.invoiceNumbers || []).join("\n") || "—"}
                     </div>
                   );
                 case "po":
                   return onOpenPo ? (
                     <button
-                      className="px-1 py-0.5 font-mono font-medium text-primary hover:underline"
+                      className="px-1.5 py-1 font-mono font-medium text-primary hover:underline"
                       onClick={() => onOpenPo(po)}
                       title="Open PO details"
                     >
                       {po.po_number}
                     </button>
                   ) : (
-                    <span className="px-1 py-0.5 font-mono font-medium">{po.po_number}</span>
+                    <span className="px-1.5 py-1 font-mono font-medium">{po.po_number}</span>
                   );
                 case "cpo":
                   return (
-                    <div className="px-1 py-0.5 font-mono truncate" title={po.cpo || ""}>
+                    <div className="px-1.5 py-1 font-mono truncate" title={po.cpo || ""}>
                       {po.cpo || "—"}
                     </div>
                   );
                 case "company":
                   return (
-                    <div className="px-1 py-0.5 truncate" title={po.companyName || po.ship_to_name || ""}>
+                    <div className="px-1.5 py-1 truncate" title={po.companyName || po.ship_to_name || ""}>
                       {po.companyName || po.ship_to_name || "—"}
                     </div>
                   );
