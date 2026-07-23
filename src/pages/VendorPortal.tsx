@@ -117,10 +117,9 @@ export default function VendorPortal() {
   };
 
   const saveStatus = async (po: SheetPo, text: string) => {
-    const status = normalizeVendorPoStatusInput(text);
-    if (!status) return;
+    const status = normalizeVendorPoStatusInput(text); // "" clears
     const before = pos.find((r) => r.id === po.id);
-    patchRow(po.id, { production_status: status });
+    patchRow(po.id, { production_status: status || null });
     const ok = await rpc("vendor_update_po_status", {
       p_po_id: po.id,
       p_status: status,

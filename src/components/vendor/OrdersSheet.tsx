@@ -249,8 +249,12 @@ function SheetCell({ value, display, placeholder, editable, className, mono, onS
     if (editing) {
       setDraft(value);
       requestAnimationFrame(() => {
-        taRef.current?.focus();
-        taRef.current?.select();
+        const ta = taRef.current;
+        if (ta) {
+          ta.focus();
+          // Caret at the end — no select-all, so drag-selection works naturally.
+          ta.setSelectionRange(ta.value.length, ta.value.length);
+        }
         autosize();
       });
     }
