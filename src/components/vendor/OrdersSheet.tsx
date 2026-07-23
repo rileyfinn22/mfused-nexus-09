@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from "react";
-import { AlertCircle, Check, ExternalLink } from "lucide-react";
+import { AlertCircle, Check, ChevronRight, ExternalLink } from "lucide-react";
 import { parseISO } from "date-fns";
 import { matchVendorPoStatus } from "@/lib/vendorPoStatus";
 import { cn } from "@/lib/utils";
@@ -378,16 +378,16 @@ export default function OrdersSheet({
 
   const tableWidth = cols.reduce((sum, c) => sum + (widths[c.id] || c.width), 0);
 
-  // Completed rows sink to the bottom under a divider, open work stays on top.
+  // Completed rows live in their own collapsed sheet below the open one.
   const openRows = pos.filter((p) => !p.sheet_completed_at);
   const completedRows = pos.filter((p) => p.sheet_completed_at);
-  const orderedRows = [...openRows, ...completedRows];
+  const [completedOpen, setCompletedOpen] = useState(false);
 
   // Sticky so the header stays visible while the sheet scrolls (solid bg — rows pass under it).
   const th = "sticky top-0 z-20 relative px-2 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground border-b border-r border-border last:border-r-0 bg-muted select-none";
   const td = "relative p-0 align-top border-b border-r border-border/60 last:border-r-0";
 
-  return (
+  const sheetTable = (rowsToRender: SheetPo[], emptyText: string) => (
     <div className="border border-border rounded-lg overflow-auto max-h-[calc(100vh-230px)]">
       <table className="text-[13px] leading-6 border-collapse table-fixed" style={{ width: tableWidth }}>
         <colgroup>
@@ -410,16 +410,15 @@ export default function OrdersSheet({
           </tr>
         </thead>
         <tbody>
-          {pos.length === 0 && (
+          {rowsToRender.length === 0 && (
             <tr>
               <td colSpan={cols.length} className="text-center text-muted-foreground py-10">
-                No purchase orders match your filters
+                {emptyText}
               </td>
             </tr>
           )}
-          {orderedRows.map((po, rowIdx) => {
+          {rowsToRender.map((po) => {
             const isCompleted = !!po.sheet_completed_at;
-            const isFirstCompleted = isCompleted && rowIdx === openRows.length;
             const statusMeta = matchVendorPoStatus(po.production_status || "");
             // Plain text only — no badges. "Not started" reads as an empty cell.
             const statusEmpty = !po.production_status || statusMeta?.value === "not_started";
@@ -582,16 +581,6 @@ export default function OrdersSheet({
 
             return (
               <Fragment key={po.id}>
-                {isFirstCompleted && (
-                  <tr>
-                    <td
-                      colSpan={cols.length}
-                      className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-success bg-success/10 border-y border-border"
-                    >
-                      Completed
-                    </td>
-                  </tr>
-                )}
                 <tr
                   className={cn(isCompleted ? "bg-success/10 hover:bg-success/15" : "hover:bg-muted/20")}
                   style={{ height: rowHeights[po.id] }}
@@ -616,6 +605,24 @@ export default function OrdersSheet({
           })}
         </tbody>
       </table>
+    </div>
+  );
+
+  return (
+    <div className="space-y-3">
+      {sheetTable(openRows, "No purchase orders match your filters")}
+      {completedRows.length > 0 && (
+        <div className="space-y-2">
+          <button
+            onClick={() => setCompletedOpen((o) => !o)}
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-success hover:opacity-80"
+          >
+            <ChevronRight className={cn("h-4 w-4 transition-transform", completedOpen && "rotate-90")} />
+            Completed ({completedRows.length})
+          </button>
+          {completedOpen && sheetTable(completedRows, "Nothing completed yet")}
+        </div>
+      )}
     </div>
   );
 }
