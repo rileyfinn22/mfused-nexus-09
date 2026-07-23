@@ -3590,6 +3590,7 @@ export type Database = {
           created_at: string
           created_by: string
           id: string
+          kind: string
           note: string | null
           percent_at_time: number | null
           vendor_po_id: string
@@ -3600,6 +3601,7 @@ export type Database = {
           created_at?: string
           created_by?: string
           id?: string
+          kind?: string
           note?: string | null
           percent_at_time?: number | null
           vendor_po_id: string
@@ -3610,6 +3612,7 @@ export type Database = {
           created_at?: string
           created_by?: string
           id?: string
+          kind?: string
           note?: string | null
           percent_at_time?: number | null
           vendor_po_id?: string
