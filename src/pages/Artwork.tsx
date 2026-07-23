@@ -115,6 +115,57 @@ const Artwork = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [artworkFiles, setArtworkFiles] = useState<ArtworkFile[]>([]);
+  const backfilledPreviewIdsRef = useRef<Set<string>>(new Set());
+
+  // Lazy backfill: for any PDF artwork missing a usable preview_url,
+  // generate a PNG preview once and persist it. Runs at most 2 concurrent.
+  useEffect(() => {
+    const needsBackfill = artworkFiles.filter(
+      (f) =>
+        /\.pdf$/i.test(f.filename) &&
+        !isUsableArtworkPreviewUrl(f.filename, f.preview_url) &&
+        !backfilledPreviewIdsRef.current.has(f.id),
+    );
+    if (needsBackfill.length === 0) return;
+
+    let cancelled = false;
+    const CONCURRENCY = 2;
+    let idx = 0;
+
+    const runNext = async (): Promise<void> => {
+      if (cancelled) return;
+      const file = needsBackfill[idx++];
+      if (!file) return;
+      backfilledPreviewIdsRef.current.add(file.id);
+      try {
+        const previewUrl = await createFlatArtworkPreviewFromArtwork({
+          artworkUrl: file.artwork_url,
+          filename: file.filename,
+          sku: file.sku,
+          contextLabel: file.filename,
+        });
+        if (cancelled) return;
+        const { error } = await supabase
+          .from("artwork_files")
+          .update({ preview_url: previewUrl })
+          .eq("id", file.id);
+        if (!error && !cancelled) {
+          setArtworkFiles((prev) =>
+            prev.map((f) => (f.id === file.id ? { ...f, preview_url: previewUrl } : f)),
+          );
+        }
+      } catch (err) {
+        console.warn("PDF preview backfill failed", file.filename, err);
+      }
+      return runNext();
+    };
+
+    const workers = Array.from({ length: Math.min(CONCURRENCY, needsBackfill.length) }, runNext);
+    Promise.all(workers).catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [artworkFiles]);
   const [productArtworkLoading, setProductArtworkLoading] = useState(false);
   const [rejectedFiles, setRejectedFiles] = useState<any[]>([]);
   const selectedProductIdRef = useRef<string | null>(null);
