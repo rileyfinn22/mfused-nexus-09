@@ -27,6 +27,7 @@ interface PoItem {
 
 interface ProductionUpdate {
   id: string;
+  kind: string;
   note: string | null;
   attachment_url: string | null;
   attachment_name: string | null;
@@ -34,6 +35,12 @@ interface ProductionUpdate {
   created_at: string;
   signedUrl?: string;
 }
+
+const DOC_KINDS = [
+  { kind: "packing_list", label: "Packing List", hint: "The packing list for this shipment" },
+  { kind: "proof", label: "Order Proofs", hint: "Proofs for the order (photos or PDFs)" },
+  { kind: "shipped_qty_sheet", label: "Shipped Qty Sheet", hint: "Sheet of quantities shipped per SKU" },
+] as const;
 
 interface PoDetail {
   id: string;
@@ -94,7 +101,10 @@ export default function VendorPortalPODetail() {
   const [note, setNote] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [posting, setPosting] = useState(false);
+  const [uploadingKind, setUploadingKind] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
+  const pendingDocKindRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (poId) load(poId);
@@ -136,7 +146,7 @@ export default function VendorPortalPODetail() {
           .eq("vendor_po_id", id),
         (supabase as any)
           .from("vendor_po_production_updates")
-          .select("id, note, attachment_url, attachment_name, percent_at_time, created_at")
+          .select("id, kind, note, attachment_url, attachment_name, percent_at_time, created_at")
           .eq("vendor_po_id", id)
           .order("created_at", { ascending: false }),
       ]);
@@ -181,33 +191,32 @@ export default function VendorPortalPODetail() {
     }
   };
 
+  const uploadAttachment = async (f: File): Promise<{ path: string; name: string }> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Not signed in");
+    const safeName = f.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const path = `${user.id}/vendor-updates/${po!.id}/${Date.now()}_${safeName}`;
+    const { error: upErr } = await (supabase as any).storage.from("po-documents").upload(path, f);
+    if (upErr) throw upErr;
+    return { path, name: f.name };
+  };
+
   const postUpdate = async () => {
     if (!po) return;
     if (!note.trim() && !file) return;
     setPosting(true);
     try {
-      let attachmentPath: string | null = null;
-      let attachmentName: string | null = null;
-
-      if (file) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error("Not signed in");
-        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-        attachmentPath = `${user.id}/vendor-updates/${po.id}/${Date.now()}_${safeName}`;
-        attachmentName = file.name;
-        const { error: upErr } = await (supabase as any).storage
-          .from("po-documents")
-          .upload(attachmentPath, file);
-        if (upErr) throw upErr;
-      }
+      let attachment: { path: string; name: string } | null = null;
+      if (file) attachment = await uploadAttachment(file);
 
       const { error: insErr } = await (supabase as any)
         .from("vendor_po_production_updates")
         .insert({
           vendor_po_id: po.id,
+          kind: "update",
           note: note.trim() || null,
-          attachment_url: attachmentPath,
-          attachment_name: attachmentName,
+          attachment_url: attachment?.path || null,
+          attachment_name: attachment?.name || null,
           percent_at_time: percent,
         });
       if (insErr) throw insErr;
@@ -221,6 +230,29 @@ export default function VendorPortalPODetail() {
       toast({ title: "Update didn't post", description: error.message || "Try again", variant: "destructive" });
     } finally {
       setPosting(false);
+    }
+  };
+
+  const uploadDoc = async (kind: string, f: File) => {
+    if (!po) return;
+    setUploadingKind(kind);
+    try {
+      const attachment = await uploadAttachment(f);
+      const { error: insErr } = await (supabase as any)
+        .from("vendor_po_production_updates")
+        .insert({
+          vendor_po_id: po.id,
+          kind,
+          attachment_url: attachment.path,
+          attachment_name: attachment.name,
+        });
+      if (insErr) throw insErr;
+      await load(po.id);
+    } catch (error: any) {
+      console.error("Error uploading document:", error);
+      toast({ title: "Upload failed", description: error.message || "Try again", variant: "destructive" });
+    } finally {
+      setUploadingKind(null);
     }
   };
 
@@ -276,6 +308,8 @@ export default function VendorPortalPODetail() {
   const itemsTotal = items.reduce((sum, it) => sum + Number(it.total || 0), 0);
   const shippingCost = Number(po.shipping_cost || 0);
   const description = po.sheet_description || po.description;
+  const updateFeed = updates.filter((u) => u.kind === "update");
+  const docsOfKind = (kind: string) => updates.filter((u) => u.kind === kind && u.attachment_url);
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -286,32 +320,199 @@ export default function VendorPortalPODetail() {
         <ArrowLeft className="h-4 w-4" /> Back to my POs
       </button>
 
+      {/* Compact title row (full PO document is below the production sections) */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+          <Package className="h-5 w-5 text-muted-foreground" />
+          Vendor PO #{po.po_number}
+          {statusMeta && statusMeta.value !== "not_started" ? (
+            <Badge className={statusMeta.badgeClass}>{statusMeta.label}</Badge>
+          ) : !statusMeta && po.production_status ? (
+            <Badge variant="secondary">{po.production_status}</Badge>
+          ) : null}
+        </h1>
+        <Button variant="outline" size="sm" onClick={handleDownloadPdf}>
+          <Download className="h-4 w-4 mr-1.5" /> Download PDF
+        </Button>
+      </div>
+
+      {/* Production progress & notes */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Production progress</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="flex items-center gap-4">
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={5}
+              value={percent}
+              onChange={(e) => setPercent(Number(e.target.value))}
+              onMouseUp={() => savePercent(percent)}
+              onTouchEnd={() => savePercent(percent)}
+              onKeyUp={() => savePercent(percent)}
+              className="flex-1 accent-primary cursor-pointer"
+            />
+            <div className={cn("text-2xl font-semibold w-20 text-right", percent === 100 && "text-success")}>
+              {percent}%
+            </div>
+          </div>
+          <div className="h-2 rounded-full bg-muted overflow-hidden">
+            <div
+              className={cn("h-full rounded-full transition-all", percent === 100 ? "bg-success" : "bg-primary")}
+              style={{ width: `${percent}%` }}
+            />
+          </div>
+
+          {/* Post a production note / attachment */}
+          <div className="space-y-2 pt-1">
+            <Textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Add a production note for the team…"
+              rows={2}
+            />
+            <div className="flex items-center gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                onChange={(e) => setFile(e.target.files?.[0] || null)}
+              />
+              <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                <Paperclip className="h-4 w-4 mr-1.5" /> Attach file
+              </Button>
+              {file && (
+                <span className="flex items-center gap-1 text-xs text-muted-foreground min-w-0">
+                  <span className="truncate max-w-[200px]">{file.name}</span>
+                  <button onClick={() => { setFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}>
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </span>
+              )}
+              <div className="flex-1" />
+              <Button size="sm" onClick={postUpdate} disabled={posting || (!note.trim() && !file)}>
+                {posting ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Send className="h-4 w-4 mr-1.5" />}
+                Post update
+              </Button>
+            </div>
+          </div>
+
+          {/* Updates feed */}
+          {updateFeed.length > 0 && (
+            <div className="space-y-4 pt-2 border-t border-border">
+              {updateFeed.map((u) => (
+                <div key={u.id} className="flex items-start gap-3 text-sm">
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                      <span>
+                        {new Date(u.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                      </span>
+                      {u.percent_at_time != null && <Badge variant="outline" className="text-[10px] px-1.5 py-0">{u.percent_at_time}%</Badge>}
+                    </div>
+                    {u.note && <p className="mt-0.5 whitespace-pre-wrap">{u.note}</p>}
+                    {u.signedUrl && (
+                      isImage(u.attachment_name) ? (
+                        <a href={u.signedUrl} target="_blank" rel="noreferrer" className="block mt-2">
+                          <img src={u.signedUrl} alt={u.attachment_name || "attachment"} className="max-h-40 rounded-md border border-border" />
+                        </a>
+                      ) : (
+                        <a
+                          href={u.signedUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 mt-1 text-primary hover:underline text-xs"
+                        >
+                          <Paperclip className="h-3.5 w-3.5" /> {u.attachment_name || "Attachment"}
+                        </a>
+                      )
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Shipment documents */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Shipment documents</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <input
+            ref={docInputRef}
+            type="file"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              const kind = pendingDocKindRef.current;
+              if (f && kind) uploadDoc(kind, f);
+              pendingDocKindRef.current = null;
+              if (docInputRef.current) docInputRef.current.value = "";
+            }}
+          />
+          <div className="grid gap-4 sm:grid-cols-3">
+            {DOC_KINDS.map((dk) => {
+              const docs = docsOfKind(dk.kind);
+              return (
+                <div key={dk.kind} className="rounded-lg border border-border p-3 space-y-2">
+                  <div>
+                    <div className="text-sm font-medium">{dk.label}</div>
+                    <div className="text-xs text-muted-foreground">{dk.hint}</div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    disabled={uploadingKind === dk.kind}
+                    onClick={() => { pendingDocKindRef.current = dk.kind; docInputRef.current?.click(); }}
+                  >
+                    {uploadingKind === dk.kind
+                      ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                      : <Paperclip className="h-4 w-4 mr-1.5" />}
+                    Upload
+                  </Button>
+                  {docs.length === 0 ? (
+                    <p className="text-xs text-muted-foreground/60">Nothing uploaded yet</p>
+                  ) : (
+                    <div className="space-y-1">
+                      {docs.map((d) => (
+                        <a
+                          key={d.id}
+                          href={d.signedUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center gap-1.5 text-xs text-primary hover:underline min-w-0"
+                        >
+                          <Paperclip className="h-3 w-3 shrink-0" />
+                          <span className="truncate">{d.attachment_name}</span>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* PO document — same layout as the vibe-admin Vendor PO page */}
       <Card className="shadow-lg">
         <CardContent className="p-0">
-          {/* Header band */}
           <div className="bg-gradient-to-r from-primary/10 to-primary/5 border-b p-8">
-            <div className="flex justify-between items-start">
-              <div>
-                <h1 className="text-3xl font-bold mb-2">Vendor PO #{po.po_number}</h1>
-                {info?.cpo && (
-                  <p className="text-sm text-muted-foreground">Customer PO: {info.cpo}</p>
-                )}
-                {(info?.invoice_numbers?.length ?? 0) > 0 && (
-                  <p className="text-sm text-muted-foreground">Vibe Invoice: {info!.invoice_numbers.join(", ")}</p>
-                )}
-                {description && <p className="text-sm text-muted-foreground">{description}</p>}
-              </div>
-              <div className="flex flex-col items-end gap-2">
-                {statusMeta && statusMeta.value !== "not_started" ? (
-                  <Badge className={statusMeta.badgeClass}>{statusMeta.label}</Badge>
-                ) : !statusMeta && po.production_status ? (
-                  <Badge variant="secondary">{po.production_status}</Badge>
-                ) : null}
-                <Button variant="outline" size="sm" onClick={handleDownloadPdf}>
-                  <Download className="h-4 w-4 mr-1.5" /> Download PDF
-                </Button>
-              </div>
+            <div>
+              <h2 className="text-xl font-bold mb-1">Purchase Order</h2>
+              {info?.cpo && <p className="text-sm text-muted-foreground">Customer PO: {info.cpo}</p>}
+              {(info?.invoice_numbers?.length ?? 0) > 0 && (
+                <p className="text-sm text-muted-foreground">Vibe Invoice: {info!.invoice_numbers.join(", ")}</p>
+              )}
+              {description && <p className="text-sm text-muted-foreground">{description}</p>}
             </div>
 
             {/* Dates and Ship To */}
@@ -407,107 +608,6 @@ export default function VendorPortalPODetail() {
         </CardContent>
       </Card>
 
-      {/* Production progress */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Production progress</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          <div className="flex items-center gap-4">
-            <input
-              type="range"
-              min={0}
-              max={100}
-              step={5}
-              value={percent}
-              onChange={(e) => setPercent(Number(e.target.value))}
-              onMouseUp={() => savePercent(percent)}
-              onTouchEnd={() => savePercent(percent)}
-              onKeyUp={() => savePercent(percent)}
-              className="flex-1 accent-primary cursor-pointer"
-            />
-            <div className={cn("text-2xl font-semibold w-20 text-right", percent === 100 && "text-success")}>
-              {percent}%
-            </div>
-          </div>
-          <div className="h-2 rounded-full bg-muted overflow-hidden">
-            <div
-              className={cn("h-full rounded-full transition-all", percent === 100 ? "bg-success" : "bg-primary")}
-              style={{ width: `${percent}%` }}
-            />
-          </div>
-
-          {/* Post a production note / attachment */}
-          <div className="space-y-2 pt-1">
-            <Textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="Add a production note for the team…"
-              rows={2}
-            />
-            <div className="flex items-center gap-2">
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="hidden"
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
-              />
-              <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
-                <Paperclip className="h-4 w-4 mr-1.5" /> Attach file
-              </Button>
-              {file && (
-                <span className="flex items-center gap-1 text-xs text-muted-foreground min-w-0">
-                  <span className="truncate max-w-[200px]">{file.name}</span>
-                  <button onClick={() => { setFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}>
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </span>
-              )}
-              <div className="flex-1" />
-              <Button size="sm" onClick={postUpdate} disabled={posting || (!note.trim() && !file)}>
-                {posting ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Send className="h-4 w-4 mr-1.5" />}
-                Post update
-              </Button>
-            </div>
-          </div>
-
-          {/* Updates feed */}
-          {updates.length > 0 && (
-            <div className="space-y-4 pt-2 border-t border-border">
-              {updates.map((u) => (
-                <div key={u.id} className="flex items-start gap-3 text-sm">
-                  <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2 shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-                      <span>
-                        {new Date(u.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
-                      </span>
-                      {u.percent_at_time != null && <Badge variant="outline" className="text-[10px] px-1.5 py-0">{u.percent_at_time}%</Badge>}
-                    </div>
-                    {u.note && <p className="mt-0.5 whitespace-pre-wrap">{u.note}</p>}
-                    {u.signedUrl && (
-                      isImage(u.attachment_name) ? (
-                        <a href={u.signedUrl} target="_blank" rel="noreferrer" className="block mt-2">
-                          <img src={u.signedUrl} alt={u.attachment_name || "attachment"} className="max-h-40 rounded-md border border-border" />
-                        </a>
-                      ) : (
-                        <a
-                          href={u.signedUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1.5 mt-1 text-primary hover:underline text-xs"
-                        >
-                          <Paperclip className="h-3.5 w-3.5" /> {u.attachment_name || "Attachment"}
-                        </a>
-                      )
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }
