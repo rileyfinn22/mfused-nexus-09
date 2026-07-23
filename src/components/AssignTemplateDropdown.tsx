@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -42,6 +42,11 @@ export function AssignTemplateDropdown({
   const [templates, setTemplates] = useState<ProductTemplate[]>([]);
   const [loading, setLoading] = useState(false);
   const [templatesLoaded, setTemplatesLoaded] = useState(false);
+
+  useEffect(() => {
+    setTemplates([]);
+    setTemplatesLoaded(false);
+  }, [companyId]);
 
   const fetchTemplates = async () => {
     if (templatesLoaded || loading) return;
