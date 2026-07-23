@@ -1714,13 +1714,10 @@ const Artwork = () => {
                     <div className="col-span-1">
                       {/* Priority: artwork thumbnail > PDF thumbnail > product image > package icon */}
                       {skuArtworkThumbnails[product.item_id || ''] ? (
-                        <img 
+                        <SignedImage 
                           src={skuArtworkThumbnails[product.item_id || '']!} 
                           alt={product.name} 
                           className="w-10 h-10 rounded object-cover"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = 'none';
-                          }}
                         />
                       ) : skuPdfArtworkUrls[product.item_id || ''] ? (
                         <PdfThumbnail 
@@ -1730,7 +1727,7 @@ const Artwork = () => {
                           maxWidth={80}
                         />
                       ) : product.image_url ? (
-                        <img src={product.image_url} alt={product.name} className="w-10 h-10 rounded object-cover" />
+                        <SignedImage src={product.image_url} alt={product.name} className="w-10 h-10 rounded object-cover" />
                       ) : (
                         <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
                           <Package className="h-5 w-5 text-muted-foreground/50" />
