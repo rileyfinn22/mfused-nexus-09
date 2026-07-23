@@ -116,27 +116,31 @@ const Artwork = () => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [artworkFiles, setArtworkFiles] = useState<ArtworkFile[]>([]);
   const backfilledPreviewIdsRef = useRef<Set<string>>(new Set());
+  const backfillQueueRef = useRef<ArtworkFile[]>([]);
+  const backfillActiveRef = useRef(0);
 
   // Lazy backfill: for any PDF artwork missing a usable preview_url,
   // generate a PNG preview once and persist it. Runs at most 2 concurrent.
+  // NOTE: intentionally does NOT cancel on artworkFiles change — updating
+  // artworkFiles mid-run would otherwise abort every in-flight worker and
+  // restart from scratch, so nothing ever completed on larger pages.
   useEffect(() => {
-    const needsBackfill = artworkFiles.filter(
-      (f) =>
-        /\.pdf$/i.test(f.filename) &&
-        !isUsableArtworkPreviewUrl(f.filename, f.preview_url) &&
-        !backfilledPreviewIdsRef.current.has(f.id),
-    );
-    if (needsBackfill.length === 0) return;
-
-    let cancelled = false;
     const CONCURRENCY = 2;
-    let idx = 0;
+
+    for (const f of artworkFiles) {
+      if (!/\.pdf$/i.test(f.filename)) continue;
+      if (isUsableArtworkPreviewUrl(f.filename, f.preview_url)) continue;
+      if (backfilledPreviewIdsRef.current.has(f.id)) continue;
+      backfilledPreviewIdsRef.current.add(f.id);
+      backfillQueueRef.current.push(f);
+    }
 
     const runNext = async (): Promise<void> => {
-      if (cancelled) return;
-      const file = needsBackfill[idx++];
-      if (!file) return;
-      backfilledPreviewIdsRef.current.add(file.id);
+      const file = backfillQueueRef.current.shift();
+      if (!file) {
+        backfillActiveRef.current = Math.max(0, backfillActiveRef.current - 1);
+        return;
+      }
       try {
         const previewUrl = await createFlatArtworkPreviewFromArtwork({
           artworkUrl: file.artwork_url,
@@ -144,12 +148,11 @@ const Artwork = () => {
           sku: file.sku,
           contextLabel: file.filename,
         });
-        if (cancelled) return;
         const { error } = await supabase
           .from("artwork_files")
           .update({ preview_url: previewUrl })
           .eq("id", file.id);
-        if (!error && !cancelled) {
+        if (!error) {
           setArtworkFiles((prev) =>
             prev.map((f) => (f.id === file.id ? { ...f, preview_url: previewUrl } : f)),
           );
@@ -160,12 +163,15 @@ const Artwork = () => {
       return runNext();
     };
 
-    const workers = Array.from({ length: Math.min(CONCURRENCY, needsBackfill.length) }, runNext);
-    Promise.all(workers).catch(() => {});
-    return () => {
-      cancelled = true;
-    };
+    while (
+      backfillActiveRef.current < CONCURRENCY &&
+      backfillQueueRef.current.length > 0
+    ) {
+      backfillActiveRef.current += 1;
+      runNext();
+    }
   }, [artworkFiles]);
+
   const [productArtworkLoading, setProductArtworkLoading] = useState(false);
   const [rejectedFiles, setRejectedFiles] = useState<any[]>([]);
   const selectedProductIdRef = useRef<string | null>(null);
