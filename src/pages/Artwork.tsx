@@ -1142,22 +1142,10 @@ const Artwork = () => {
                     const thumbnail = getArtworkThumbnail(file);
                     if (thumbnail.type === 'image' && thumbnail.src) {
                       return (
-                        <img 
+                        <SignedImage 
                           src={thumbnail.src} 
                           alt={file.sku}
                           className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                          onError={(e) => {
-                            // If image fails to load, show placeholder instead
-                            const target = e.target as HTMLImageElement;
-                            target.style.display = 'none';
-                            const parent = target.parentElement;
-                            if (parent && !parent.querySelector('.fallback-placeholder')) {
-                              const placeholder = document.createElement('div');
-                              placeholder.className = 'fallback-placeholder w-full h-full flex flex-col items-center justify-center bg-muted/50';
-                              placeholder.innerHTML = '<span class="text-xs text-muted-foreground">Image unavailable</span>';
-                              parent.appendChild(placeholder);
-                            }
-                          }}
                         />
                       );
                     } else if (thumbnail.type === 'pdf') {
@@ -1657,13 +1645,10 @@ const Artwork = () => {
                   <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative">
                     {/* Priority: artwork thumbnail > PDF thumbnail > product image > package icon */}
                     {skuArtworkThumbnails[product.item_id || ''] ? (
-                      <img 
+                      <SignedImage 
                         src={skuArtworkThumbnails[product.item_id || '']!} 
                         alt={product.name} 
                         className="w-full h-full object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none';
-                        }}
                       />
                     ) : skuPdfArtworkUrls[product.item_id || ''] ? (
                       <PdfThumbnail 
@@ -1672,7 +1657,7 @@ const Artwork = () => {
                         className="w-full h-full object-cover"
                       />
                     ) : product.image_url ? (
-                      <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                      <SignedImage src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
                     ) : (
                       <Package className="h-16 w-16 text-muted-foreground/30" />
                     )}
@@ -1729,13 +1714,10 @@ const Artwork = () => {
                     <div className="col-span-1">
                       {/* Priority: artwork thumbnail > PDF thumbnail > product image > package icon */}
                       {skuArtworkThumbnails[product.item_id || ''] ? (
-                        <img 
+                        <SignedImage 
                           src={skuArtworkThumbnails[product.item_id || '']!} 
                           alt={product.name} 
                           className="w-10 h-10 rounded object-cover"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = 'none';
-                          }}
                         />
                       ) : skuPdfArtworkUrls[product.item_id || ''] ? (
                         <PdfThumbnail 
@@ -1745,7 +1727,7 @@ const Artwork = () => {
                           maxWidth={80}
                         />
                       ) : product.image_url ? (
-                        <img src={product.image_url} alt={product.name} className="w-10 h-10 rounded object-cover" />
+                        <SignedImage src={product.image_url} alt={product.name} className="w-10 h-10 rounded object-cover" />
                       ) : (
                         <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
                           <Package className="h-5 w-5 text-muted-foreground/50" />
@@ -1944,7 +1926,7 @@ const Artwork = () => {
                         className="w-full h-full object-cover"
                       />
                     ) : product.image_url ? (
-                      <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                      <SignedImage src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
                     ) : (
                       <Package className="h-16 w-16 text-muted-foreground/30" />
                     )}
@@ -1991,7 +1973,7 @@ const Artwork = () => {
             >
               <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative overflow-hidden">
                 {templateThumbnail ? (
-                  <img src={templateThumbnail} alt={template.name} className="w-full h-full object-cover" />
+                  <SignedImage src={templateThumbnail} alt={template.name} className="w-full h-full object-cover" />
                 ) : (
                   <Package className="h-16 w-16 text-muted-foreground/30" />
                 )}
