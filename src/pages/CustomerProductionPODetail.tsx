@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, ArrowLeft, Package, Paperclip } from "lucide-react";
+import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { cn } from "@/lib/utils";
 
 interface SheetRow {
@@ -50,13 +51,14 @@ export default function CustomerProductionPODetail() {
   const [percent, setPercent] = useState(0);
   const [updates, setUpdates] = useState<Update[]>([]);
   const [loading, setLoading] = useState(true);
+  const { activeCompanyId } = useActiveCompany();
 
   useEffect(() => {
-    if (!poId) return;
+    if (!poId || !activeCompanyId) return;
     (async () => {
       try {
         const [{ data: sheet }, { data: detail, error }] = await Promise.all([
-          (supabase as any).rpc("customer_production_sheet"),
+          (supabase as any).rpc("customer_production_sheet", { p_company_id: activeCompanyId }),
           (supabase as any).rpc("customer_po_production_detail", { p_po_id: poId }),
         ]);
         if (error || detail?.success === false) throw new Error(error?.message || detail?.error || "Not available");
@@ -88,7 +90,7 @@ export default function CustomerProductionPODetail() {
         setLoading(false);
       }
     })();
-  }, [poId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [poId, activeCompanyId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
     return (

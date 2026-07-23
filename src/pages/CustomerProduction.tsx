@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Loader2, Search, Factory } from "lucide-react";
 import OrdersSheet, { type SheetPo } from "@/components/vendor/OrdersSheet";
+import { useActiveCompany } from "@/hooks/useActiveCompany";
 
 /** Customer-safe production row from customer_production_sheet(). */
 interface Row {
@@ -36,11 +37,16 @@ export default function CustomerProduction() {
   const [search, setSearch] = useState("");
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { activeCompanyId } = useActiveCompany();
 
   useEffect(() => {
+    if (!activeCompanyId) return;
     (async () => {
+      setLoading(true);
       try {
-        const { data, error } = await (supabase as any).rpc("customer_production_sheet");
+        const { data, error } = await (supabase as any).rpc("customer_production_sheet", {
+          p_company_id: activeCompanyId,
+        });
         if (error) throw error;
         setRows((data || []) as Row[]);
       } catch (error: any) {
@@ -50,7 +56,7 @@ export default function CustomerProduction() {
         setLoading(false);
       }
     })();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeCompanyId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const q = search.trim().toLowerCase();
   const filtered = useMemo(
