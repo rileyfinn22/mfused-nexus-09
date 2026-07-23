@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -41,12 +41,16 @@ export function AssignTemplateDropdown({
 }: AssignTemplateDropdownProps) {
   const [templates, setTemplates] = useState<ProductTemplate[]>([]);
   const [loading, setLoading] = useState(false);
+  const [templatesLoaded, setTemplatesLoaded] = useState(false);
 
   useEffect(() => {
-    fetchTemplates();
+    setTemplates([]);
+    setTemplatesLoaded(false);
   }, [companyId]);
 
   const fetchTemplates = async () => {
+    if (templatesLoaded || loading) return;
+    setLoading(true);
     try {
       let query = supabase
         .from("product_templates")
@@ -75,8 +79,11 @@ export function AssignTemplateDropdown({
       }
 
       setTemplates((data || []).map(t => ({ ...t, cost: costMap[t.id] ?? null })));
+      setTemplatesLoaded(true);
     } catch (error) {
       console.error("Error fetching templates:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -122,7 +129,7 @@ export function AssignTemplateDropdown({
     <HoverCard openDelay={200} closeDelay={100}>
       <DropdownMenu>
         <HoverCardTrigger asChild>
-          <DropdownMenuTrigger asChild>
+          <DropdownMenuTrigger asChild onClick={fetchTemplates}>
             <Button
               variant="ghost"
               size="icon"
@@ -182,7 +189,11 @@ export function AssignTemplateDropdown({
               <DropdownMenuSeparator />
             </>
           )}
-          {templates.length === 0 ? (
+          {loading && !templatesLoaded ? (
+            <div className="px-2 py-3 text-sm text-muted-foreground text-center">
+              Loading templates...
+            </div>
+          ) : templates.length === 0 ? (
             <div className="px-2 py-3 text-sm text-muted-foreground text-center">
               No templates available
             </div>

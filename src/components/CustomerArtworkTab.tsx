@@ -553,14 +553,10 @@ export function CustomerArtworkTab({
                     const thumbnail = getArtworkThumbnail(file);
                     if (thumbnail.type === 'image' && thumbnail.src) {
                       return (
-                        <img 
-                          src={thumbnail.src} 
+                        <SignedImage
+                          src={thumbnail.src}
                           alt={file.sku}
                           className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.style.display = 'none';
-                          }}
                         />
                       );
                     } else if (thumbnail.type === 'pdf') {
@@ -798,7 +794,7 @@ export function CustomerArtworkTab({
                 >
                   <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative">
                     {product.image_url ? (
-                      <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                      <SignedImage src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
                     ) : (
                       <Package className="h-16 w-16 text-muted-foreground/30" />
                     )}
@@ -848,7 +844,7 @@ export function CustomerArtworkTab({
                   >
                     <div className="col-span-1">
                       {product.image_url ? (
-                        <img src={product.image_url} alt={product.name} className="w-10 h-10 rounded object-cover" />
+                        <SignedImage src={product.image_url} alt={product.name} className="w-10 h-10 rounded object-cover" />
                       ) : (
                         <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
                           <Package className="h-5 w-5 text-muted-foreground/50" />
@@ -983,7 +979,7 @@ export function CustomerArtworkTab({
             >
               <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative overflow-hidden">
                 {templateThumbnail ? (
-                  <img src={templateThumbnail} alt={template.name} className="w-full h-full object-cover" />
+                  <SignedImage src={templateThumbnail} alt={template.name} className="w-full h-full object-cover" />
                 ) : (
                   <Package className="h-16 w-16 text-muted-foreground/30" />
                 )}

@@ -10,6 +10,7 @@ interface Company {
 interface CompanyContextType {
   companies: Company[];
   activeCompany: Company | null;
+  currentUserId: string | null;
   setActiveCompany: (company: Company) => void;
   loading: boolean;
   isMultiCompany: boolean;
@@ -29,6 +30,7 @@ const ACTIVE_COMPANY_KEY = "activeCompanyId";
 export function CompanyProvider({ children }: { children: ReactNode }) {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [activeCompany, setActiveCompanyState] = useState<Company | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [hasFinanceRole, setHasFinanceRole] = useState(false);
   const [hasVibeAdminRole, setHasVibeAdminRole] = useState(false);
@@ -46,35 +48,40 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   ];
 
   useEffect(() => {
-    loadCompanies();
+    supabase.auth.getSession().then(({ data }) => {
+      loadCompanies(data.session?.user?.id ?? null);
+    });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "INITIAL_SESSION" || event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
-        loadCompanies();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_IN") {
+        loadCompanies(session?.user?.id ?? null);
       } else if (event === "SIGNED_OUT") {
+        setCurrentUserId(null);
         setCompanies([]);
         setActiveCompanyState(null);
         setHasFinanceRole(false);
         setHasVibeAdminRole(false);
         setHasForwarderRole(false);
-      setHasVendorRole(false);
+        setHasVendorRole(false);
         localStorage.removeItem(ACTIVE_COMPANY_KEY);
+        setLoading(false);
       }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  const loadCompanies = async () => {
+  const loadCompanies = async (userId: string | null) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      setCurrentUserId(userId);
+
+      if (!userId) {
         setCompanies([]);
         setActiveCompanyState(null);
         setHasFinanceRole(false);
         setHasVibeAdminRole(false);
         setHasForwarderRole(false);
-      setHasVendorRole(false);
+        setHasVendorRole(false);
         setLoading(false);
         return;
       }
@@ -90,7 +97,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
             name
           )
         `)
-        .eq("user_id", user.id);
+        .eq("user_id", userId);
 
       if (error) {
         console.error("Error fetching user companies:", error);
@@ -99,7 +106,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         setHasFinanceRole(false);
         setHasVibeAdminRole(false);
         setHasForwarderRole(false);
-      setHasVendorRole(false);
+        setHasVendorRole(false);
         setLoading(false);
         return;
       }
@@ -177,6 +184,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       value={{
         companies,
         activeCompany,
+        currentUserId,
         setActiveCompany,
         loading,
         isMultiCompany: companies.length > 1,
@@ -202,6 +210,7 @@ export function useCompany() {
     return {
       companies: [],
       activeCompany: null,
+      currentUserId: null,
       setActiveCompany: () => {},
       loading: true,
       isMultiCompany: false,

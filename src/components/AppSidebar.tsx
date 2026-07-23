@@ -89,7 +89,7 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const location = useLocation();
   const currentPath = location.pathname;
-  const { activeCompany, hasFinanceRole, hasVibeAdminRole, isFinancePortalUser, isForwarderPortalUser } = useCompany();
+  const { activeCompany, currentUserId, hasFinanceRole, hasVibeAdminRole, isFinancePortalUser, isForwarderPortalUser } = useCompany();
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [isVendor, setIsVendor] = useState(false);
   const [isFinance, setIsFinance] = useState(false);
@@ -100,24 +100,15 @@ export function AppSidebar() {
     checkRole();
   }, [activeCompany]);
 
-  // Track unread chat messages using last_seen_at
-  const [currentUserIdSidebar, setCurrentUserIdSidebar] = useState<string | null>(null);
-
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (data.user) setCurrentUserIdSidebar(data.user.id);
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!currentUserIdSidebar) return;
+    if (!currentUserId) return;
     let cancelled = false;
 
     const fetchUnread = async () => {
       const { data: memberships } = await supabase
         .from('chat_channel_members')
         .select('channel_id, last_seen_at')
-        .eq('user_id', currentUserIdSidebar);
+        .eq('user_id', currentUserId);
 
       if (!memberships || memberships.length === 0) { if (!cancelled) setUnreadChatCount(0); return; }
 
@@ -128,7 +119,7 @@ export function AppSidebar() {
           .from('chat_messages')
           .select('*', { count: 'exact', head: true })
           .eq('channel_id', m.channel_id)
-          .neq('user_id', currentUserIdSidebar)
+          .neq('user_id', currentUserId)
           .gt('created_at', lastSeen);
         total += count || 0;
       }
@@ -142,14 +133,14 @@ export function AppSidebar() {
       .channel('sidebar-chat-unread')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, (payload) => {
         const msg = payload.new as any;
-        if (msg.user_id !== currentUserIdSidebar) {
+        if (msg.user_id !== currentUserId) {
           setUnreadChatCount(prev => prev + 1);
         }
       })
       .subscribe();
 
     return () => { cancelled = true; supabase.removeChannel(channel); };
-  }, [currentUserIdSidebar]);
+  }, [currentUserId]);
 
   // When on chat page, zero out; when leaving, refetch accurate count
   const [wasOnChat, setWasOnChat] = useState(false);
@@ -159,12 +150,12 @@ export function AppSidebar() {
       setUnreadChatCount(0);
     } else if (wasOnChat) {
       setWasOnChat(false);
-      if (!currentUserIdSidebar) return;
+      if (!currentUserId) return;
       const refetch = async () => {
         const { data: memberships } = await supabase
           .from('chat_channel_members')
           .select('channel_id, last_seen_at')
-          .eq('user_id', currentUserIdSidebar);
+          .eq('user_id', currentUserId);
         if (!memberships) return;
         let total = 0;
         for (const m of memberships) {
@@ -173,7 +164,7 @@ export function AppSidebar() {
             .from('chat_messages')
             .select('*', { count: 'exact', head: true })
             .eq('channel_id', m.channel_id)
-            .neq('user_id', currentUserIdSidebar)
+            .neq('user_id', currentUserId)
             .gt('created_at', lastSeen);
           total += count || 0;
         }
@@ -181,7 +172,7 @@ export function AppSidebar() {
       };
       refetch();
     }
-  }, [currentPath]);
+  }, [currentPath, currentUserId, wasOnChat]);
 
   const checkRole = async () => {
     if (isForwarderPortalUser) {
@@ -217,19 +208,10 @@ export function AppSidebar() {
       return;
     }
 
-    // Fallback to fetching from DB
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id);
-      const roles = (data || []).map((row: any) => row.role as string);
-      setIsVibeAdmin(roles.includes('vibe_admin'));
-      setIsVendor(roles.includes('vendor'));
-      setIsFinance(roles.includes('finance') && !roles.includes('vibe_admin'));
-      setIsForwarder(roles.includes('forwarder') && !roles.includes('vibe_admin'));
-    }
+    setIsVibeAdmin(false);
+    setIsVendor(false);
+    setIsFinance(false);
+    setIsForwarder(false);
   };
 
   const navigationItems = isForwarder

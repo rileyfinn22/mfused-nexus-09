@@ -45,9 +45,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { AddProductDialog } from "@/components/AddProductDialog";
 import { AnalyzePOProductsDialog } from "@/components/AnalyzePOProductsDialog";
 import { QuickAddProductsDialog } from "@/components/QuickAddProductsDialog";
-import { ProductTemplateGrid } from "@/components/ProductTemplateGrid";
 import { TemplateProductsView } from "@/components/TemplateProductsView";
 import { AssignTemplateDropdown } from "@/components/AssignTemplateDropdown";
+import SignedImage from "@/components/SignedImage";
 import { useToast } from "@/hooks/use-toast";
 import { isLegacyGeneratedTemplateMockupUrl, isUsableArtworkPreviewUrl } from "@/lib/artworkPreview";
 import { cn } from "@/lib/utils";
@@ -153,8 +153,7 @@ const Products = () => {
   useEffect(() => {
     fetchProducts();
     fetchTemplates();
-    fetchArtworkStatus();
-    fetchArtworkThumbnails();
+    fetchArtworkMetadata();
     if (isVibeAdmin) {
       fetchCompanies();
     }
@@ -178,7 +177,7 @@ const Products = () => {
     try {
       let query = supabase
         .from('products')
-        .select('*, product_states(*)')
+        .select('*')
         .order('created_at', { ascending: false })
         .limit(50000);
 
@@ -242,19 +241,6 @@ const Products = () => {
         template_id: product.template_id,
       }));
 
-
-      const productsToUpdate = productsWithStates.filter(p => !p.item_id);
-      if (productsToUpdate.length > 0) {
-        for (const product of productsToUpdate) {
-          const tempSKU = `VB-${Math.floor(10000 + Math.random() * 90000)}`;
-          await supabase
-            .from('products')
-            .update({ item_id: tempSKU })
-            .eq('id', product.id);
-          product.item_id = tempSKU;
-        }
-      }
-      
       setProducts(productsWithStates);
     } catch (error) {
       console.error('Error fetching products:', error);
@@ -328,28 +314,7 @@ const Products = () => {
     }
   };
 
-  const fetchArtworkStatus = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('artwork_files')
-        .select('sku, is_approved')
-        .limit(50000);
-
-      if (error) throw error;
-
-      const statusMap: Record<string, boolean> = {};
-      data?.forEach(artwork => {
-        if (!statusMap[artwork.sku] || artwork.is_approved) {
-          statusMap[artwork.sku] = artwork.is_approved;
-        }
-      });
-      setArtworkStatus(statusMap);
-    } catch (error) {
-      console.error('Error fetching artwork status:', error);
-    }
-  };
-
-  const fetchArtworkThumbnails = async () => {
+  const fetchArtworkMetadata = async () => {
     try {
       const { data, error } = await supabase
         .from('artwork_files')
@@ -360,8 +325,13 @@ const Products = () => {
 
       if (error) throw error;
 
+      const statusMap: Record<string, boolean> = {};
       const thumbnailMap: Record<string, string> = {};
       data?.forEach((artwork) => {
+        if (!statusMap[artwork.sku] || artwork.is_approved) {
+          statusMap[artwork.sku] = artwork.is_approved;
+        }
+
         if (thumbnailMap[artwork.sku]) return;
 
         if (isUsableArtworkPreviewUrl(artwork.filename, artwork.preview_url)) {
@@ -373,9 +343,10 @@ const Products = () => {
           thumbnailMap[artwork.sku] = artwork.artwork_url;
         }
       });
+      setArtworkStatus(statusMap);
       setArtworkThumbnails(thumbnailMap);
     } catch (error) {
-      console.error('Error fetching artwork thumbnails:', error);
+      console.error('Error fetching artwork metadata:', error);
     }
   };
 
@@ -967,7 +938,7 @@ const Products = () => {
                   {/* Template Image/Icon Area */}
                   <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative overflow-hidden">
                     {getTemplateDisplayThumbnail(template) ? (
-                      <img
+                      <SignedImage
                         src={getTemplateDisplayThumbnail(template) || undefined}
                         alt={template.name}
                         className="w-full h-full object-cover"
@@ -997,9 +968,9 @@ const Products = () => {
                   {/* Product Image/Icon Area */}
                   <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative overflow-hidden">
                     {product.sku && artworkThumbnails[product.sku] ? (
-                      <img src={artworkThumbnails[product.sku]} alt={product.name} className="w-full h-full object-cover" />
+                      <SignedImage src={artworkThumbnails[product.sku]} alt={product.name} className="w-full h-full object-cover" />
                     ) : product.image_url ? (
-                      <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                      <SignedImage src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
                     ) : (
                       <Package className="h-16 w-16 text-muted-foreground/30" />
                     )}
@@ -1144,14 +1115,14 @@ const Products = () => {
                       <div className="col-span-1" onClick={(e) => e.stopPropagation()}>
                         {/* Priority: 1. Artwork thumbnail, 2. Product image_url, 3. Package icon */}
                         {product.sku && artworkThumbnails[product.sku] ? (
-                          <img 
+                          <SignedImage
                             src={artworkThumbnails[product.sku]} 
                             alt={product.name}
                             className="w-10 h-10 object-cover rounded-md border border-border cursor-pointer hover:opacity-80 transition-opacity"
                             onClick={() => navigate(`/artwork?search=${encodeURIComponent(product.sku)}`)}
                           />
                         ) : product.image_url ? (
-                          <img 
+                          <SignedImage
                             src={product.image_url} 
                             alt={product.name}
                             className="w-10 h-10 object-cover rounded-md border border-border cursor-pointer hover:opacity-80 transition-opacity"
