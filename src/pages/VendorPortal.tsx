@@ -86,7 +86,11 @@ export default function VendorPortal() {
       }
     } catch (error: any) {
       console.error("Error loading vendor POs:", error);
-      toast({ title: "Error", description: "Failed to load your purchase orders", variant: "destructive" });
+      toast({
+        title: "Failed to load your purchase orders",
+        description: error?.message || error?.hint || String(error) || "Unknown error",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
