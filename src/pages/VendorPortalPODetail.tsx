@@ -40,6 +40,7 @@ const DOC_KINDS = [
   { kind: "packing_list", label: "Packing List", hint: "The packing list for this shipment" },
   { kind: "proof", label: "Order Proofs", hint: "Proofs for the order (photos or PDFs)" },
   { kind: "shipped_qty_sheet", label: "Shipped Qty Sheet", hint: "Sheet of quantities shipped per SKU" },
+  { kind: "final_invoice", label: "Final Invoice", hint: "Your final invoice for this PO" },
 ] as const;
 
 interface PoDetail {
@@ -457,7 +458,7 @@ export default function VendorPortalPODetail() {
               if (docInputRef.current) docInputRef.current.value = "";
             }}
           />
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {DOC_KINDS.map((dk) => {
               const docs = docsOfKind(dk.kind);
               return (
