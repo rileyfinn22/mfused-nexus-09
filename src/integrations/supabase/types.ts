@@ -4267,6 +4267,7 @@ export type Database = {
       vendor_po_sheet_info: {
         Args: { p_po_ids: string[] }
         Returns: {
+          company_name: string
           cpo: string
           invoice_numbers: string[]
           order_description: string
