@@ -3683,6 +3683,7 @@ export type Database = {
           created_at: string
           customer_company_id: string | null
           delay_reason: string | null
+          delivery_date: string | null
           description: string | null
           expected_delivery_date: string | null
           expense_category: string | null
@@ -3729,6 +3730,7 @@ export type Database = {
           created_at?: string
           customer_company_id?: string | null
           delay_reason?: string | null
+          delivery_date?: string | null
           description?: string | null
           expected_delivery_date?: string | null
           expense_category?: string | null
@@ -3775,6 +3777,7 @@ export type Database = {
           created_at?: string
           customer_company_id?: string | null
           delay_reason?: string | null
+          delivery_date?: string | null
           description?: string | null
           expected_delivery_date?: string | null
           expense_category?: string | null
@@ -4282,6 +4285,7 @@ export type Database = {
       vendor_update_po_details: {
         Args: {
           p_completion_date?: string
+          p_delivery_date?: string
           p_notes?: string
           p_po_id: string
           p_production_percent?: number
