@@ -52,8 +52,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   }, [isVendorPortalUser, companyLoading, navigate]);
 
   useEffect(() => {
-    checkAuth();
-    
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event) => {
         if (event === 'SIGNED_OUT') {
@@ -65,30 +63,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const checkAuth = async () => {
-    try {
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Auth check timeout')), 5000)
-      );
-      
-      const authPromise = supabase.auth.getUser();
-      const { data: { user } } = await Promise.race([authPromise, timeoutPromise]) as any;
-      
-      if (!user) {
-        navigate('/login');
-        return;
-      }
-    } catch (error) {
-      console.error('Auth check error:', error);
-      if (error instanceof Error && error.message === 'Auth check timeout') {
-        console.error('Auth check timed out - showing default state');
-      } else {
+  useEffect(() => {
+    if (!companyLoading) {
+      if (!activeCompany && !isFinancePortalUser && !isForwarderPortalUser && !isVendorPortalUser) {
         navigate('/login');
       }
-    } finally {
       setLoading(false);
     }
-  };
+  }, [companyLoading, activeCompany, isFinancePortalUser, isForwarderPortalUser, isVendorPortalUser, navigate]);
 
   const handleLogout = async () => {
     try {

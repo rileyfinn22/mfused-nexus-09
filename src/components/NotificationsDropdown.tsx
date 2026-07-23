@@ -13,6 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
+import { useCompany } from "@/contexts/CompanyContext";
+import { cn } from "@/lib/utils";
 
 interface Notification {
   id: string;
@@ -28,8 +30,10 @@ export function NotificationsDropdown() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const navigate = useNavigate();
+  const { currentUserId } = useCompany();
 
   useEffect(() => {
+    if (!currentUserId) return;
     loadNotifications();
     
     const channel = supabase
@@ -48,17 +52,16 @@ export function NotificationsDropdown() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [currentUserId]);
 
   const loadNotifications = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!currentUserId) return;
 
       const { data } = await supabase
         .from("notifications")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", currentUserId)
         .order("created_at", { ascending: false })
         .limit(10);
 
@@ -157,8 +160,4 @@ export function NotificationsDropdown() {
       </DropdownMenuContent>
     </DropdownMenu>
   );
-}
-
-function cn(...classes: any[]) {
-  return classes.filter(Boolean).join(" ");
 }

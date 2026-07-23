@@ -115,62 +115,9 @@ const Artwork = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [artworkFiles, setArtworkFiles] = useState<ArtworkFile[]>([]);
-  const backfilledPreviewIdsRef = useRef<Set<string>>(new Set());
-  const backfillQueueRef = useRef<ArtworkFile[]>([]);
-  const backfillActiveRef = useRef(0);
 
-  // Lazy backfill: for any PDF artwork missing a usable preview_url,
-  // generate a PNG preview once and persist it. Runs at most 2 concurrent.
-  // NOTE: intentionally does NOT cancel on artworkFiles change — updating
-  // artworkFiles mid-run would otherwise abort every in-flight worker and
-  // restart from scratch, so nothing ever completed on larger pages.
-  useEffect(() => {
-    const CONCURRENCY = 2;
-
-    for (const f of artworkFiles) {
-      if (!/\.pdf$/i.test(f.filename)) continue;
-      if (isUsableArtworkPreviewUrl(f.filename, f.preview_url)) continue;
-      if (backfilledPreviewIdsRef.current.has(f.id)) continue;
-      backfilledPreviewIdsRef.current.add(f.id);
-      backfillQueueRef.current.push(f);
-    }
-
-    const runNext = async (): Promise<void> => {
-      const file = backfillQueueRef.current.shift();
-      if (!file) {
-        backfillActiveRef.current = Math.max(0, backfillActiveRef.current - 1);
-        return;
-      }
-      try {
-        const previewUrl = await createFlatArtworkPreviewFromArtwork({
-          artworkUrl: file.artwork_url,
-          filename: file.filename,
-          sku: file.sku,
-          contextLabel: file.filename,
-        });
-        const { error } = await supabase
-          .from("artwork_files")
-          .update({ preview_url: previewUrl })
-          .eq("id", file.id);
-        if (!error) {
-          setArtworkFiles((prev) =>
-            prev.map((f) => (f.id === file.id ? { ...f, preview_url: previewUrl } : f)),
-          );
-        }
-      } catch (err) {
-        console.warn("PDF preview backfill failed", file.filename, err);
-      }
-      return runNext();
-    };
-
-    while (
-      backfillActiveRef.current < CONCURRENCY &&
-      backfillQueueRef.current.length > 0
-    ) {
-      backfillActiveRef.current += 1;
-      runNext();
-    }
-  }, [artworkFiles]);
+  // PDF previews are generated at upload time. Do not backfill them on page load:
+  // loading a large artwork grid should not download/rasterize dozens of PDFs.
 
   const [productArtworkLoading, setProductArtworkLoading] = useState(false);
   const [rejectedFiles, setRejectedFiles] = useState<any[]>([]);
