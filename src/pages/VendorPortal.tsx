@@ -16,6 +16,7 @@ interface VendorPoRow {
   po_number: string;
   vendor_invoice_number: string | null;
   completion_date: string | null;
+  delivery_date: string | null;
   sheet_description: string | null;
   sheet_completed_at: string | null;
   order_date: string;
@@ -63,7 +64,7 @@ export default function VendorPortal() {
       const { data, error } = await (supabase as any)
         .from("vendor_pos")
         .select(
-          `id, po_number, vendor_invoice_number, completion_date, sheet_description, sheet_completed_at, order_date, expected_delivery_date, vendor_committed_ship_date,
+          `id, po_number, vendor_invoice_number, completion_date, delivery_date, sheet_description, sheet_completed_at, order_date, expected_delivery_date, vendor_committed_ship_date,
            production_status, is_delayed, delay_reason, description, notes,
            ship_to_name, ship_to_street, ship_to_city, ship_to_state, ship_to_zip,
            tracking_carrier, tracking_number, tracking_url,
@@ -138,6 +139,16 @@ export default function VendorPortal() {
     const ok = await rpc("vendor_update_po_details", {
       p_po_id: po.id,
       p_completion_date: text.trim() === "" ? "" : text,
+    });
+    if (!ok && before) patchRow(po.id, before);
+  };
+
+  const saveDeliveryDate = async (po: SheetPo, text: string) => {
+    const before = pos.find((r) => r.id === po.id);
+    patchRow(po.id, { delivery_date: text.trim() || null });
+    const ok = await rpc("vendor_update_po_details", {
+      p_po_id: po.id,
+      p_delivery_date: text.trim() === "" ? "" : text,
     });
     if (!ok && before) patchRow(po.id, before);
   };
@@ -242,7 +253,8 @@ export default function VendorPortal() {
   const sheetPos: SheetPo[] = filtered.map((r) => ({
     ...r,
     cpo: sheetInfo[r.id]?.cpo || r.orders?.po_number || null,
-    orderDescription: sheetInfo[r.id]?.order_description || r.orders?.description || r.description || null,
+    // No description preset on the vendor side — only what's typed in the sheet shows.
+    orderDescription: null,
     invoiceNumbers: sheetInfo[r.id]?.invoice_numbers || [],
     companyName: r.ship_to_name,
     items: (r.vendor_po_items || []).filter((i) => !i.is_adjustment),
@@ -291,6 +303,7 @@ export default function VendorPortal() {
         onOpenPo={(po) => navigate(`/vendor-portal/${po.id}`)}
         onSaveStatus={saveStatus}
         onSaveShipDate={saveCompletionDate}
+        onSaveDeliveryDate={saveDeliveryDate}
         onSaveTracking={saveTracking}
         onSaveNotes={saveNotes}
         onSaveVendorInvoice={saveVendorInvoice}

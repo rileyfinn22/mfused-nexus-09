@@ -13,6 +13,7 @@ interface Row {
   po_number: string;
   vendor_invoice_number: string | null;
   completion_date: string | null;
+  delivery_date: string | null;
   sheet_description: string | null;
   sheet_completed_at: string | null;
   production_status: string | null;
@@ -59,7 +60,7 @@ export default function VendorStatus() {
       const { data, error } = await (supabase as any)
         .from("vendor_pos")
         .select(
-          `id, po_number, vendor_invoice_number, completion_date, sheet_description, sheet_completed_at, production_status, vendor_committed_ship_date, expected_delivery_date,
+          `id, po_number, vendor_invoice_number, completion_date, delivery_date, sheet_description, sheet_completed_at, production_status, vendor_committed_ship_date, expected_delivery_date,
            is_delayed, delay_reason, production_status_updated_at, order_date, description, notes,
            ship_to_name, ship_to_street, ship_to_city, ship_to_state, ship_to_zip,
            tracking_carrier, tracking_number, tracking_url,
@@ -217,6 +218,7 @@ export default function VendorStatus() {
             ...(parsed && parsed !== "invalid" ? { vendor_committed_ship_date: parsed } : {}),
           });
         }}
+        onSaveDeliveryDate={(po, text) => savePoFields(po, { delivery_date: text.trim() || null })}
         onSaveVendorInvoice={(po, value) => savePoFields(po, { vendor_invoice_number: value.trim() || null })}
         onSaveDescription={(po, value) => savePoFields(po, { sheet_description: value.trim() || null })}
         onToggleComplete={(po, completed) =>

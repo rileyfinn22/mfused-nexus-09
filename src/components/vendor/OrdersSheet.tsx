@@ -25,6 +25,7 @@ export interface SheetPo {
   /** Set = row is marked complete: green, sunk to the Completed section. */
   sheet_completed_at?: string | null;
   vendor_invoice_number?: string | null;
+  delivery_date?: string | null;
   completion_date?: string | null;
   production_status: string | null;
   vendor_committed_ship_date: string | null;
@@ -64,6 +65,7 @@ export interface OrdersSheetProps {
   onSaveStatus?: (po: SheetPo, status: string) => void;
   /** Free-written completion date text, saved exactly as typed. */
   onSaveShipDate?: (po: SheetPo, cellText: string) => void;
+  onSaveDeliveryDate?: (po: SheetPo, cellText: string) => void;
   onSaveVendorInvoice?: (po: SheetPo, value: string) => void;
   onSaveDescription?: (po: SheetPo, value: string) => void;
   onToggleComplete?: (po: SheetPo, completed: boolean) => void;
@@ -209,9 +211,9 @@ const buildCols = (showVendor: boolean, showInvoice: boolean, showCompany: boole
   { id: "po", label: "PO #", width: 70, minWidth: 50 },
   { id: "cpo", label: "CPO", width: 90, minWidth: 60 },
   { id: "item", label: "Description", width: 240, minWidth: 120 },
-  { id: "status", label: "Status", width: 130, minWidth: 80 },
   { id: "shipDate", label: "Completion date", width: 120, minWidth: 80 },
-  { id: "notes", label: "Notes", width: 190, minWidth: 90 },
+  { id: "deliveryDate", label: "Delivery date", width: 120, minWidth: 80 },
+  { id: "statusNotes", label: "Status / Notes", width: 200, minWidth: 100 },
   { id: "tracking", label: "Tracking", width: 160, minWidth: 90 },
   { id: "shipTo", label: "Ship to", width: 180, minWidth: 100 },
   ...(showCompany ? [{ id: "company", label: "Company", width: 130, minWidth: 80 }] : []),
@@ -310,6 +312,7 @@ export default function OrdersSheet({
   onOpenPo,
   onSaveStatus,
   onSaveShipDate,
+  onSaveDeliveryDate,
   onSaveTracking,
   onSaveNotes,
   onSaveShipTo,
@@ -495,14 +498,24 @@ export default function OrdersSheet({
                       onSave={(v) => onSaveDescription?.(po, v)}
                     />
                   );
-                case "status":
+                case "statusNotes": {
+                  // One free-write cell: first line = status, everything after = notes.
+                  const statusText = statusEmpty ? "" : (statusMeta ? statusMeta.label : po.production_status || "");
+                  const notesText = po.notes || "";
+                  const combined = [statusText, notesText].filter(Boolean).join("\n");
                   return (
                     <div className="flex items-start gap-1">
                       <div className="flex-1 min-w-0">
                         <SheetCell
-                          value={statusEmpty ? "" : (statusMeta ? statusMeta.label : po.production_status || "")}
-                          editable={editable && !!onSaveStatus}
-                          onSave={(v) => onSaveStatus?.(po, v)}
+                          value={combined}
+                          editable={editable && (!!onSaveStatus || !!onSaveNotes)}
+                          onSave={(v) => {
+                            const lines = v.split("\n");
+                            const newStatus = (lines[0] || "").trim();
+                            const newNotes = lines.slice(1).join("\n").trim();
+                            if (newStatus !== statusText.trim()) onSaveStatus?.(po, newStatus);
+                            if (newNotes !== notesText.trim()) onSaveNotes?.(po, newNotes);
+                          }}
                         />
                       </div>
                       {po.is_delayed && (
@@ -510,12 +523,21 @@ export default function OrdersSheet({
                       )}
                     </div>
                   );
+                }
                 case "shipDate":
                   return (
                     <SheetCell
                       value={po.completion_date || fmtDate(po.vendor_committed_ship_date)}
                       editable={editable && !!onSaveShipDate}
                       onSave={(v) => onSaveShipDate?.(po, v)}
+                    />
+                  );
+                case "deliveryDate":
+                  return (
+                    <SheetCell
+                      value={po.delivery_date || ""}
+                      editable={editable && !!onSaveDeliveryDate}
+                      onSave={(v) => onSaveDeliveryDate?.(po, v)}
                     />
                   );
                 case "tracking":
@@ -543,15 +565,6 @@ export default function OrdersSheet({
                         </a>
                       )}
                     </div>
-                  );
-                case "notes":
-                  return (
-                    <SheetCell
-                      value={po.notes || ""}
-                      editable={editable && !!onSaveNotes}
-                      placeholder="add note"
-                      onSave={(v) => onSaveNotes?.(po, v)}
-                    />
                   );
                 case "shipTo":
                   return (
