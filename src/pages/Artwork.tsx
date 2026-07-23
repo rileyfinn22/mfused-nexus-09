@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
+import SignedImage from "@/components/SignedImage";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1443,7 +1444,7 @@ const Artwork = () => {
               {selectedFile?.preview_url && (
                 <div>
                   <Label>Current Thumbnail</Label>
-                  <img src={selectedFile.preview_url} alt="Current thumbnail" className="w-full h-48 object-cover rounded border mt-2" />
+                  <SignedImage src={selectedFile.preview_url} alt="Current thumbnail" className="w-full h-48 object-cover rounded border mt-2" />
                 </div>
               )}
               <div>

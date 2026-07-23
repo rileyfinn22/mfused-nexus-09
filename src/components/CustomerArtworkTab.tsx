@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import PdfThumbnail from "@/components/PdfThumbnail";
+import SignedImage from "@/components/SignedImage";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -690,7 +691,7 @@ export function CustomerArtworkTab({
               {selectedFile?.preview_url && (
                 <div>
                   <Label>Current Thumbnail</Label>
-                  <img src={selectedFile.preview_url} alt="Current thumbnail" className="w-full h-48 object-cover rounded border mt-2" />
+                  <SignedImage src={selectedFile.preview_url} alt="Current thumbnail" className="w-full h-48 object-cover rounded border mt-2" />
                 </div>
               )}
               <div>

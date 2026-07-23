@@ -14,6 +14,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import SignedImage from "@/components/SignedImage";
 
 const RejectedArchive = () => {
   const navigate = useNavigate();
@@ -148,7 +149,7 @@ const RejectedArchive = () => {
               {/* Thumbnail Image */}
               <div className="relative w-32 h-32 flex-shrink-0 bg-muted rounded-lg overflow-hidden border">
                 {file.preview_url ? (
-                  <img 
+                  <SignedImage 
                     src={file.preview_url} 
                     alt={file.sku}
                     className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
@@ -158,7 +159,7 @@ const RejectedArchive = () => {
                     }}
                   />
                 ) : file.artwork_url?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
-                  <img 
+                  <SignedImage 
                     src={file.artwork_url} 
                     alt={file.sku}
                     className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
@@ -260,13 +261,13 @@ const RejectedArchive = () => {
           </DialogHeader>
           <div className="overflow-auto max-h-[70vh]">
             {selectedFile?.preview_url ? (
-              <img 
+              <SignedImage 
                 src={selectedFile.preview_url} 
                 alt={selectedFile.filename}
                 className="w-full h-auto"
               />
             ) : selectedFile?.artwork_url?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
-              <img 
+              <SignedImage 
                 src={selectedFile.artwork_url} 
                 alt={selectedFile.filename}
                 className="w-full h-auto"

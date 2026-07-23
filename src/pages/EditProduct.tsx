@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ArrowLeft, FileImage, CheckCircle, Clock, Eye, Upload, Trash2 } from "lucide-react";
 import AddArtworkDialog from "@/components/AddArtworkDialog";
+import SignedImage from "@/components/SignedImage";
 
 const EditProduct = () => {
   const navigate = useNavigate();
@@ -544,7 +545,7 @@ const EditProduct = () => {
                   className="flex items-center gap-3 p-4 border rounded-lg bg-background hover:bg-muted/50 transition-colors"
                 >
                   {artwork.preview_url ? (
-                    <img
+                    <SignedImage
                       src={artwork.preview_url}
                       alt={artwork.filename}
                       className="w-16 h-16 object-cover rounded border"

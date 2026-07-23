@@ -23,6 +23,7 @@ import { CreateCustomVendorPODialog } from "@/components/CreateCustomVendorPODia
 import { CreateShipmentInvoiceDialog } from "@/components/CreateShipmentInvoiceDialog";
 import { ProductionStageTimeline } from "@/components/ProductionStageTimeline";
 import { cn } from "@/lib/utils";
+import SignedImage from "@/components/SignedImage";
 
 import { generateInvoiceNumber } from "@/lib/invoiceUtils";
 import { generateInvoicePDF } from "@/lib/invoicePdfUtils";
@@ -3115,7 +3116,7 @@ const OrderDetail = () => {
                             className="w-full h-full object-cover"
                           />
                         ) : artwork.preview_url ? (
-                          <img 
+                          <SignedImage 
                             src={artwork.preview_url} 
                             alt={artwork.filename} 
                             className="w-full h-full object-cover"
