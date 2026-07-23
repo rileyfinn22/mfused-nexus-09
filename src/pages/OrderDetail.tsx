@@ -23,6 +23,7 @@ import { CreateCustomVendorPODialog } from "@/components/CreateCustomVendorPODia
 import { CreateShipmentInvoiceDialog } from "@/components/CreateShipmentInvoiceDialog";
 import { ProductionStageTimeline } from "@/components/ProductionStageTimeline";
 import { cn } from "@/lib/utils";
+import SignedImage from "@/components/SignedImage";
 
 import { generateInvoiceNumber } from "@/lib/invoiceUtils";
 import { generateInvoicePDF } from "@/lib/invoicePdfUtils";
