@@ -207,13 +207,13 @@ const buildCols = (showVendor: boolean, showInvoice: boolean, showCompany: boole
   ...(showInvoice ? [{ id: "invoice", label: "Vibe Invoice", width: 90, minWidth: 50 }] : []),
   { id: "po", label: "PO #", width: 70, minWidth: 50 },
   { id: "cpo", label: "CPO", width: 90, minWidth: 60 },
+  ...(showCompany ? [{ id: "company", label: "Company", width: 130, minWidth: 80 }] : []),
   { id: "item", label: "Description", width: 240, minWidth: 120 },
   { id: "shipDate", label: "Completion date", width: 120, minWidth: 80 },
   { id: "deliveryDate", label: "Delivery date", width: 120, minWidth: 80 },
   { id: "statusNotes", label: "Status / Notes", width: 200, minWidth: 100 },
   { id: "tracking", label: "Tracking", width: 160, minWidth: 90 },
   { id: "shipTo", label: "Ship to", width: 180, minWidth: 100 },
-  ...(showCompany ? [{ id: "company", label: "Company", width: 130, minWidth: 80 }] : []),
 ];
 
 /* ---------- free-write cell (Excel-style) ----------
