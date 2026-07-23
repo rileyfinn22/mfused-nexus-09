@@ -35,7 +35,7 @@ interface Row {
   vendors: { name: string | null } | null;
   customer_company: { name: string | null } | null;
   vendor_po_items: SheetItem[] | null;
-  orders: { po_number: string | null; description: string | null; invoices: { id: string; invoice_number: string | null; deleted_at: string | null }[] | null } | null;
+  orders: { po_number: string | null; description: string | null; companies: { name: string | null } | null; invoices: { id: string; invoice_number: string | null; deleted_at: string | null }[] | null } | null;
 }
 
 const ALL = "__all__";
@@ -66,7 +66,7 @@ export default function VendorStatus() {
            vendors ( name ),
            customer_company:companies!vendor_pos_customer_company_id_fkey ( name ),
            vendor_po_items ( id, name, description, quantity, final_quantity, shipped_quantity, is_adjustment ),
-           orders ( po_number, description, invoices ( id, invoice_number, deleted_at ) )`
+           orders ( po_number, description, companies ( name ), invoices ( id, invoice_number, deleted_at ) )`
         )
         .neq("po_type", "expense")
         .order("order_date", { ascending: false });
@@ -140,7 +140,8 @@ export default function VendorStatus() {
     cpo: r.orders?.po_number || null,
     orderDescription: r.orders?.description || null,
     vendorName: r.vendors?.name || null,
-    companyName: r.customer_company?.name || null,
+    // The company the connected order belongs to (customer_company as fallback).
+    companyName: r.orders?.companies?.name || r.customer_company?.name || null,
     invoiceNumbers: invoiceNumbers(r),
     items: (r.vendor_po_items || []).filter((i) => !i.is_adjustment),
   }));
