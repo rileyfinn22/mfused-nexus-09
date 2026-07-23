@@ -239,7 +239,8 @@ export default function VendorPortal() {
     // No description preset on the vendor side — only what's typed in the sheet shows.
     orderDescription: null,
     invoiceNumbers: sheetInfo[r.id]?.invoice_numbers || [],
-    companyName: sheetInfo[r.id]?.company_name || r.ship_to_name,
+    // Company column shows the attached company only — never ship-to contact names.
+    companyName: sheetInfo[r.id]?.company_name || null,
     items: (r.vendor_po_items || []).filter((i) => !i.is_adjustment),
   }));
 

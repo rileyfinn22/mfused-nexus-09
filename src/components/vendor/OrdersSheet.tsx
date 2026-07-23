@@ -478,8 +478,8 @@ export default function OrdersSheet({
                   );
                 case "company":
                   return (
-                    <div className="px-1.5 py-1 truncate" title={po.companyName || po.ship_to_name || ""}>
-                      {po.companyName || po.ship_to_name || "—"}
+                    <div className="px-1.5 py-1 truncate" title={po.companyName || ""}>
+                      {po.companyName || "—"}
                     </div>
                   );
                 case "item":
