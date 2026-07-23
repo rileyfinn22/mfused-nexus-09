@@ -70,6 +70,7 @@ interface SheetInfo {
   cpo: string | null;
   order_number: string | null;
   order_description: string | null;
+  company_name: string | null;
   invoice_numbers: string[];
 }
 

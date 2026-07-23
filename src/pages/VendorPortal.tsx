@@ -8,7 +8,7 @@ import OrdersSheet, { parseTracking, parseShipTo, type SheetItem, type SheetPo }
 
 /** CPO / order description / vibe invoice numbers, piped through an
     ownership-checked RPC (vendors can't read orders/invoices directly). */
-type SheetInfo = { po_id: string; cpo: string | null; order_description: string | null; invoice_numbers: string[] };
+type SheetInfo = { po_id: string; cpo: string | null; order_number: string | null; order_description: string | null; company_name: string | null; invoice_numbers: string[] };
 
 interface VendorPoRow {
   id: string;
@@ -239,7 +239,7 @@ export default function VendorPortal() {
     // No description preset on the vendor side — only what's typed in the sheet shows.
     orderDescription: null,
     invoiceNumbers: sheetInfo[r.id]?.invoice_numbers || [],
-    companyName: r.ship_to_name,
+    companyName: sheetInfo[r.id]?.company_name || r.ship_to_name,
     items: (r.vendor_po_items || []).filter((i) => !i.is_adjustment),
   }));
 
@@ -280,7 +280,6 @@ export default function VendorPortal() {
       <OrdersSheet
         pos={sheetPos}
         showInvoice
-        showCompany={false}
         editable
         storageKey="vendor-portal-sheet"
         onOpenPo={(po) => navigate(`/vendor-portal/${po.id}`)}
