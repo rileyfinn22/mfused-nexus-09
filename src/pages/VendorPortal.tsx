@@ -4,7 +4,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Loader2, Search } from "lucide-react";
-import { normalizeVendorPoStatusInput } from "@/lib/vendorPoStatus";
 import OrdersSheet, { parseTracking, parseShipTo, type SheetItem, type SheetPo } from "@/components/vendor/OrdersSheet";
 
 /** CPO / order description / vibe invoice numbers, piped through an
@@ -114,21 +113,6 @@ export default function VendorPortal() {
       return false;
     }
     return true;
-  };
-
-  const saveStatus = async (po: SheetPo, text: string) => {
-    const status = normalizeVendorPoStatusInput(text); // "" clears
-    const before = pos.find((r) => r.id === po.id);
-    patchRow(po.id, { production_status: status || null });
-    const ok = await rpc("vendor_update_po_status", {
-      p_po_id: po.id,
-      p_status: status,
-      p_committed_ship_date: null,
-      p_is_delayed: po.is_delayed,
-      p_delay_reason: po.delay_reason,
-      p_note: null,
-    });
-    if (!ok && before) patchRow(po.id, before);
   };
 
   const saveCompletionDate = async (po: SheetPo, text: string) => {
@@ -300,7 +284,6 @@ export default function VendorPortal() {
         editable
         storageKey="vendor-portal-sheet"
         onOpenPo={(po) => navigate(`/vendor-portal/${po.id}`)}
-        onSaveStatus={saveStatus}
         onSaveShipDate={saveCompletionDate}
         onSaveDeliveryDate={saveDeliveryDate}
         onSaveTracking={saveTracking}

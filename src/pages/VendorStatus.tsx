@@ -5,7 +5,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Search, Factory } from "lucide-react";
-import { normalizeVendorPoStatusInput } from "@/lib/vendorPoStatus";
 import OrdersSheet, { parseTracking, parseShipTo, parseDateInput, type SheetItem, type SheetPo } from "@/components/vendor/OrdersSheet";
 
 interface Row {
@@ -204,12 +203,6 @@ export default function VendorStatus() {
         editable
         storageKey="vendor-status-sheet"
         onOpenPo={(po) => navigate(`/vendor-pos/${po.id}`)}
-        onSaveStatus={(po, text) =>
-          savePoFields(po, {
-            production_status: normalizeVendorPoStatusInput(text) || null,
-            production_status_updated_at: new Date().toISOString(),
-          })
-        }
         onSaveShipDate={(po, text) => {
           // Save exactly what was typed; quietly sync the real date column when it parses.
           const parsed = parseDateInput(text);

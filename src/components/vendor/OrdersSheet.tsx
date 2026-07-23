@@ -1,7 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { AlertCircle, Check, ChevronRight, ExternalLink } from "lucide-react";
 import { parseISO } from "date-fns";
-import { matchVendorPoStatus } from "@/lib/vendorPoStatus";
 import { cn } from "@/lib/utils";
 
 export interface SheetItem {
@@ -61,8 +60,6 @@ export interface OrdersSheetProps {
   /** localStorage key prefix for persisted column widths. */
   storageKey?: string;
   onOpenPo?: (po: SheetPo) => void;
-  /** Free-text status, exactly as typed (pages may normalize to canonical values). */
-  onSaveStatus?: (po: SheetPo, status: string) => void;
   /** Free-written completion date text, saved exactly as typed. */
   onSaveShipDate?: (po: SheetPo, cellText: string) => void;
   onSaveDeliveryDate?: (po: SheetPo, cellText: string) => void;
@@ -314,7 +311,6 @@ export default function OrdersSheet({
   editable = false,
   storageKey = "orders-sheet",
   onOpenPo,
-  onSaveStatus,
   onSaveShipDate,
   onSaveDeliveryDate,
   onSaveTracking,
@@ -423,9 +419,6 @@ export default function OrdersSheet({
           )}
           {rowsToRender.map((po) => {
             const isCompleted = !!po.sheet_completed_at;
-            const statusMeta = matchVendorPoStatus(po.production_status || "");
-            // Plain text only — no badges. "Not started" reads as an empty cell.
-            const statusEmpty = !po.production_status || statusMeta?.value === "not_started";
             const url = po.tracking_url || trackingUrl(po.tracking_carrier || "", po.tracking_number || "");
 
             const cell = (id: string): React.ReactNode => {
@@ -501,24 +494,15 @@ export default function OrdersSheet({
                       onSave={(v) => onSaveDescription?.(po, v)}
                     />
                   );
-                case "statusNotes": {
-                  // One free-write cell: first line = status, everything after = notes.
-                  const statusText = statusEmpty ? "" : (statusMeta ? statusMeta.label : po.production_status || "");
-                  const notesText = po.notes || "";
-                  const combined = [statusText, notesText].filter(Boolean).join("\n");
+                case "statusNotes":
+                  // Pure free-write space — bound to notes only, nothing else feeds in.
                   return (
                     <div className="flex items-start gap-1">
                       <div className="flex-1 min-w-0">
                         <SheetCell
-                          value={combined}
-                          editable={editable && (!!onSaveStatus || !!onSaveNotes)}
-                          onSave={(v) => {
-                            const lines = v.split("\n");
-                            const newStatus = (lines[0] || "").trim();
-                            const newNotes = lines.slice(1).join("\n").trim();
-                            if (newStatus !== statusText.trim()) onSaveStatus?.(po, newStatus);
-                            if (newNotes !== notesText.trim()) onSaveNotes?.(po, newNotes);
-                          }}
+                          value={po.notes || ""}
+                          editable={editable && !!onSaveNotes}
+                          onSave={(v) => onSaveNotes?.(po, v.trim())}
                         />
                       </div>
                       {po.is_delayed && (
@@ -526,7 +510,6 @@ export default function OrdersSheet({
                       )}
                     </div>
                   );
-                }
                 case "shipDate":
                   return (
                     <SheetCell
