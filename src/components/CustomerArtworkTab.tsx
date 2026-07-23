@@ -690,7 +690,7 @@ export function CustomerArtworkTab({
               {selectedFile?.preview_url && (
                 <div>
                   <Label>Current Thumbnail</Label>
-                  <img src={selectedFile.preview_url} alt="Current thumbnail" className="w-full h-48 object-cover rounded border mt-2" />
+                  <SignedImage src={selectedFile.preview_url} alt="Current thumbnail" className="w-full h-48 object-cover rounded border mt-2" />
                 </div>
               )}
               <div>

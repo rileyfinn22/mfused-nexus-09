@@ -15,6 +15,7 @@ import { CompanyEmailsManager } from "@/components/CompanyEmailsManager";
 import { CompanyContactsManager } from "@/components/CompanyContactsManager";
 import { CompanyUsersManager } from "@/components/CompanyUsersManager";
 import { CompanyProductTemplates } from "@/components/CompanyProductTemplates";
+import SignedImage from "@/components/SignedImage";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -2021,7 +2022,7 @@ const CustomerDetail = () => {
                         className="flex items-center gap-3 p-3 border rounded-lg bg-background hover:bg-muted/50 transition-colors"
                       >
                         {artwork.preview_url ? (
-                          <img
+                          <SignedImage
                             src={artwork.preview_url}
                             alt={artwork.filename}
                             className="w-12 h-12 object-cover rounded border"

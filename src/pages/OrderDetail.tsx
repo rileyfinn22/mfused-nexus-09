@@ -3115,7 +3115,7 @@ const OrderDetail = () => {
                             className="w-full h-full object-cover"
                           />
                         ) : artwork.preview_url ? (
-                          <img 
+                          <SignedImage 
                             src={artwork.preview_url} 
                             alt={artwork.filename} 
                             className="w-full h-full object-cover"

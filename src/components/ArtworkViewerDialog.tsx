@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Download, FileImage, FileText, FileCode, CheckCircle, Clock, ExternalLink } from "lucide-react";
 import { useState } from "react";
 import { isUsableArtworkPreviewUrl } from "@/lib/artworkPreview";
+import SignedImage from "@/components/SignedImage";
 
 interface ArtworkFile {
   id: string;
@@ -96,7 +97,7 @@ const ArtworkViewerDialog = ({
         <div className="flex-1 overflow-auto min-h-0">
           {previewUrl ? (
             <div className="flex items-center justify-center bg-muted/30 rounded-lg p-4">
-              <img
+              <SignedImage
                 src={previewUrl}
                 alt={file.filename}
                 className="max-w-full max-h-[60vh] object-contain rounded"
@@ -108,7 +109,7 @@ const ArtworkViewerDialog = ({
             </div>
           ) : fileType === "image" ? (
             <div className="flex items-center justify-center bg-muted/30 rounded-lg p-4">
-              <img
+              <SignedImage
                 src={file.artwork_url}
                 alt={file.filename}
                 className="max-w-full max-h-[60vh] object-contain rounded"

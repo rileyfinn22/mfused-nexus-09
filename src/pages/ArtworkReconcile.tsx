@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import SignedImage from "@/components/SignedImage";
 
 interface Orphan {
   id: string;
@@ -216,7 +217,7 @@ export default function ArtworkReconcile() {
                   <Checkbox checked={!!checked[o.id]} onCheckedChange={(v) => setChecked(c => ({ ...c, [o.id]: !!v }))} />
                   <div className="w-16 h-16 bg-muted rounded overflow-hidden flex items-center justify-center">
                     {o.preview_url ? (
-                      <img src={o.preview_url} alt="" className="w-full h-full object-contain" />
+                      <SignedImage src={o.preview_url} alt="" className="w-full h-full object-contain" />
                     ) : (
                       <span className="text-xs text-muted-foreground">No img</span>
                     )}
