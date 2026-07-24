@@ -1124,6 +1124,15 @@ Thank you for your business.`;
     );
   }
 
+  // Subtotal must match the per-line amounts shown in the table:
+  // when final qty/cost are in play, the line total is final_quantity * final_unit_cost.
+  const displayedItemsTotal = poItems.reduce((sum, item) => {
+    const useFinal = po.final_total && item.final_quantity != null && item.final_unit_cost != null;
+    return sum + (useFinal
+      ? Number(item.final_quantity) * Number(item.final_unit_cost)
+      : Number(item.total || 0));
+  }, 0);
+
   return (
     <div className="max-w-7xl mx-auto">
       {/* Header */}
@@ -1725,7 +1734,7 @@ Thank you for your business.`;
               <div className="w-72 space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Subtotal</span>
-                  <span className="font-medium">${poItems.reduce((sum, item) => sum + Number(item.total), 0).toFixed(2)}</span>
+                  <span className="font-medium">${displayedItemsTotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Shipping</span>
@@ -1745,7 +1754,7 @@ Thank you for your business.`;
                 <div className="flex justify-between items-center pt-3 border-t">
                   <span className="text-sm font-semibold">Total</span>
                   <span className="text-2xl font-bold">
-                    ${(poItems.reduce((sum, item) => sum + Number(item.total), 0) + Number(isEditMode ? (editedPO.shipping_cost || 0) : (po.shipping_cost || 0))).toFixed(2)}
+                    ${(displayedItemsTotal + Number(isEditMode ? (editedPO.shipping_cost || 0) : (po.shipping_cost || 0))).toFixed(2)}
                   </span>
                 </div>
               </div>
