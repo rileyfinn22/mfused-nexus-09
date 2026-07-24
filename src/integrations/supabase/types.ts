@@ -4123,6 +4123,14 @@ export type Database = {
         Args: { _object_name: string; _user_id: string }
         Returns: boolean
       }
+      can_access_print_file: {
+        Args: { _object_name: string; _user_id: string }
+        Returns: boolean
+      }
+      can_access_production_image: {
+        Args: { _object_name: string; _user_id: string }
+        Returns: boolean
+      }
       can_view_child_order: {
         Args: { _order_id: string; _user_id: string }
         Returns: boolean
