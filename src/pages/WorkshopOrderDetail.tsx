@@ -398,7 +398,10 @@ export default function WorkshopOrderDetail() {
                           <Download className="h-3.5 w-3.5" />
                         </Button>
                         {item.print_file_url && (
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Open stored file" onClick={() => window.open(item.print_file_url, "_blank")}>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Open stored file" onClick={async () => {
+                            const signed = await getSignedArtworkUrl(item.print_file_url);
+                            window.open(signed || item.print_file_url, "_blank");
+                          }}>
                             <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
                           </Button>
                         )}
