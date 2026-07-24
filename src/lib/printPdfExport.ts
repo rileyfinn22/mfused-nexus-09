@@ -41,9 +41,15 @@ interface ExportOptions {
  * Fetch the original PDF from storage and return as ArrayBuffer.
  */
 async function fetchSourcePdf(path: string): Promise<ArrayBuffer> {
-  const { data } = supabase.storage.from("print-files").getPublicUrl(path);
-  const cacheBustedUrl = `${data.publicUrl}${data.publicUrl.includes("?") ? "&" : "?"}v=${encodeURIComponent(path)}-${Date.now()}`;
-  const resp = await fetch(cacheBustedUrl, { cache: "no-store" });
+  // print-files bucket is private — sign the URL instead of using the public URL.
+  const { data, error } = await supabase.storage.from("print-files").createSignedUrl(path, 3600);
+  if (error || !data?.signedUrl) {
+    // Fallback: try direct download via the storage client (uses auth headers).
+    const { data: blobData, error: dlErr } = await supabase.storage.from("print-files").download(path);
+    if (dlErr || !blobData) throw new Error(`Failed to fetch source PDF: ${error?.message || dlErr?.message || "unknown"}`);
+    return blobData.arrayBuffer();
+  }
+  const resp = await fetch(data.signedUrl, { cache: "no-store" });
   if (!resp.ok) throw new Error(`Failed to fetch source PDF: ${resp.statusText}`);
   return resp.arrayBuffer();
 }

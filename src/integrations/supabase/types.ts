@@ -4127,6 +4127,34 @@ export type Database = {
         Args: { _order_id: string; _user_id: string }
         Returns: boolean
       }
+      customer_po_production_detail: {
+        Args: { p_po_id: string }
+        Returns: Json
+      }
+      customer_production_sheet: {
+        Args: { p_company_id: string }
+        Returns: {
+          completion_date: string
+          cpo: string
+          delivery_date: string
+          description: string
+          invoice_numbers: string[]
+          notes: string
+          order_date: string
+          order_number: string
+          po_id: string
+          production_percent: number
+          sheet_completed_at: string
+          ship_to_city: string
+          ship_to_name: string
+          ship_to_state: string
+          ship_to_street: string
+          ship_to_zip: string
+          tracking_carrier: string
+          tracking_number: string
+          tracking_url: string
+        }[]
+      }
       delete_shipment_leg_public: {
         Args: { p_leg_id: string; p_token: string }
         Returns: Json

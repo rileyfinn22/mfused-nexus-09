@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { getSignedArtworkUrl } from "@/lib/signedArtworkUrl";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -397,7 +398,10 @@ export default function WorkshopOrderDetail() {
                           <Download className="h-3.5 w-3.5" />
                         </Button>
                         {item.print_file_url && (
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Open stored file" onClick={() => window.open(item.print_file_url, "_blank")}>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Open stored file" onClick={async () => {
+                            const signed = await getSignedArtworkUrl(item.print_file_url);
+                            window.open(signed || item.print_file_url, "_blank");
+                          }}>
                             <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
                           </Button>
                         )}
@@ -622,10 +626,11 @@ function CustomerOrderView({
   const downloadLineItemPdf = async (item: any) => {
     setGeneratingFileId(item.id);
     try {
-      // Try stored file first
+      // Try stored file first (sign it — print-files bucket is private)
       if (item.print_file_url) {
+        const signed = await getSignedArtworkUrl(item.print_file_url);
         const a = document.createElement("a");
-        a.href = item.print_file_url;
+        a.href = signed || item.print_file_url;
         a.download = `${(item.template_name || "print_file").replace(/\s+/g, "_")}_print_ready.pdf`;
         a.target = "_blank";
         document.body.appendChild(a);
@@ -654,7 +659,8 @@ function CustomerOrderView({
     setGeneratingFileId(item.id);
     try {
       if (item.print_file_url) {
-        window.open(item.print_file_url, "_blank");
+        const signed = await getSignedArtworkUrl(item.print_file_url);
+        window.open(signed || item.print_file_url, "_blank");
         return;
       }
       const blob = await buildLineItemPdf(item);
