@@ -1124,6 +1124,15 @@ Thank you for your business.`;
     );
   }
 
+  // Subtotal must match the per-line amounts shown in the table:
+  // when final qty/cost are in play, the line total is final_quantity * final_unit_cost.
+  const displayedItemsTotal = poItems.reduce((sum, item) => {
+    const useFinal = po.final_total && item.final_quantity != null && item.final_unit_cost != null;
+    return sum + (useFinal
+      ? Number(item.final_quantity) * Number(item.final_unit_cost)
+      : Number(item.total || 0));
+  }, 0);
+
   return (
     <div className="max-w-7xl mx-auto">
       {/* Header */}
