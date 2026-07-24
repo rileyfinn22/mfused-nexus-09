@@ -103,11 +103,11 @@ export default function VendorStatus() {
     () => [...new Set(rows.map((r) => r.vendors?.name?.trim() || "Unknown vendor"))].sort((a, b) => a.localeCompare(b)),
     [rows]
   );
+  // Must match the sheet's Company column exactly, or the filter lists/matches
+  // names the column never shows.
+  const companyOf = (r: Row) => r.orders?.companies?.name?.trim() || r.customer_company?.name?.trim() || "";
   const companyNames = useMemo(
-    () =>
-      [...new Set(rows.map((r) => r.customer_company?.name?.trim() || r.ship_to_name?.trim() || "").filter(Boolean))].sort(
-        (a, b) => a.localeCompare(b)
-      ),
+    () => [...new Set(rows.map(companyOf).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
     [rows]
   );
 
@@ -118,7 +118,7 @@ export default function VendorStatus() {
 
   const scoped = rows
     .filter((r) => vendorFilter === ALL || (r.vendors?.name?.trim() || "Unknown vendor") === vendorFilter)
-    .filter((r) => companyFilter === ALL || (r.customer_company?.name?.trim() || r.ship_to_name?.trim() || "") === companyFilter);
+    .filter((r) => companyFilter === ALL || companyOf(r) === companyFilter);
 
   const q = search.trim().toLowerCase();
   const filtered = scoped
@@ -128,7 +128,8 @@ export default function VendorStatus() {
         r.po_number.toLowerCase().includes(q) ||
         (r.orders?.po_number || "").toLowerCase().includes(q) ||
         (r.vendors?.name || "").toLowerCase().includes(q) ||
-        (r.customer_company?.name || r.ship_to_name || "").toLowerCase().includes(q) ||
+        companyOf(r).toLowerCase().includes(q) ||
+        (r.ship_to_name || "").toLowerCase().includes(q) ||
         (r.tracking_number || "").toLowerCase().includes(q) ||
         invoiceNumbers(r).some((n) => n.toLowerCase().includes(q)) ||
         (r.vendor_po_items || []).some((i) => (i.name || "").toLowerCase().includes(q))
