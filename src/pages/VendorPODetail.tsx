@@ -1725,7 +1725,7 @@ Thank you for your business.`;
               <div className="w-72 space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Subtotal</span>
-                  <span className="font-medium">${poItems.reduce((sum, item) => sum + Number(item.total), 0).toFixed(2)}</span>
+                  <span className="font-medium">${displayedItemsTotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Shipping</span>
@@ -1745,7 +1745,7 @@ Thank you for your business.`;
                 <div className="flex justify-between items-center pt-3 border-t">
                   <span className="text-sm font-semibold">Total</span>
                   <span className="text-2xl font-bold">
-                    ${(poItems.reduce((sum, item) => sum + Number(item.total), 0) + Number(isEditMode ? (editedPO.shipping_cost || 0) : (po.shipping_cost || 0))).toFixed(2)}
+                    ${(displayedItemsTotal + Number(isEditMode ? (editedPO.shipping_cost || 0) : (po.shipping_cost || 0))).toFixed(2)}
                   </span>
                 </div>
               </div>
