@@ -626,10 +626,11 @@ function CustomerOrderView({
   const downloadLineItemPdf = async (item: any) => {
     setGeneratingFileId(item.id);
     try {
-      // Try stored file first
+      // Try stored file first (sign it — print-files bucket is private)
       if (item.print_file_url) {
+        const signed = await getSignedArtworkUrl(item.print_file_url);
         const a = document.createElement("a");
-        a.href = item.print_file_url;
+        a.href = signed || item.print_file_url;
         a.download = `${(item.template_name || "print_file").replace(/\s+/g, "_")}_print_ready.pdf`;
         a.target = "_blank";
         document.body.appendChild(a);
