@@ -659,7 +659,8 @@ function CustomerOrderView({
     setGeneratingFileId(item.id);
     try {
       if (item.print_file_url) {
-        window.open(item.print_file_url, "_blank");
+        const signed = await getSignedArtworkUrl(item.print_file_url);
+        window.open(signed || item.print_file_url, "_blank");
         return;
       }
       const blob = await buildLineItemPdf(item);
