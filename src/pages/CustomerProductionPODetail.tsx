@@ -3,7 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, ArrowLeft, Package } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, ArrowLeft, Package, Paperclip } from "lucide-react";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { cn } from "@/lib/utils";
 
@@ -26,9 +27,23 @@ interface SheetRow {
   invoice_numbers: string[];
 }
 
-/** Customer production detail: order info + progress percent only. Vendor
- *  notes, attachments, and shipment documents are vibe-admin-only; customer
- *  packing lists and art files live on the invoice page. */
+interface Update {
+  id: string;
+  kind: string;
+  note: string | null;
+  attachment_name: string | null;
+  attachment_url: string | null;
+  percent_at_time: number | null;
+  created_at: string;
+  signedUrl?: string;
+}
+
+const isImage = (name: string | null) => !!name && /\.(png|jpe?g|gif|webp)$/i.test(name);
+
+/** Customer production detail: order info, progress percent, and updates the
+ *  vibe-admin team posted for them (the RPC filters to vibe_admin-authored
+ *  notes only). Vendor notes, attachments, and shipment documents never
+ *  surface; customer packing lists and art files live on the invoice page. */
 export default function CustomerProductionPODetail() {
   const { poId } = useParams();
   const navigate = useNavigate();
@@ -36,6 +51,7 @@ export default function CustomerProductionPODetail() {
 
   const [row, setRow] = useState<SheetRow | null>(null);
   const [percent, setPercent] = useState(0);
+  const [updates, setUpdates] = useState<Update[]>([]);
   const [loading, setLoading] = useState(true);
   const { activeCompanyId } = useActiveCompany();
 
@@ -51,6 +67,23 @@ export default function CustomerProductionPODetail() {
 
         setRow(((sheet || []) as SheetRow[]).find((r) => r.po_id === poId) || null);
         setPercent(detail?.production_percent ?? 0);
+
+        // Sign attachment links (admin-authored only; requires the
+        // 20260727170001 storage policy to resolve).
+        const rows = (detail?.updates || []) as Update[];
+        const paths = rows.filter((u) => u.attachment_url).map((u) => u.attachment_url as string);
+        if (paths.length > 0) {
+          const { data: signed } = await (supabase as any).storage
+            .from("po-documents")
+            .createSignedUrls(paths, 60 * 60);
+          const byPath = new Map<string, string>(
+            (signed || []).filter((s: any) => s.signedUrl).map((s: any) => [s.path, s.signedUrl])
+          );
+          rows.forEach((u) => {
+            if (u.attachment_url) u.signedUrl = byPath.get(u.attachment_url);
+          });
+        }
+        setUpdates(rows);
       } catch (error: any) {
         console.error("Error loading production detail:", error);
         toast({ title: "Failed to load", description: error?.message || "Try again", variant: "destructive" });
@@ -132,12 +165,12 @@ export default function CustomerProductionPODetail() {
         )}
       </Card>
 
-      {/* Production progress */}
+      {/* Production progress + updates from the Vibe team */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Production progress</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-5">
           <div className="flex items-center gap-4">
             <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
               <div
@@ -149,6 +182,45 @@ export default function CustomerProductionPODetail() {
               {percent}%
             </div>
           </div>
+
+          {updates.length > 0 ? (
+            <div className="space-y-4 pt-2 border-t border-border">
+              {updates.map((u) => (
+                <div key={u.id} className="flex items-start gap-3 text-sm">
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                      <span>
+                        {new Date(u.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                      </span>
+                      {u.percent_at_time != null && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">{u.percent_at_time}%</Badge>
+                      )}
+                    </div>
+                    {u.note && <p className="mt-0.5 whitespace-pre-wrap">{u.note}</p>}
+                    {u.signedUrl && (
+                      isImage(u.attachment_name) ? (
+                        <a href={u.signedUrl} target="_blank" rel="noreferrer" className="block mt-2">
+                          <img src={u.signedUrl} alt={u.attachment_name || "attachment"} className="max-h-40 rounded-md border border-border" />
+                        </a>
+                      ) : (
+                        <a
+                          href={u.signedUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 mt-1 text-primary hover:underline text-xs"
+                        >
+                          <Paperclip className="h-3.5 w-3.5" /> {u.attachment_name || "Attachment"}
+                        </a>
+                      )
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No production updates yet.</p>
+          )}
         </CardContent>
       </Card>
     </div>
