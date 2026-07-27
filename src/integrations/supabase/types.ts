@@ -4146,6 +4146,7 @@ export type Database = {
           cpo: string
           delivery_date: string
           description: string
+          invoice_ids: string[]
           invoice_numbers: string[]
           notes: string
           order_date: string
