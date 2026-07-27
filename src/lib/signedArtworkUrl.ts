@@ -5,7 +5,7 @@ const PRIVATE_BUCKETS = ["artwork", "print-files", "product-images", "production
 const SIGN_TTL_SECONDS = 3600;
 const CACHE_TTL_MS = (SIGN_TTL_SECONDS - 300) * 1000; // refresh 5 min before expiry
 const SESSION_KEY = "signed-artwork-url-cache-v1";
-const SIGN_BATCH_SIZE = 50;
+const SIGN_BATCH_SIZE = 20;
 
 type CacheEntry = { url: string; expires: number };
 const cache = new Map<string, CacheEntry>();
@@ -123,24 +123,25 @@ async function flush(bucket: string) {
   const uniquePaths = Array.from(new Set(items.map((i) => i.path)));
 
   try {
-    const bySource = new Map<string, string>();
     for (let from = 0; from < uniquePaths.length; from += SIGN_BATCH_SIZE) {
       const batch = uniquePaths.slice(from, from + SIGN_BATCH_SIZE);
       const signedBatch = await signPathsResiliently(bucket, batch);
-      signedBatch.forEach((signedUrl, path) => bySource.set(path, signedUrl));
+      const now = Date.now();
+
+      for (const item of items) {
+        if (!batch.includes(item.path)) continue;
+
+        const signed = signedBatch.get(item.path);
+        if (signed) {
+          cache.set(item.originalUrl, { url: signed, expires: now + CACHE_TTL_MS });
+          item.resolve(signed);
+        } else {
+          item.resolve(item.originalUrl); // best-effort fallback
+        }
+        inflight.delete(item.originalUrl);
+      }
     }
 
-    const now = Date.now();
-    for (const item of items) {
-      const signed = bySource.get(item.path);
-      if (signed) {
-        cache.set(item.originalUrl, { url: signed, expires: now + CACHE_TTL_MS });
-        item.resolve(signed);
-      } else {
-        item.resolve(item.originalUrl); // best-effort fallback
-      }
-      inflight.delete(item.originalUrl);
-    }
     persist();
   } catch {
     for (const item of items) {
