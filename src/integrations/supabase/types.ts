@@ -3593,6 +3593,7 @@ export type Database = {
           kind: string
           note: string | null
           percent_at_time: number | null
+          published_at: string | null
           vendor_po_id: string
         }
         Insert: {
@@ -3604,6 +3605,7 @@ export type Database = {
           kind?: string
           note?: string | null
           percent_at_time?: number | null
+          published_at?: string | null
           vendor_po_id: string
         }
         Update: {
@@ -3615,6 +3617,7 @@ export type Database = {
           kind?: string
           note?: string | null
           percent_at_time?: number | null
+          published_at?: string | null
           vendor_po_id?: string
         }
         Relationships: [
