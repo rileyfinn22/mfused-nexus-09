@@ -35,7 +35,7 @@ interface Row {
   vendors: { name: string | null } | null;
   customer_company: { name: string | null } | null;
   vendor_po_items: SheetItem[] | null;
-  orders: { po_number: string | null; description: string | null; companies: { name: string | null } | null; invoices: { id: string; invoice_number: string | null; deleted_at: string | null }[] | null } | null;
+  orders: { po_number: string | null; description: string | null; companies: { name: string | null } | null; invoices: { id: string; invoice_number: string | null; customer_po_number: string | null; deleted_at: string | null }[] | null } | null;
 }
 
 const ALL = "__all__";
@@ -66,7 +66,7 @@ export default function VendorStatus() {
            vendors ( name ),
            customer_company:companies!vendor_pos_customer_company_id_fkey ( name ),
            vendor_po_items ( id, name, description, quantity, final_quantity, shipped_quantity, is_adjustment ),
-           orders ( po_number, description, companies ( name ), invoices ( id, invoice_number, deleted_at ) )`
+           orders ( po_number, description, companies ( name ), invoices ( id, invoice_number, customer_po_number, deleted_at ) )`
         )
         .neq("po_type", "expense")
         .order("order_date", { ascending: false });
@@ -106,6 +106,11 @@ export default function VendorStatus() {
   // Must match the sheet's Company column exactly, or the filter lists/matches
   // names the column never shows.
   const companyOf = (r: Row) => r.orders?.companies?.name?.trim() || r.customer_company?.name?.trim() || "";
+  // CPO often lives on the invoice rather than the order — same fallback as the RPCs.
+  const cpoOf = (r: Row) =>
+    r.orders?.po_number?.trim() ||
+    (r.orders?.invoices || []).find((i) => !i.deleted_at && i.customer_po_number?.trim())?.customer_po_number?.trim() ||
+    null;
   const companyNames = useMemo(
     () => [...new Set(rows.map(companyOf).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
     [rows]
@@ -126,7 +131,7 @@ export default function VendorStatus() {
       (r) =>
         !q ||
         r.po_number.toLowerCase().includes(q) ||
-        (r.orders?.po_number || "").toLowerCase().includes(q) ||
+        (cpoOf(r) || "").toLowerCase().includes(q) ||
         (r.vendors?.name || "").toLowerCase().includes(q) ||
         companyOf(r).toLowerCase().includes(q) ||
         (r.ship_to_name || "").toLowerCase().includes(q) ||
@@ -138,7 +143,7 @@ export default function VendorStatus() {
 
   const sheetPos: SheetPo[] = filtered.map((r) => ({
     ...r,
-    cpo: r.orders?.po_number || null,
+    cpo: cpoOf(r),
     orderDescription: r.orders?.description || null,
     vendorName: r.vendors?.name || null,
     // The company the connected order belongs to (customer_company as fallback).
