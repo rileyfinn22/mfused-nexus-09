@@ -27,6 +27,7 @@ interface Row {
   sheet_completed_at: string | null;
   production_percent: number | null;
   invoice_numbers: string[];
+  invoice_ids: string[];
   order_date: string;
 }
 
@@ -99,6 +100,7 @@ export default function CustomerProduction() {
     tracking_url: r.tracking_url,
     sheet_completed_at: r.sheet_completed_at,
     invoiceNumbers: r.invoice_numbers || [],
+    invoiceIds: r.invoice_ids || [],
     items: [],
   }));
 
@@ -120,7 +122,7 @@ export default function CustomerProduction() {
             <Factory className="h-5 w-5 text-primary" /> Production
           </h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Live production status for your orders — click an invoice for details, progress, and documents.
+            Live production status for your orders — click an invoice for packing lists &amp; art files, or a PO # for progress and updates.
           </p>
         </div>
         <div className="text-xs text-muted-foreground whitespace-nowrap sm:mb-1">
@@ -142,6 +144,7 @@ export default function CustomerProduction() {
         customerView
         storageKey="customer-production-sheet"
         onOpenPo={(po) => navigate(`/production/po/${po.id}`)}
+        onOpenInvoice={(_po, invoiceId) => navigate(`/invoices/${invoiceId}`)}
       />
     </div>
   );

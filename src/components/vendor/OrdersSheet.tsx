@@ -45,6 +45,8 @@ export interface SheetPo {
   vendorName?: string | null;
   companyName?: string | null;
   invoiceNumbers?: string[];
+  /** Aligned 1:1 with invoiceNumbers (customer view links each to its invoice page). */
+  invoiceIds?: string[];
   items: SheetItem[];
 }
 
@@ -62,6 +64,8 @@ export interface OrdersSheetProps {
   /** localStorage key prefix for persisted column widths. */
   storageKey?: string;
   onOpenPo?: (po: SheetPo) => void;
+  /** Customer view: open one specific invoice from the Vibe Invoice cell. */
+  onOpenInvoice?: (po: SheetPo, invoiceId: string) => void;
   /** Free-written completion date text, saved exactly as typed. */
   onSaveShipDate?: (po: SheetPo, cellText: string) => void;
   onSaveDeliveryDate?: (po: SheetPo, cellText: string) => void;
@@ -327,6 +331,7 @@ export default function OrdersSheet({
   editable = false,
   storageKey = "orders-sheet",
   onOpenPo,
+  onOpenInvoice,
   onSaveShipDate,
   onSaveDeliveryDate,
   onSaveTracking,
@@ -469,7 +474,26 @@ export default function OrdersSheet({
                 case "vendor":
                   return <div className="px-1.5 py-1 whitespace-pre-wrap break-words">{po.vendorName || "—"}</div>;
                 case "invoice":
-                  return customerView && onOpenPo ? (
+                  // Customer view: each invoice number opens its own invoice page.
+                  return customerView && onOpenInvoice && (po.invoiceIds?.length || 0) > 0 ? (
+                    <div className="px-1.5 py-1 flex flex-col items-start">
+                      {(po.invoiceNumbers || []).map((num, idx) => {
+                        const invId = po.invoiceIds?.[idx];
+                        return invId ? (
+                          <button
+                            key={invId}
+                            className="font-mono text-primary hover:underline text-left"
+                            onClick={() => onOpenInvoice(po, invId)}
+                            title="Open invoice"
+                          >
+                            {num}
+                          </button>
+                        ) : (
+                          <span key={idx} className="font-mono">{num}</span>
+                        );
+                      })}
+                    </div>
+                  ) : customerView && onOpenPo ? (
                     <button
                       className="px-1.5 py-1 font-mono text-primary hover:underline text-left whitespace-pre-wrap break-words"
                       onClick={() => onOpenPo(po)}
@@ -495,7 +519,17 @@ export default function OrdersSheet({
                     <span className="px-1.5 py-1 font-mono font-medium">{po.po_number}</span>
                   );
                 case "cpo":
-                  return (
+                  // Customer view: the invoice cell links to the invoice page, so
+                  // their PO # is the way into the production detail instead.
+                  return customerView && onOpenPo ? (
+                    <button
+                      className="px-1.5 py-1 font-mono text-primary hover:underline text-left truncate max-w-full"
+                      onClick={() => onOpenPo(po)}
+                      title="Open production details"
+                    >
+                      {po.cpo || "Details"}
+                    </button>
+                  ) : (
                     <div className="px-1.5 py-1 font-mono truncate" title={po.cpo || ""}>
                       {po.cpo || "—"}
                     </div>
