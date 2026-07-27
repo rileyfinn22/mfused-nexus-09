@@ -39,9 +39,11 @@ interface Update {
 }
 
 const isImage = (name: string | null) => !!name && /\.(png|jpe?g|gif|webp)$/i.test(name);
-const KIND_LABEL: Record<string, string> = { packing_list: "Packing List", proof: "Proof" };
 
-/** Customer production detail: order info, progress, notes, packing lists + proofs. */
+/** Customer production detail: order info, progress, and the vendor's progress
+ *  notes. Vendor shipment documents (packing lists, proofs, invoices, qty
+ *  sheets) are vibe-admin-only — customer packing lists come from the invoice
+ *  page instead. */
 export default function CustomerProductionPODetail() {
   const { poId } = useParams();
   const navigate = useNavigate();
@@ -107,7 +109,6 @@ export default function CustomerProductionPODetail() {
         [row.ship_to_city, [row.ship_to_state, row.ship_to_zip].filter(Boolean).join(" ")].filter(Boolean).join(", "),
       ].filter(Boolean) as string[])
     : [];
-  const docs = updates.filter((u) => u.kind !== "update" && u.attachment_url);
   const feed = updates.filter((u) => u.kind === "update");
 
   return (
@@ -183,27 +184,6 @@ export default function CustomerProductionPODetail() {
             </div>
           </div>
 
-          {/* Documents: packing lists + proofs */}
-          {docs.length > 0 && (
-            <div className="space-y-1.5 pt-1">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Documents</div>
-              {docs.map((d) => (
-                <div key={d.id} className="flex items-center gap-2 text-sm min-w-0">
-                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 shrink-0">
-                    {KIND_LABEL[d.kind] || d.kind}
-                  </Badge>
-                  {d.signedUrl ? (
-                    <a href={d.signedUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline truncate">
-                      {d.attachment_name || "Attachment"}
-                    </a>
-                  ) : (
-                    <span className="text-muted-foreground truncate">{d.attachment_name || "Attachment"}</span>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
           {/* Notes feed */}
           {feed.length > 0 && (
             <div className="space-y-4 pt-2 border-t border-border">
@@ -242,7 +222,7 @@ export default function CustomerProductionPODetail() {
             </div>
           )}
 
-          {docs.length === 0 && feed.length === 0 && (
+          {feed.length === 0 && (
             <p className="text-sm text-muted-foreground">No production updates yet.</p>
           )}
         </CardContent>
