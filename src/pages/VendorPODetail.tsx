@@ -20,6 +20,7 @@ import { VendorPOPackingListSection } from "@/components/VendorPOPackingListSect
 import { getTrackingUrl, CARRIERS } from "@/lib/trackingUtils";
 import { InlineTrackingEditor } from "@/components/InlineTrackingEditor";
 import { normalizeStorageObjectPath, openStorageObjectInNewTab } from "@/lib/storageUrl";
+import VendorProductionPanel from "@/components/vendor/VendorProductionPanel";
 
 const VendorPODetail = () => {
   const { poId } = useParams();
@@ -45,31 +46,10 @@ const VendorPODetail = () => {
   const [uploadingFile, setUploadingFile] = useState(false);
   const [artworkFiles, setArtworkFiles] = useState<ArtworkFile[]>([]);
   const [loadingArtwork, setLoadingArtwork] = useState(false);
-  const [prodUpdates, setProdUpdates] = useState<any[]>([]);
 
-  // Vendor-reported production updates (posted from the vendor portal).
-  useEffect(() => {
-    if (!poId) return;
-    (async () => {
-      const { data } = await (supabase as any)
-        .from('vendor_po_production_updates')
-        .select('id, kind, note, attachment_url, attachment_name, percent_at_time, created_at')
-        .eq('vendor_po_id', poId)
-        .order('created_at', { ascending: false });
-      const rows = (data || []) as any[];
-      const paths = rows.filter((u) => u.attachment_url).map((u) => u.attachment_url);
-      if (paths.length > 0) {
-        const { data: signed } = await (supabase as any).storage
-          .from('po-documents')
-          .createSignedUrls(paths, 60 * 60);
-        const byPath = new Map<string, string>(
-          (signed || []).filter((s: any) => s.signedUrl).map((s: any) => [s.path, s.signedUrl])
-        );
-        rows.forEach((u) => { if (u.attachment_url) u.signedUrl = byPath.get(u.attachment_url); });
-      }
-      setProdUpdates(rows);
-    })();
-  }, [poId]);
+  // Coming from Vendor Status, lead with exactly what the vendor sees; the
+  // standard admin PO content follows below.
+  const vendorViewFirst = returnTo === '/vendor-status';
 
   useEffect(() => {
     checkAdminStatus();
@@ -1217,6 +1197,13 @@ Thank you for your business.`;
         </div>
       </div>
 
+      {/* From Vendor Status: exactly what the vendor sees, before the admin PO document */}
+      {vendorViewFirst && (
+        <div className="mb-6">
+          <VendorProductionPanel poId={po.id} />
+        </div>
+      )}
+
       {/* PO Details Card */}
       <Card className="shadow-lg">
         <CardContent className="p-0">
@@ -1763,64 +1750,12 @@ Thank you for your business.`;
         </CardContent>
       </Card>
 
-      {/* Vendor production (reported from the vendor portal) */}
-      <Card className="shadow-lg mt-6">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">Vendor Production</h2>
-            <span className="text-2xl font-bold">{po.production_percent || 0}%</span>
-          </div>
-          <div className="h-2 rounded-full bg-muted overflow-hidden mb-5">
-            <div
-              className={(po.production_percent || 0) >= 100 ? "h-full rounded-full bg-success" : "h-full rounded-full bg-primary"}
-              style={{ width: `${Math.min(100, po.production_percent || 0)}%` }}
-            />
-          </div>
-          {prodUpdates.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No production updates from the vendor yet.</p>
-          ) : (
-            <div className="space-y-4">
-              {prodUpdates.map((u) => (
-                <div key={u.id} className="flex items-start gap-3 text-sm">
-                  <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2 shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-                      <span>
-                        {new Date(u.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
-                      </span>
-                      {u.percent_at_time != null && (
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">{u.percent_at_time}%</Badge>
-                      )}
-                      {u.kind && u.kind !== 'update' && (
-                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0 capitalize">
-                          {String(u.kind).replace(/_/g, ' ')}
-                        </Badge>
-                      )}
-                    </div>
-                    {u.note && <p className="mt-0.5 whitespace-pre-wrap">{u.note}</p>}
-                    {u.signedUrl && (
-                      /\.(png|jpe?g|gif|webp)$/i.test(u.attachment_name || "") ? (
-                        <a href={u.signedUrl} target="_blank" rel="noreferrer" className="block mt-2">
-                          <img src={u.signedUrl} alt={u.attachment_name || "attachment"} className="max-h-40 rounded-md border border-border" />
-                        </a>
-                      ) : (
-                        <a
-                          href={u.signedUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1.5 mt-1 text-primary hover:underline text-xs"
-                        >
-                          <Paperclip className="h-3.5 w-3.5" /> {u.attachment_name || "Attachment"}
-                        </a>
-                      )
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Vendor production (same panel the vendor sees) — here unless it already led the page */}
+      {!vendorViewFirst && (
+        <div className="mt-6">
+          <VendorProductionPanel poId={po.id} />
+        </div>
+      )}
 
       {/* Payments Section */}
       {poPayments.length > 0 && (

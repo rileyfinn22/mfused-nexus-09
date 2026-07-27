@@ -204,7 +204,7 @@ export default function VendorStatus() {
         showInvoice
         editable
         storageKey="vendor-status-sheet"
-        onOpenPo={(po) => navigate(`/vendor-pos/${po.id}`)}
+        onOpenPo={(po) => navigate(`/vendor-pos/${po.id}?returnTo=/vendor-status`)}
         onSaveShipDate={(po, text) => {
           // Save exactly what was typed; quietly sync the real date column when it parses.
           const parsed = parseDateInput(text);
