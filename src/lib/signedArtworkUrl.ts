@@ -5,6 +5,7 @@ const PRIVATE_BUCKETS = ["artwork", "print-files", "product-images", "production
 const SIGN_TTL_SECONDS = 3600;
 const CACHE_TTL_MS = (SIGN_TTL_SECONDS - 300) * 1000; // refresh 5 min before expiry
 const SESSION_KEY = "signed-artwork-url-cache-v1";
+const SIGN_BATCH_SIZE = 50;
 
 type CacheEntry = { url: string; expires: number };
 const cache = new Map<string, CacheEntry>();
@@ -65,6 +66,45 @@ const queues = new Map<string, PendingItem[]>();
 const scheduled = new Map<string, boolean>();
 const inflight = new Map<string, Promise<string>>();
 
+async function signPathBatch(bucket: string, paths: string[]): Promise<Map<string, string>> {
+  if (paths.length === 0) return new Map();
+
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .createSignedUrls(paths, SIGN_TTL_SECONDS);
+
+  if (error) {
+    throw error;
+  }
+
+  const signedByPath = new Map<string, string>();
+  for (const entry of data ?? []) {
+    if (entry.path && entry.signedUrl) {
+      signedByPath.set(entry.path, resolveStorageSignedUrl(entry.signedUrl));
+    }
+  }
+
+  return signedByPath;
+}
+
+async function signPathsResiliently(bucket: string, paths: string[]): Promise<Map<string, string>> {
+  try {
+    return await signPathBatch(bucket, paths);
+  } catch {
+    if (paths.length <= 1) {
+      return new Map();
+    }
+
+    const midpoint = Math.ceil(paths.length / 2);
+    const [left, right] = await Promise.all([
+      signPathsResiliently(bucket, paths.slice(0, midpoint)),
+      signPathsResiliently(bucket, paths.slice(midpoint)),
+    ]);
+
+    return new Map([...left, ...right]);
+  }
+}
+
 function scheduleFlush(bucket: string) {
   if (scheduled.get(bucket)) return;
   scheduled.set(bucket, true);
@@ -83,17 +123,11 @@ async function flush(bucket: string) {
   const uniquePaths = Array.from(new Set(items.map((i) => i.path)));
 
   try {
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .createSignedUrls(uniquePaths, SIGN_TTL_SECONDS);
-
     const bySource = new Map<string, string>();
-    if (!error && data) {
-      for (const entry of data) {
-        if (entry.path && entry.signedUrl) {
-          bySource.set(entry.path, resolveStorageSignedUrl(entry.signedUrl));
-        }
-      }
+    for (let from = 0; from < uniquePaths.length; from += SIGN_BATCH_SIZE) {
+      const batch = uniquePaths.slice(from, from + SIGN_BATCH_SIZE);
+      const signedBatch = await signPathsResiliently(bucket, batch);
+      signedBatch.forEach((signedUrl, path) => bySource.set(path, signedUrl));
     }
 
     const now = Date.now();
