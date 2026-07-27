@@ -40,9 +40,9 @@ interface Update {
 
 const isImage = (name: string | null) => !!name && /\.(png|jpe?g|gif|webp)$/i.test(name);
 
-/** Customer production detail: order info, progress percent, and updates the
- *  vibe-admin team posted for them (the RPC filters to vibe_admin-authored
- *  notes only). Vendor notes, attachments, and shipment documents never
+/** Customer production detail: order info, progress percent, and the notes a
+ *  vibe admin PUBLISHED for them (the RPC filters on published_at; author can
+ *  be vendor or admin). Unpublished notes and vendor shipment documents never
  *  surface; customer packing lists and art files live on the invoice page. */
 export default function CustomerProductionPODetail() {
   const { poId } = useParams();
@@ -68,8 +68,8 @@ export default function CustomerProductionPODetail() {
         setRow(((sheet || []) as SheetRow[]).find((r) => r.po_id === poId) || null);
         setPercent(detail?.production_percent ?? 0);
 
-        // Sign attachment links (admin-authored only; requires the
-        // 20260727170001 storage policy to resolve).
+        // Sign attachment links (published notes only; requires the
+        // 20260727180001 storage policy to resolve).
         const rows = (detail?.updates || []) as Update[];
         const paths = rows.filter((u) => u.attachment_url).map((u) => u.attachment_url as string);
         if (paths.length > 0) {

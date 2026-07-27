@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Paperclip, Send, X, Trash2 } from "lucide-react";
+import { Loader2, Paperclip, Send, X, Trash2, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ProductionUpdate {
@@ -17,6 +17,7 @@ interface ProductionUpdate {
   percent_at_time: number | null;
   created_at: string;
   created_by: string | null;
+  published_at: string | null;
   signedUrl?: string;
 }
 
@@ -64,7 +65,7 @@ export default function VendorProductionPanel({ poId }: { poId: string }) {
         (supabase as any).from("vendor_pos").select("production_percent").eq("id", poId).maybeSingle(),
         (supabase as any)
           .from("vendor_po_production_updates")
-          .select("id, kind, note, attachment_url, attachment_name, percent_at_time, created_at, created_by")
+          .select("id, kind, note, attachment_url, attachment_name, percent_at_time, created_at, created_by, published_at")
           .eq("vendor_po_id", poId)
           .order("created_at", { ascending: false }),
         supabase.auth.getUser(),
@@ -178,6 +179,40 @@ export default function VendorProductionPanel({ poId }: { poId: string }) {
   };
 
   const canDelete = (u: ProductionUpdate) => isVibeAdmin || (!!uid && u.created_by === uid);
+
+  // Vibe admin decides which notes customers see (vendor- or admin-authored).
+  const togglePublish = async (u: ProductionUpdate) => {
+    const publish = !u.published_at;
+    const { data, error } = await (supabase as any)
+      .from("vendor_po_production_updates")
+      .update({ published_at: publish ? new Date().toISOString() : null })
+      .eq("id", u.id)
+      .select("id");
+    if (error || !data?.length) {
+      toast({ title: "Couldn't update", description: error?.message || "Not allowed", variant: "destructive" });
+      return;
+    }
+    setUpdates((prev) =>
+      prev.map((row) => (row.id === u.id ? { ...row, published_at: publish ? new Date().toISOString() : null } : row))
+    );
+  };
+
+  const publishButton = (u: ProductionUpdate) =>
+    isVibeAdmin && (
+      <button
+        onClick={() => togglePublish(u)}
+        title={u.published_at ? "Visible to customer — click to unpublish" : "Hidden from customer — click to publish"}
+        className={cn(
+          "inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border shrink-0",
+          u.published_at
+            ? "border-success/40 text-success hover:bg-success/10"
+            : "border-border text-muted-foreground hover:text-foreground hover:bg-muted/40"
+        )}
+      >
+        {u.published_at ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+        {u.published_at ? "Published" : "Publish"}
+      </button>
+    );
 
   const deleteUpdate = async (u: ProductionUpdate) => {
     if (!confirm(`Delete ${u.attachment_name || "this update"}? This can't be undone.`)) return;
@@ -307,6 +342,7 @@ export default function VendorProductionPanel({ poId }: { poId: string }) {
                         {new Date(u.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
                       </span>
                       {u.percent_at_time != null && <Badge variant="outline" className="text-[10px] px-1.5 py-0">{u.percent_at_time}%</Badge>}
+                      {publishButton(u)}
                       {deleteButton(u)}
                     </div>
                     {u.note && <p className="mt-0.5 whitespace-pre-wrap">{u.note}</p>}
