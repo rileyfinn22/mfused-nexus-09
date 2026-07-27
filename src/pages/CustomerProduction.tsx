@@ -60,6 +60,11 @@ export default function CustomerProduction() {
   }, [activeCompanyId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const q = search.trim().toLowerCase();
+  // Newest invoice first; rows with no invoice yet fall back to order date.
+  const invoiceRank = (r: Row) => {
+    const nums = (r.invoice_numbers || []).map((n) => parseInt(n, 10)).filter(Number.isFinite);
+    return nums.length ? Math.max(...nums) : 0;
+  };
   const filtered = useMemo(
     () =>
       rows
@@ -71,8 +76,12 @@ export default function CustomerProduction() {
             (r.tracking_number || "").toLowerCase().includes(q) ||
             (r.invoice_numbers || []).some((n) => n.toLowerCase().includes(q))
         )
-        .sort((a, b) => (b.order_date || "").localeCompare(a.order_date || "")),
-    [rows, q]
+        .sort(
+          (a, b) =>
+            invoiceRank(b) - invoiceRank(a) ||
+            (b.order_date || "").localeCompare(a.order_date || "")
+        ),
+    [rows, q] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const sheetPos: SheetPo[] = filtered.map((r) => ({

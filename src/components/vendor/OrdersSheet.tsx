@@ -627,7 +627,7 @@ export default function OrdersSheet({
             return (
               <Fragment key={po.id}>
                 <tr
-                  className={cn(isCompleted ? "bg-success/10 hover:bg-success/15" : "hover:bg-muted/20")}
+                  className="hover:bg-muted/20"
                   style={{ height: rowHeights[po.id] }}
                 >
                   {cols.map((c, idx) => (
