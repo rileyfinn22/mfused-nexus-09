@@ -34,6 +34,7 @@ import { generateInvoicePDF } from "@/lib/invoicePdfUtils";
 import { EditableDescription } from "@/components/EditableDescription";
 import { InlineTrackingEditor } from "@/components/InlineTrackingEditor";
 import { InvoicePackingListSection } from "@/components/InvoicePackingListSection";
+import InvoiceArtworkSection from "@/components/InvoiceArtworkSection";
 import { calculateInvoiceTotals, blanketTotalItems, partialTotalItems } from "@/lib/invoiceTotals";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { triggerBlobFileDownload } from "@/lib/storageUrl";
@@ -3449,6 +3450,9 @@ const InvoiceDetail = () => {
           onRefresh={fetchInvoiceDetails}
         />
       )}
+
+      {/* Art files for this invoice's products (matched by SKU, like the order page) */}
+      {order && <InvoiceArtworkSection orderItems={order.order_items || []} />}
 
 
       {/* Related Invoices - For child/partial invoices viewing siblings */}
