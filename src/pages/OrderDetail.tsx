@@ -1252,34 +1252,47 @@ const OrderDetail = () => {
               billing_zip: editedOrder.billing_zip,
               po_number: editedOrder.po_number,
               memo: editedOrder.memo,
-              estimated_delivery_date: editedOrder.estimated_delivery_date,
-              subtotal: newSubtotal,
-              total: newTotal
+              estimated_delivery_date: editedOrder.estimated_delivery_date
             })
             .eq('id', orderId);
         })()
       );
 
-      // Update blanket invoice in parallel.
-      // Existing rows use invoice_type='full' (legacy) — match both 'full' and
-      // 'blanket' so edits actually sync. Filter by shipment_number=1 so we
-      // never touch child invoices.
-      phase2Promises.push(
-        (async () => {
-          await supabase
-            .from('invoices')
-            .update({
-              subtotal: newSubtotal,
-              total: newTotal + Number(editedOrder.shipping_cost || 0)
-            })
-            .eq('order_id', orderId)
-            .in('invoice_type', ['full', 'blanket'])
-            .eq('shipment_number', 1)
-            .is('deleted_at', null);
-        })()
-      );
-
       await Promise.all(phase2Promises);
+
+      // PHASE 2.5: authoritative recalc from the DB (after all item writes landed).
+      // This overwrites anything the per-row recalc trigger may have written from a
+      // partial snapshot while the parallel item updates were in flight.
+      const { data: freshItems } = await supabase
+        .from('order_items')
+        .select('quantity, unit_price')
+        .eq('order_id', orderId);
+
+      const newSubtotal = (freshItems || []).reduce(
+        (sum, i: any) => sum + Number(i.quantity || 0) * Number(i.unit_price || 0),
+        0
+      );
+      const newTotal = newSubtotal + Number(editedOrder.tax || 0);
+
+      await supabase
+        .from('orders')
+        .update({ subtotal: newSubtotal, total: newTotal })
+        .eq('id', orderId);
+
+      // Keep the blanket invoice in sync. Existing rows use invoice_type='full'
+      // (legacy) — match both 'full' and 'blanket'. shipment_number=1 so we never
+      // touch child invoices.
+      await supabase
+        .from('invoices')
+        .update({
+          subtotal: newSubtotal,
+          total: newTotal + Number(editedOrder.shipping_cost || 0)
+        })
+        .eq('order_id', orderId)
+        .in('invoice_type', ['full', 'blanket'])
+        .eq('shipment_number', 1)
+        .is('deleted_at', null);
+
 
       // PHASE 3: Recalculate vendor PO totals in parallel
       const affectedPoIds = [...new Set(allVendorPoItems.map(poi => poi.vendor_po_id))];
