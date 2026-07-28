@@ -1183,11 +1183,10 @@ const OrderDetail = () => {
 
       await Promise.all(phase1Promises);
 
-      // Calculate new totals
-      const newSubtotal = editedItems.reduce((sum, item) => 
-        sum + (Number(item.quantity) * Number(item.unit_price)), 0
-      );
-      const newTotal = newSubtotal + Number(editedOrder.tax || 0);
+      // NOTE: totals are NOT computed here. Item writes below run in parallel and
+      // each one fires the DB recalc trigger, which can read a partial snapshot.
+      // We recompute authoritatively from the DB after every item write settles.
+
 
       // PHASE 2: Update all existing items, vendor PO items, order, and invoice in parallel
       const phase2Promises: Promise<any>[] = [];
