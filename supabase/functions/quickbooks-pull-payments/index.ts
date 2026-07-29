@@ -351,21 +351,12 @@ serve(async (req) => {
     const qbPayments = paymentsData.QueryResponse?.Payment || [];
     console.log(`Found ${qbPayments.length} recent payments in QBO`);
 
-    // Get all existing payments with QBO IDs
-    const { data: existingPayments } = await supabase
-      .from('payments')
-      .select('quickbooks_id');
-    
-    const existingQBIds = new Set((existingPayments || []).map(p => p.quickbooks_id).filter(Boolean));
-
     let newPaymentsCount = 0;
     const updatedInvoices = new Set<string>();
 
     for (const qbPayment of qbPayments) {
-      // Skip if we already have this payment
-      if (existingQBIds.has(qbPayment.Id)) continue;
-
-      // Process each line item that links to an invoice
+      // Process EVERY line that links to an invoice: a lump sum can be split
+      // across several invoices, and each split is its own payment row.
       for (const line of qbPayment.Line || []) {
         const linkedInvoice = line.LinkedTxn?.find((txn: any) => txn.TxnType === 'Invoice');
         if (!linkedInvoice) continue;
@@ -373,7 +364,7 @@ serve(async (req) => {
         // Find the invoice in our database
         const { data: invoice } = await supabase
           .from('invoices')
-          .select('id, company_id, total, total_paid, status')
+          .select('id, company_id')
           .eq('quickbooks_id', linkedInvoice.TxnId)
           .maybeSingle();
 
@@ -381,31 +372,20 @@ serve(async (req) => {
 
         const paymentAmount = line.Amount || qbPayment.TotalAmt;
 
-        // Insert the payment (idempotent: unique on quickbooks_id + invoice_id)
-        const { error: insertError } = await supabase
-          .from('payments')
-          .upsert({
-            company_id: invoice.company_id,
-            invoice_id: invoice.id,
-            amount: paymentAmount,
-            payment_date: qbPayment.TxnDate,
-            payment_method: qbPayment.PaymentMethodRef?.name || 'Other',
-            reference_number: qbPayment.PaymentRefNum || null,
-            notes: `Imported from QuickBooks`,
-            quickbooks_id: qbPayment.Id,
-            quickbooks_sync_status: 'synced',
-            quickbooks_synced_at: new Date().toISOString(),
-          }, { onConflict: 'quickbooks_id,invoice_id', ignoreDuplicates: true });
+        const result = await recordQboPayment(supabase, {
+          companyId: invoice.company_id,
+          invoiceId: invoice.id,
+          qbPaymentId: qbPayment.Id,
+          amount: paymentAmount,
+          txnDate: qbPayment.TxnDate,
+          method: qbPayment.PaymentMethodRef?.name || 'Other',
+          refNum: qbPayment.PaymentRefNum || null,
+        });
 
-        if (!insertError) {
+        if (result === 'inserted') {
           newPaymentsCount++;
           updatedInvoices.add(invoice.id);
-          existingQBIds.add(qbPayment.Id);
-          // total_paid / status are recomputed by the payments trigger.
         }
-
-
-        break; // Only process first matching invoice per payment
       }
     }
 
