@@ -605,8 +605,24 @@ const InvoiceDetail = () => {
       ? relatedInvoices.filter((ri: any) => ri.parent_invoice_id === invoiceId).reduce((s: number, ri: any) => s + Number(ri.total_paid || 0), 0)
       : 0;
 
+    // Mirror layout for child shipment invoices drawing down a paid blanket
+    const parentBlanketForPdf = !isBlanket && invoice.parent_invoice_id
+      ? relatedInvoices.find((ri: any) => ri.id === invoice.parent_invoice_id && ri.invoice_type === 'full')
+      : null;
+    const parentPaidForPdf = parentBlanketForPdf ? Number(parentBlanketForPdf.total_paid || 0) : 0;
+    const useMirrorForPdf = !!parentBlanketForPdf && parentPaidForPdf > 0;
+
     const invoiceData = {
       invoice_number: invoice.invoice_number,
+      invoice_date: invoice.invoice_date,
+      due_date: invoice.due_date,
+      total: invoice.total,
+      mirror_subtotal: useMirrorForPdf ? Number(parentBlanketForPdf.subtotal || 0) : null,
+      mirror_shipping: useMirrorForPdf ? Number(parentBlanketForPdf.shipping_cost || 0) : null,
+      deposit_credit: useMirrorForPdf ? parentPaidForPdf : null,
+      deposit_credit_label: useMirrorForPdf
+        ? `Less Deposit Paid (Inv #${parentBlanketForPdf.invoice_number})`
+        : null,
       invoice_date: invoice.invoice_date,
       due_date: invoice.due_date,
       total: invoice.total,
