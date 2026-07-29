@@ -18,6 +18,7 @@ import { format, parseISO } from "date-fns";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { useCompany } from "@/contexts/CompanyContext";
 import CustomerProduction from "./CustomerProduction";
+import VendorStatus from "./VendorStatus";
 import { AddShipmentLegDialog, type LegFormData } from "@/components/AddShipmentLegDialog";
 import { GenerateShipmentLinkDialog } from "@/components/GenerateShipmentLinkDialog";
 import { getTrackingUrl } from "@/lib/trackingUtils";
@@ -506,10 +507,13 @@ export default function Production() {
     (isVibeAdmin && order.companies.name.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  // Customer views use the production sheet grid. Admins keep the monitoring view
-  // here (their all-company grid lives at /vendor-status) and vendors keep theirs
-  // (/vendor-portal).
-  if (roleChecked && !hasVibeAdminRole && !isVendor) {
+  // Everyone gets the production sheet grid on this tab.
+  // Vibe admins see every order/PO across all companies and vendors (with vendor +
+  // company filters); customers see only their own company's rows.
+  if (roleChecked && hasVibeAdminRole) {
+    return <VendorStatus />;
+  }
+  if (roleChecked && !isVendor) {
     return <CustomerProduction />;
   }
 
