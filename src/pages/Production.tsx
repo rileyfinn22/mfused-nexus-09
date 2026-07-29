@@ -506,12 +506,11 @@ export default function Production() {
     (isVibeAdmin && order.companies.name.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  // Customers always get the production sheet grid. Admins get it too whenever a
-  // specific company is in context (matches what they saw before). Vendors keep
-  // the monitoring view. Admins viewing "all companies" keep the monitoring view.
-  const adminCompanyId = selectedCompanyId !== 'all' ? selectedCompanyId : activeCompanyId;
-  if (roleChecked && !isVendor && (!hasVibeAdminRole || !!adminCompanyId)) {
-    return <CustomerProduction companyId={adminCompanyId} />;
+  // Customer views use the production sheet grid. Admins keep the monitoring view
+  // here (their all-company grid lives at /vendor-status) and vendors keep theirs
+  // (/vendor-portal).
+  if (roleChecked && !hasVibeAdminRole && !isVendor) {
+    return <CustomerProduction />;
   }
 
 
