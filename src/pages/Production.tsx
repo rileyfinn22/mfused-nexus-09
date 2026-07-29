@@ -506,11 +506,13 @@ export default function Production() {
     (isVibeAdmin && order.companies.name.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  // Test rollout: Mfused customers get the new production sheet instead of the
-  // legacy tiles while we iterate. Admins keep the legacy monitoring view.
-  if (!hasVibeAdminRole && /^mfused/i.test(activeCompany?.name || "")) {
+  // All customer (non-admin, non-vendor) views use the production sheet grid.
+  // Admins and vendors keep the legacy monitoring view.
+  if (roleChecked && !hasVibeAdminRole && !isVendor) {
     return <CustomerProduction />;
   }
+
+
 
   if (loading) {
     return (
