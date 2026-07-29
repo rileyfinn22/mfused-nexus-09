@@ -304,7 +304,7 @@ const renderInvoiceToDoc = async (
   // Shipping (if applicable)
   if (hasShipping) {
     doc.text('Shipping', totalsX, totalsY);
-    doc.text(formatCurrency(invoice.shipping_cost || 0), totalsX + totalsWidth, totalsY, { align: 'right' });
+    doc.text(formatCurrency(shippingAmount), totalsX + totalsWidth, totalsY, { align: 'right' });
     totalsY += 5;
     if (invoice.shipping_note) {
       doc.setFontSize(7);
@@ -326,7 +326,16 @@ const renderInvoiceToDoc = async (
     totalsY += 8;
     doc.setFont('helvetica', 'normal');
   }
-  
+
+  // Deposit already paid on the parent blanket (mirror layout)
+  if (depositCredit > 0.005) {
+    const label = invoice.deposit_credit_label || 'Less Deposit Paid';
+    const labelLines = doc.splitTextToSize(label, totalsWidth - 32);
+    doc.text(labelLines, totalsX, totalsY);
+    doc.text(`(${formatCurrency(depositCredit)})`, totalsX + totalsWidth, totalsY, { align: 'right' });
+    totalsY += Math.max(8, labelLines.length * 5 + 3);
+  }
+
   // Less Deposit / Payments
   if (hasPayments) {
     doc.text('Less Payments', totalsX, totalsY);
@@ -345,7 +354,8 @@ const renderInvoiceToDoc = async (
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
   doc.text('BALANCE DUE', totalsX, totalsY);
-  doc.text(formatCurrency(hasPayments ? balance : billedTotal), totalsX + totalsWidth, totalsY, { align: 'right' });
+  doc.text(formatCurrency(hasPayments || depositCredit > 0.005 ? balance : billedTotal), totalsX + totalsWidth, totalsY, { align: 'right' });
+
   
   // ============ TERMS / NOTES / FOOTER ============
   // Keep all follow-up content below totals and avoid bottom-of-page overlap.
