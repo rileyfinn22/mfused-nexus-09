@@ -260,25 +260,35 @@ const renderInvoiceToDoc = async (
   // Line items in the table above may still show ordered qty as fallback for display,
   // but the totals must match the portal and DB.
   const anyShipped = items.some((item) => Number(item.shipped_quantity || 0) > 0);
-  const computedSubtotal = anyShipped
+  const lineSubtotal = anyShipped
     ? items.reduce((sum, item) => {
         const shipped = Number(item.shipped_quantity || 0);
         return sum + (shipped > 0 ? shipped : 0) * Number(item.unit_price || 0);
       }, 0)
     : items.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_price || 0), 0);
-  const computedTotal = computedSubtotal + Number(invoice.tax || 0) + Number(invoice.shipping_cost || 0);
+
+  // Mirror layout: a child shipment invoice drawing down an already-paid blanket
+  // shows the blanket subtotal and credits the deposit already paid.
+  const depositCredit = Number(invoice.deposit_credit || 0);
+  const useMirror = depositCredit > 0.005 && invoice.mirror_subtotal != null;
+  const computedSubtotal = useMirror ? Number(invoice.mirror_subtotal) : lineSubtotal;
+  const shippingAmount = useMirror
+    ? Number(invoice.mirror_shipping || 0)
+    : Number(invoice.shipping_cost || 0);
+  const computedTotal = computedSubtotal + Number(invoice.tax || 0) + shippingAmount;
 
   const billedPct = invoice.billed_percentage;
   const totalPaidPreview = invoice.total_paid || 0;
   // Deposit line only applies when nothing has shipped AND no payments have been recorded.
   // Otherwise it's misleading clutter (deposit was already billed/paid; "Less Payments" covers it).
-  const isDeposit = !anyShipped && totalPaidPreview === 0 && billedPct != null && billedPct > 0 && billedPct < 100;
+  const isDeposit = !useMirror && !anyShipped && totalPaidPreview === 0 && billedPct != null && billedPct > 0 && billedPct < 100;
   const billedTotal = isDeposit ? computedTotal * (billedPct / 100) : computedTotal;
 
   const totalPaid = invoice.total_paid || 0;
-  const balance = billedTotal - totalPaid;
+  const balance = billedTotal - totalPaid - depositCredit;
   const hasPayments = totalPaid > 0;
-  const hasShipping = (invoice.shipping_cost || 0) > 0;
+  const hasShipping = shippingAmount > 0;
+
   
   doc.setFontSize(9);
   doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
