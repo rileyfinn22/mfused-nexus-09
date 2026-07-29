@@ -16,6 +16,11 @@ interface InvoiceData {
   notes?: string | null;
   companies?: { name: string } | null;
   billed_percentage?: number | null;
+  /** Mirror layout (child shipment invoice drawing down a paid blanket) */
+  mirror_subtotal?: number | null;
+  mirror_shipping?: number | null;
+  deposit_credit?: number | null;
+  deposit_credit_label?: string | null;
   // Invoice-level address overrides (take precedence over order addresses)
   billing_name?: string | null;
   billing_street?: string | null;
