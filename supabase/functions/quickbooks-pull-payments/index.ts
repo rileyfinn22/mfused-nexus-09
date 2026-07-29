@@ -58,6 +58,111 @@ async function refreshAccessToken(supabase: any, companyId: string, refreshToken
   return tokens.access_token;
 }
 
+// Records a QBO payment against an invoice without ever creating an echo copy.
+//
+// Order of operations matters:
+//  1. If a row already carries this QBO id for this invoice, refresh its amount
+//     (QBO is the accounting source of truth) and stop.
+//  2. If the portal pushed this payment to QBO but never got the id written back
+//     (failed/timed-out sync), adopt that existing unsynced row instead of
+//     inserting a second one. Matched on invoice + amount + a +/-7 day window.
+//  3. Only if neither exists is a brand new row inserted.
+async function recordQboPayment(
+  supabase: any,
+  args: {
+    companyId: string;
+    invoiceId: string;
+    qbPaymentId: string;
+    amount: number;
+    txnDate: string;
+    method: string;
+    refNum: string | null;
+  }
+): Promise<'updated' | 'adopted' | 'inserted' | 'error'> {
+  const { companyId, invoiceId, qbPaymentId, amount, txnDate, method, refNum } = args;
+
+  // 1. Already imported for this invoice -> reconcile the amount only.
+  const { data: sameQbId } = await supabase
+    .from('payments')
+    .select('id, amount')
+    .eq('invoice_id', invoiceId)
+    .eq('quickbooks_id', qbPaymentId)
+    .maybeSingle();
+
+  if (sameQbId) {
+    if (Number(sameQbId.amount) !== Number(amount)) {
+      await supabase
+        .from('payments')
+        .update({ amount, quickbooks_synced_at: new Date().toISOString() })
+        .eq('id', sameQbId.id);
+      console.log(`Reconciled payment ${qbPaymentId} amount to ${amount}`);
+      return 'updated';
+    }
+    return 'updated';
+  }
+
+  // 2. Portal-originated payment that never got its QBO id back.
+  const windowMs = 7 * 24 * 60 * 60 * 1000;
+  const txn = new Date(txnDate).getTime();
+  const from = new Date(txn - windowMs).toISOString();
+  const to = new Date(txn + windowMs).toISOString();
+
+  const { data: orphans } = await supabase
+    .from('payments')
+    .select('id, amount, payment_date')
+    .eq('invoice_id', invoiceId)
+    .is('quickbooks_id', null)
+    .gte('payment_date', from)
+    .lte('payment_date', to);
+
+  const orphan = (orphans || []).find(
+    (p: any) => Math.abs(Number(p.amount) - Number(amount)) < 0.01
+  );
+
+  if (orphan) {
+    const { error: adoptError } = await supabase
+      .from('payments')
+      .update({
+        quickbooks_id: qbPaymentId,
+        quickbooks_sync_status: 'synced',
+        quickbooks_synced_at: new Date().toISOString(),
+      })
+      .eq('id', orphan.id);
+
+    if (adoptError) {
+      console.error('Error adopting local payment:', adoptError);
+      return 'error';
+    }
+    console.log(`Linked existing portal payment ${orphan.id} to QBO payment ${qbPaymentId}`);
+    return 'adopted';
+  }
+
+  // 3. Genuinely new payment from QBO.
+  const { error: insertError } = await supabase
+    .from('payments')
+    .upsert(
+      {
+        company_id: companyId,
+        invoice_id: invoiceId,
+        amount,
+        payment_date: txnDate,
+        payment_method: method,
+        reference_number: refNum,
+        notes: 'Imported from QuickBooks',
+        quickbooks_id: qbPaymentId,
+        quickbooks_sync_status: 'synced',
+        quickbooks_synced_at: new Date().toISOString(),
+      },
+      { onConflict: 'quickbooks_id,invoice_id', ignoreDuplicates: true }
+    );
+
+  if (insertError) {
+    console.error('Error inserting payment:', insertError);
+    return 'error';
+  }
+  return 'inserted';
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
