@@ -32,13 +32,14 @@ interface Row {
 }
 
 /** Test rollout of the production sheet for customers (currently Mfused only). */
-export default function CustomerProduction() {
+export default function CustomerProduction({ companyId }: { companyId?: string | null } = {}) {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { activeCompanyId } = useActiveCompany();
+  const { activeCompanyId: ctxCompanyId } = useActiveCompany();
+  const activeCompanyId = companyId || ctxCompanyId;
 
   useEffect(() => {
     if (!activeCompanyId) return;

@@ -511,7 +511,7 @@ export default function Production() {
   // the monitoring view. Admins viewing "all companies" keep the monitoring view.
   const adminCompanyId = selectedCompanyId !== 'all' ? selectedCompanyId : activeCompanyId;
   if (roleChecked && !isVendor && (!hasVibeAdminRole || !!adminCompanyId)) {
-    return <CustomerProduction />;
+    return <CustomerProduction companyId={adminCompanyId} />;
   }
 
 
