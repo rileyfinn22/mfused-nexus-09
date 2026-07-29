@@ -297,10 +297,10 @@ serve(async (req) => {
 
         const paymentAmount = line.Amount || qbPayment.TotalAmt;
 
-        // Insert the payment
+        // Insert the payment (idempotent: unique on quickbooks_id + invoice_id)
         const { error: insertError } = await supabase
           .from('payments')
-          .insert({
+          .upsert({
             company_id: invoice.company_id,
             invoice_id: invoice.id,
             amount: paymentAmount,
@@ -311,27 +311,15 @@ serve(async (req) => {
             quickbooks_id: qbPayment.Id,
             quickbooks_sync_status: 'synced',
             quickbooks_synced_at: new Date().toISOString(),
-          });
+          }, { onConflict: 'quickbooks_id,invoice_id', ignoreDuplicates: true });
 
         if (!insertError) {
           newPaymentsCount++;
           updatedInvoices.add(invoice.id);
           existingQBIds.add(qbPayment.Id);
-
-          // Update invoice
-          const newTotalPaid = (invoice.total_paid || 0) + paymentAmount;
-          const newStatus = newTotalPaid >= invoice.total ? 'paid' : 
-                            newTotalPaid > 0 ? 'partial' : invoice.status;
-
-          await supabase
-            .from('invoices')
-            .update({
-              total_paid: newTotalPaid,
-              status: newStatus,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', invoice.id);
+          // total_paid / status are recomputed by the payments trigger.
         }
+
 
         break; // Only process first matching invoice per payment
       }
