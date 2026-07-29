@@ -508,7 +508,7 @@ export default function Production() {
 
   // All customer (non-admin, non-vendor) views use the production sheet grid.
   // Admins and vendors keep the legacy monitoring view.
-  if (!hasVibeAdminRole && !isVendor) {
+  if (roleChecked && !hasVibeAdminRole && !isVendor) {
     return <CustomerProduction />;
   }
 
