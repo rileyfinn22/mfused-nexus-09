@@ -274,23 +274,10 @@ serve(async (req) => {
       const qbPayments = paymentsData.QueryResponse?.Payment || [];
       console.log(`Found ${qbPayments.length} payments in QBO for invoice ${invoice.invoice_number}`);
 
-      // Get existing payments for this invoice
-      const { data: existingPayments } = await supabase
-        .from('payments')
-        .select('id, quickbooks_id, amount')
-        .eq('invoice_id', invoiceId);
-
-      const existingQBIds = new Set((existingPayments || []).map(p => p.quickbooks_id).filter(Boolean));
       let newPaymentsCount = 0;
       let totalNewAmount = 0;
 
       for (const qbPayment of qbPayments) {
-        // Skip if we already have this payment
-        if (existingQBIds.has(qbPayment.Id)) {
-          console.log(`Payment ${qbPayment.Id} already exists, skipping`);
-          continue;
-        }
-
         // Find the line item for this specific invoice
         const invoiceLine = qbPayment.Line?.find((line: any) => 
           line.LinkedTxn?.some((txn: any) => txn.TxnType === 'Invoice' && txn.TxnId === invoice.quickbooks_id)
@@ -303,25 +290,17 @@ serve(async (req) => {
 
         const paymentAmount = invoiceLine.Amount || qbPayment.TotalAmt;
 
-        // Insert the payment (idempotent: unique on quickbooks_id + invoice_id)
-        const { error: insertError } = await supabase
-          .from('payments')
-          .upsert({
-            company_id: invoice.company_id,
-            invoice_id: invoice.id,
-            amount: paymentAmount,
-            payment_date: qbPayment.TxnDate,
-            payment_method: qbPayment.PaymentMethodRef?.name || 'Other',
-            reference_number: qbPayment.PaymentRefNum || null,
-            notes: `Imported from QuickBooks`,
-            quickbooks_id: qbPayment.Id,
-            quickbooks_sync_status: 'synced',
-            quickbooks_synced_at: new Date().toISOString(),
-          }, { onConflict: 'quickbooks_id,invoice_id', ignoreDuplicates: true });
+        const result = await recordQboPayment(supabase, {
+          companyId: invoice.company_id,
+          invoiceId: invoice.id,
+          qbPaymentId: qbPayment.Id,
+          amount: paymentAmount,
+          txnDate: qbPayment.TxnDate,
+          method: qbPayment.PaymentMethodRef?.name || 'Other',
+          refNum: qbPayment.PaymentRefNum || null,
+        });
 
-        if (insertError) {
-          console.error('Error inserting payment:', insertError);
-        } else {
+        if (result === 'inserted') {
           newPaymentsCount++;
           totalNewAmount += paymentAmount;
           console.log(`Imported payment ${qbPayment.Id} for $${paymentAmount}`);
