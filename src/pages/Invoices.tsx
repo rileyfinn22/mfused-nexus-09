@@ -1005,8 +1005,29 @@ const Invoices = () => {
                             ...orderData,
                             order_items: itemsForPdf
                           };
-                          
-                          await generateInvoicePDF(invoice, orderForPdf);
+
+                          // Mirror layout: child shipment invoice drawing down a paid blanket
+                          let invoiceForPdf: any = invoice;
+                          if (!isBlanket && (invoice as any).parent_invoice_id) {
+                            const { data: parentInv } = await supabase
+                              .from('invoices')
+                              .select('invoice_number, subtotal, shipping_cost, total_paid, invoice_type')
+                              .eq('id', (invoice as any).parent_invoice_id)
+                              .maybeSingle();
+                            const parentPaid = Number(parentInv?.total_paid || 0);
+                            if (parentInv && parentInv.invoice_type === 'full' && parentPaid > 0) {
+                              invoiceForPdf = {
+                                ...invoice,
+                                mirror_subtotal: Number(parentInv.subtotal || 0),
+                                mirror_shipping: Number(parentInv.shipping_cost || 0),
+                                deposit_credit: parentPaid,
+                                deposit_credit_label: `Less Deposit Paid (Inv #${parentInv.invoice_number})`,
+                              };
+                            }
+                          }
+
+                          await generateInvoicePDF(invoiceForPdf, orderForPdf);
+
                           toast({
                             title: "Success",
                             description: "Invoice PDF downloaded"
