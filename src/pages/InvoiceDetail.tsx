@@ -623,9 +623,6 @@ const InvoiceDetail = () => {
       deposit_credit_label: useMirrorForPdf
         ? `Less Deposit Paid (Inv #${parentBlanketForPdf.invoice_number})`
         : null,
-      invoice_date: invoice.invoice_date,
-      due_date: invoice.due_date,
-      total: invoice.total,
       total_paid: (invoice.total_paid || 0) + pdfChildPayments,
       subtotal: invoice.subtotal,
       tax: invoice.tax,
