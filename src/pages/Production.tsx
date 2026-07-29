@@ -506,11 +506,12 @@ export default function Production() {
     (isVibeAdmin && order.companies.name.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  // All customer (non-admin) views use the production sheet grid.
-  // Admins keep the legacy monitoring view.
-  if (!hasVibeAdminRole) {
+  // All customer (non-admin, non-vendor) views use the production sheet grid.
+  // Admins and vendors keep the legacy monitoring view.
+  if (!hasVibeAdminRole && !isVendor) {
     return <CustomerProduction />;
   }
+
 
 
   if (loading) {
