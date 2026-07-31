@@ -612,17 +612,31 @@ const InvoiceDetail = () => {
     const parentPaidForPdf = parentBlanketForPdf ? Number(parentBlanketForPdf.total_paid || 0) : 0;
     const useMirrorForPdf = !!parentBlanketForPdf && parentPaidForPdf > 0;
 
+    // Deposit may sit on a sibling child invoice instead of the blanket
+    const siblingDepositsForPdf = !isBlanket && invoice.parent_invoice_id
+      ? relatedInvoices.filter((ri: any) =>
+          ri.id !== invoice.id &&
+          ri.parent_invoice_id === invoice.parent_invoice_id &&
+          Number(ri.total_paid || 0) > 0)
+      : [];
+    const siblingPaidForPdf = siblingDepositsForPdf.reduce((s: number, ri: any) => s + Number(ri.total_paid || 0), 0);
+    const useSiblingCreditForPdf = !useMirrorForPdf && siblingPaidForPdf > 0.005;
+
     const invoiceData = {
       invoice_number: invoice.invoice_number,
       invoice_date: invoice.invoice_date,
       due_date: invoice.due_date,
       total: invoice.total,
-      mirror_subtotal: useMirrorForPdf ? Number(parentBlanketForPdf.subtotal || 0) : null,
+      mirror_subtotal: useMirrorForPdf
+        ? Number(parentBlanketForPdf.subtotal || 0)
+        : (useSiblingCreditForPdf ? Number(invoice.subtotal || 0) : null),
       mirror_shipping: useMirrorForPdf ? Number(parentBlanketForPdf.shipping_cost || 0) : null,
-      deposit_credit: useMirrorForPdf ? parentPaidForPdf : null,
+      deposit_credit: useMirrorForPdf ? parentPaidForPdf : (useSiblingCreditForPdf ? siblingPaidForPdf : null),
       deposit_credit_label: useMirrorForPdf
         ? `Less Deposit Paid (Inv #${parentBlanketForPdf.invoice_number})`
-        : null,
+        : (useSiblingCreditForPdf
+          ? `Less Deposit Paid (Inv #${siblingDepositsForPdf.map((ri: any) => ri.invoice_number).join(', #')})`
+          : null),
       total_paid: (invoice.total_paid || 0) + pdfChildPayments,
       subtotal: invoice.subtotal,
       tax: invoice.tax,
