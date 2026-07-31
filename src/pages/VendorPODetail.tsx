@@ -1261,12 +1261,14 @@ Thank you for your business.`;
               <div className="grid grid-cols-5 gap-4 text-center">
                 <div>
                   <p className="text-xs text-muted-foreground">Original PO</p>
-                  <p className="text-lg font-bold">${Number(po.total || 0).toFixed(2)}</p>
+                  <p className="text-lg font-bold">${orderedGrandTotal.toFixed(2)}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Final Bill</p>
-                  <p className={`text-lg font-bold ${po.final_total ? 'text-primary' : 'text-muted-foreground'}`}>
-                    {po.final_total ? `$${Number(po.final_total).toFixed(2)}` : 'Not finalized'}
+                  <p className="text-xs text-muted-foreground">
+                    {po.final_total != null ? 'Final Bill' : 'Adjusted (shipped)'}
+                  </p>
+                  <p className={`text-lg font-bold ${po.final_total != null || adjustedGrandTotal !== orderedGrandTotal ? 'text-primary' : 'text-muted-foreground'}`}>
+                    ${effectiveBillTotal.toFixed(2)}
                   </p>
                 </div>
                 <div>
@@ -1276,7 +1278,7 @@ Thank you for your business.`;
                 <div>
                   <p className="text-xs text-muted-foreground">Amount Owed</p>
                   <p className="text-lg font-bold text-destructive">
-                    ${((po.final_total ?? po.total ?? 0) - Number(po.total_paid || 0)).toFixed(2)}
+                    ${(effectiveBillTotal - Number(po.total_paid || 0)).toFixed(2)}
                   </p>
                 </div>
                 <div>
