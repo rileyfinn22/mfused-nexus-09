@@ -2974,7 +2974,7 @@ const InvoiceDetail = () => {
                 {showDepositCredit && (
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">
-                      Less Deposit Paid (Inv #{parentBlanket.invoice_number})
+                      {depositLabel}
                     </span>
                     <span className="font-semibold text-green-600">({formatCurrency(depositCredit)})</span>
                   </div>
