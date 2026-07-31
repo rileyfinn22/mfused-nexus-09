@@ -1113,6 +1113,14 @@ Thank you for your business.`;
       : Number(item.total || 0));
   }, 0);
 
+  const poShippingCost = Number(po.shipping_cost || 0);
+  // What the PO was originally cut for (ordered quantities)
+  const orderedGrandTotal =
+    Math.round((poItems.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_cost || 0), 0) + poShippingCost) * 100) / 100;
+  // What is actually owed based on shipped/final quantities shown in the table
+  const adjustedGrandTotal = Math.round((displayedItemsTotal + poShippingCost) * 100) / 100;
+  const effectiveBillTotal = po.final_total != null ? Number(po.final_total) : adjustedGrandTotal;
+
   return (
     <div className="max-w-7xl mx-auto">
       {/* Header */}
