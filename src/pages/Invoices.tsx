@@ -1023,6 +1023,23 @@ const Invoices = () => {
                                 deposit_credit: parentPaid,
                                 deposit_credit_label: `Less Deposit Paid (Inv #${parentInv.invoice_number})`,
                               };
+                            } else {
+                              // Deposit may live on a sibling child invoice
+                              const { data: siblings } = await supabase
+                                .from('invoices')
+                                .select('invoice_number, total_paid')
+                                .eq('parent_invoice_id', (invoice as any).parent_invoice_id)
+                                .neq('id', invoice.id);
+                              const paidSiblings = (siblings || []).filter((s: any) => Number(s.total_paid || 0) > 0);
+                              const siblingPaid = paidSiblings.reduce((s: number, r: any) => s + Number(r.total_paid || 0), 0);
+                              if (siblingPaid > 0.005) {
+                                invoiceForPdf = {
+                                  ...invoice,
+                                  mirror_subtotal: Number(invoice.subtotal || 0),
+                                  deposit_credit: siblingPaid,
+                                  deposit_credit_label: `Less Deposit Paid (Inv #${paidSiblings.map((r: any) => r.invoice_number).join(', #')})`,
+                                };
+                              }
                             }
                           }
 
