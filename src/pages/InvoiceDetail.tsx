@@ -31,6 +31,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 import { generateInvoicePDF } from "@/lib/invoicePdfUtils";
+import { computeChildCredit } from "@/lib/invoiceBalance";
 import { EditableDescription } from "@/components/EditableDescription";
 import { InlineTrackingEditor } from "@/components/InlineTrackingEditor";
 import { InvoicePackingListSection } from "@/components/InvoicePackingListSection";
@@ -605,38 +606,25 @@ const InvoiceDetail = () => {
       ? relatedInvoices.filter((ri: any) => ri.parent_invoice_id === invoiceId).reduce((s: number, ri: any) => s + Number(ri.total_paid || 0), 0)
       : 0;
 
-    // Mirror layout for child shipment invoices drawing down a paid blanket
+    // Prorated blanket-payment credit for child invoices — single source of truth
+    // in src/lib/invoiceBalance.ts (same math as the totals section below and the
+    // invoice list PDF, so every surface shows the same balance).
     const parentBlanketForPdf = !isBlanket && invoice.parent_invoice_id
       ? relatedInvoices.find((ri: any) => ri.id === invoice.parent_invoice_id && ri.invoice_type === 'full')
       : null;
-    const parentPaidForPdf = parentBlanketForPdf ? Number(parentBlanketForPdf.total_paid || 0) : 0;
-    const useMirrorForPdf = !!parentBlanketForPdf && parentPaidForPdf > 0;
-
-    // Deposit may sit on a sibling child invoice instead of the blanket
-    const siblingDepositsForPdf = !isBlanket && invoice.parent_invoice_id
-      ? relatedInvoices.filter((ri: any) =>
-          ri.id !== invoice.id &&
-          ri.parent_invoice_id === invoice.parent_invoice_id &&
-          Number(ri.total_paid || 0) > 0)
+    const childrenForPdf = !isBlanket && invoice.parent_invoice_id
+      ? [invoice, ...relatedInvoices.filter((ri: any) =>
+          ri.id !== invoice.id && ri.parent_invoice_id === invoice.parent_invoice_id)]
       : [];
-    const siblingPaidForPdf = siblingDepositsForPdf.reduce((s: number, ri: any) => s + Number(ri.total_paid || 0), 0);
-    const useSiblingCreditForPdf = !useMirrorForPdf && siblingPaidForPdf > 0.005;
+    const pdfCredit = computeChildCredit(invoice, parentBlanketForPdf, childrenForPdf);
 
     const invoiceData = {
       invoice_number: invoice.invoice_number,
       invoice_date: invoice.invoice_date,
       due_date: invoice.due_date,
       total: invoice.total,
-      mirror_subtotal: useMirrorForPdf
-        ? Number(parentBlanketForPdf.subtotal || 0)
-        : (useSiblingCreditForPdf ? Number(invoice.subtotal || 0) : null),
-      mirror_shipping: useMirrorForPdf ? Number(parentBlanketForPdf.shipping_cost || 0) : null,
-      deposit_credit: useMirrorForPdf ? parentPaidForPdf : (useSiblingCreditForPdf ? siblingPaidForPdf : null),
-      deposit_credit_label: useMirrorForPdf
-        ? `Less Deposit Paid (Inv #${parentBlanketForPdf.invoice_number})`
-        : (useSiblingCreditForPdf
-          ? `Less Deposit Paid (Inv #${siblingDepositsForPdf.map((ri: any) => ri.invoice_number).join(', #')})`
-          : null),
+      deposit_credit: pdfCredit.amount > 0 ? pdfCredit.amount : null,
+      deposit_credit_label: pdfCredit.label,
       total_paid: (invoice.total_paid || 0) + pdfChildPayments,
       subtotal: invoice.subtotal,
       tax: invoice.tax,
@@ -2888,51 +2876,28 @@ const InvoiceDetail = () => {
 
             {/* Invoice Totals */}
             {(() => {
-              // For partial/shipment child invoices, show the deposit drawdown explicitly.
-              // Only show when this is the SOLE live child of the blanket AND the parent's paid
-              // amount plus this child's total reconciles to the blanket total (within $1).
-              // This avoids false positives where parent payments are stranded/misapplied
-              // across multi-shipment blankets.
+              // Child invoices always show their OWN numbers (subtotal, shipping, total).
+              // Blanket-level payments appear as a prorated credit line — computed by
+              // src/lib/invoiceBalance.ts, the same math as the PDF and list downloads,
+              // so this page and the customer's PDF can never disagree.
               const isPartialChild = invoice && invoice.invoice_type !== 'full' && invoice.parent_invoice_id;
               const parentBlanket = isPartialChild
                 ? relatedInvoices.find((ri: any) => ri.id === invoice.parent_invoice_id && ri.invoice_type === 'full')
                 : null;
-              const parentPaid = parentBlanket ? Number(parentBlanket.total_paid || 0) : 0;
-              const parentTotal = parentBlanket ? Number(parentBlanket.total || 0) : 0;
-              const parentSubtotal = parentBlanket ? Number(parentBlanket.subtotal || 0) : 0;
-
-              // Deposits can also live on a SIBLING child invoice (e.g. "-01 Deposit").
-              // Those payments draw down the same blanket, so credit them here too.
-              const siblingDeposits = isPartialChild
-                ? relatedInvoices.filter(
-                    (ri: any) =>
-                      ri.id !== invoice.id &&
-                      ri.parent_invoice_id === invoice.parent_invoice_id &&
-                      Number(ri.total_paid || 0) > 0
-                  )
+              const allBlanketChildren = isPartialChild
+                ? [invoice, ...relatedInvoices.filter(
+                    (ri: any) => ri.id !== invoice.id && ri.parent_invoice_id === invoice.parent_invoice_id
+                  )]
                 : [];
-              const siblingPaid = siblingDeposits.reduce(
-                (s: number, ri: any) => s + Number(ri.total_paid || 0),
-                0
-              );
+              const pageCredit = computeChildCredit(invoice, parentBlanket, allBlanketChildren);
 
-              // Child shipment invoices mirror the blanket: Subtotal = blanket subtotal,
-              // Less Deposit = whatever has already been paid on the blanket,
-              // Balance Due = blanket remaining. Never double-count the deposit.
-              const useMirrorLayout = !!parentBlanket && parentPaid > 0;
-              const useSiblingCredit = !useMirrorLayout && siblingPaid > 0.005;
-              const depositLabel = useMirrorLayout
-                ? `Less Deposit Paid (Inv #${parentBlanket.invoice_number})`
-                : `Less Deposit Paid (Inv #${siblingDeposits.map((ri: any) => ri.invoice_number).join(', #')})`;
-              const mirroredSubtotal = useMirrorLayout ? parentSubtotal : displaySubtotal;
-              const mirroredShipping = useMirrorLayout ? Number(parentBlanket.shipping_cost || 0) : (Number(invoice?.shipping_cost || 0) + childShippingTotal);
-              const mirroredTotal = useMirrorLayout ? parentTotal : displayBilledTotal;
-              const depositCredit = useMirrorLayout ? parentPaid : (useSiblingCredit ? siblingPaid : 0);
+              const depositLabel = pageCredit.label || 'Less Blanket Payments';
+              const mirroredSubtotal = displaySubtotal;
+              const mirroredShipping = Number(invoice?.shipping_cost || 0) + childShippingTotal;
+              const depositCredit = pageCredit.amount;
               const showDepositCredit = depositCredit > 0.005;
-              const mirroredBalance = useMirrorLayout
-                ? (parentTotal - parentPaid)
-                : (useSiblingCredit ? (displayBilledTotal - displayTotalPaid - siblingPaid) : displayBalance);
-              const showBalanceRow = useMirrorLayout || useSiblingCredit ? true : displayTotalPaid > 0;
+              const mirroredBalance = displayBilledTotal - displayTotalPaid - depositCredit;
+              const showBalanceRow = showDepositCredit || displayTotalPaid > 0;
 
               return (
             <div className="flex justify-end mt-8">
@@ -2993,7 +2958,7 @@ const InvoiceDetail = () => {
                     <span className="font-semibold text-green-600">({formatCurrency(depositCredit)})</span>
                   </div>
                 )}
-                {!useMirrorLayout && displayTotalPaid > 0 && (
+                {displayTotalPaid > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Less Payments</span>
                     <span className="font-semibold text-green-600">({formatCurrency(displayTotalPaid)})</span>
@@ -3002,7 +2967,7 @@ const InvoiceDetail = () => {
                 <div className="h-px bg-border my-2"></div>
                 <div className="flex justify-between">
                   <span className="text-lg font-semibold">{showBalanceRow ? 'Balance Due' : (isDepositBilling ? 'Deposit Due' : 'Total')}</span>
-                  <span className="text-2xl font-bold">{formatCurrency(showBalanceRow ? mirroredBalance : mirroredTotal)}</span>
+                  <span className="text-2xl font-bold">{formatCurrency(showBalanceRow ? mirroredBalance : displayBilledTotal)}</span>
                 </div>
                 {isEditMode && <p className="text-xs text-muted-foreground italic mt-2">
                     Totals will be saved when you click "Save Changes"

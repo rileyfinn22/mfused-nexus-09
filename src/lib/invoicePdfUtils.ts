@@ -16,9 +16,10 @@ interface InvoiceData {
   notes?: string | null;
   companies?: { name: string } | null;
   billed_percentage?: number | null;
-  /** Mirror layout (child shipment invoice drawing down a paid blanket) */
-  mirror_subtotal?: number | null;
-  mirror_shipping?: number | null;
+  /**
+   * Blanket-level payments credited to this child invoice (prorated in shipment
+   * order — see src/lib/invoiceBalance.ts, the single owner of that math).
+   */
   deposit_credit?: number | null;
   deposit_credit_label?: string | null;
   // Invoice-level address overrides (take precedence over order addresses)
@@ -252,13 +253,9 @@ const renderInvoiceToDoc = async (
   const totalsWidth = 85;
   const totalsX = pageWidth - totalsWidth - 14;
   
-  // Use DB-stored subtotal/total for the totals section to match portal logic.
-  // The DB trigger (recalculate_order_totals) applies the correct blanket logic:
-  //   has children → GREATEST(ordered, shipped)
-  //   no children, any shipped → shipped-only subtotal
-  //   nothing shipped → ordered subtotal
-  // Line items in the table above may still show ordered qty as fallback for display,
-  // but the totals must match the portal and DB.
+  // The stored invoice.subtotal is the source of truth (DB trigger owns it) so the
+  // PDF always matches the portal, the list page, and QuickBooks. Line math is only
+  // a fallback for callers that couldn't supply the stored value.
   const anyShipped = items.some((item) => Number(item.shipped_quantity || 0) > 0);
   const lineSubtotal = anyShipped
     ? items.reduce((sum, item) => {
@@ -267,21 +264,20 @@ const renderInvoiceToDoc = async (
       }, 0)
     : items.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_price || 0), 0);
 
-  // Mirror layout: a child shipment invoice drawing down an already-paid blanket
-  // shows the blanket subtotal and credits the deposit already paid.
-  const depositCredit = Number(invoice.deposit_credit || 0);
-  const useMirror = depositCredit > 0.005 && invoice.mirror_subtotal != null;
-  const computedSubtotal = useMirror ? Number(invoice.mirror_subtotal) : lineSubtotal;
-  const shippingAmount = useMirror
-    ? Number(invoice.mirror_shipping || 0)
-    : Number(invoice.shipping_cost || 0);
+  const computedSubtotal = invoice.subtotal != null ? Number(invoice.subtotal) : lineSubtotal;
+  const shippingAmount = Number(invoice.shipping_cost || 0);
   const computedTotal = computedSubtotal + Number(invoice.tax || 0) + shippingAmount;
+
+  // Prorated blanket-payment credit for child invoices (computed by the caller via
+  // src/lib/invoiceBalance.ts). This invoice's own subtotal/shipping always show —
+  // a child never displays blanket-wide numbers.
+  const depositCredit = Number(invoice.deposit_credit || 0);
 
   const billedPct = invoice.billed_percentage;
   const totalPaidPreview = invoice.total_paid || 0;
   // Deposit line only applies when nothing has shipped AND no payments have been recorded.
   // Otherwise it's misleading clutter (deposit was already billed/paid; "Less Payments" covers it).
-  const isDeposit = !useMirror && !anyShipped && totalPaidPreview === 0 && billedPct != null && billedPct > 0 && billedPct < 100;
+  const isDeposit = depositCredit <= 0.005 && !anyShipped && totalPaidPreview === 0 && billedPct != null && billedPct > 0 && billedPct < 100;
   const billedTotal = isDeposit ? computedTotal * (billedPct / 100) : computedTotal;
 
   const totalPaid = invoice.total_paid || 0;
@@ -327,9 +323,9 @@ const renderInvoiceToDoc = async (
     doc.setFont('helvetica', 'normal');
   }
 
-  // Deposit already paid on the parent blanket (mirror layout)
+  // Blanket-level payments credited to this child (prorated, never credited twice)
   if (depositCredit > 0.005) {
-    const label = invoice.deposit_credit_label || 'Less Deposit Paid';
+    const label = invoice.deposit_credit_label || 'Less Blanket Payments';
     const labelLines = doc.splitTextToSize(label, totalsWidth - 32);
     doc.text(labelLines, totalsX, totalsY);
     doc.text(`(${formatCurrency(depositCredit)})`, totalsX + totalsWidth, totalsY, { align: 'right' });

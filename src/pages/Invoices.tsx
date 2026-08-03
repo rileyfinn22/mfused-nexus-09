@@ -26,6 +26,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { exportToCSV } from "@/lib/exportUtils";
 import { generateInvoicePDF } from "@/lib/invoicePdfUtils";
+import { fetchChildPdfInputs } from "@/lib/invoiceBalance";
 import { EditableDescription } from "@/components/EditableDescription";
 import { CustomerStatementTab } from "@/components/CustomerStatementTab";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
@@ -956,92 +957,20 @@ const Invoices = () => {
                           
                           if (!orderData) return;
 
-                          // For blanket/full invoices, use all order items (with shipped_quantity).
-                          // Only use allocations for partial/shipment invoices.
-                          const isBlanket = invoice.invoice_type === 'full' || (!invoice.invoice_type && !(invoice as any).parent_invoice_id);
-                          let itemsForPdf = orderData.order_items || [];
+                          // Children bill from their OWN allocation lines and get a prorated
+                          // blanket-payment credit; blankets use the order items as-is.
+                          // All of that math lives in src/lib/invoiceBalance.ts so this PDF
+                          // matches the detail page, emailed PDFs, and QuickBooks.
+                          const { itemsOverride, credit } = await fetchChildPdfInputs(supabase, invoice as any);
 
-                          if (!isBlanket) {
-                            // Fetch inventory allocations for THIS specific invoice
-                            const { data: allocationsData } = await supabase
-                              .from('inventory_allocations')
-                              .select(`
-                                quantity_allocated,
-                                order_items (
-                                  id, sku, name, unit_price, line_number
-                                )
-                              `)
-                              .eq('invoice_id', invoice.id);
-
-                            if (allocationsData && allocationsData.length > 0) {
-                              // Build a map of edited shipped_quantity from order_items
-                              const shippedMap = new Map<string, number>();
-                              (orderData.order_items || []).forEach((oi: any) => {
-                                shippedMap.set(oi.id, Number(oi.shipped_quantity || 0));
-                              });
-                              // Use allocated quantities for this specific invoice, but
-                              // honor the edited shipped_quantity on the underlying order item
-                              // so admins can zero-out lines on a shipment invoice.
-                              itemsForPdf = allocationsData
-                                .sort((a, b) => (a.order_items?.line_number ?? 999) - (b.order_items?.line_number ?? 999))
-                                .map((alloc: any) => {
-                                  const oiId = alloc.order_items?.id;
-                                  const editedShipped = oiId ? shippedMap.get(oiId) : undefined;
-                                  const qty = editedShipped !== undefined
-                                    ? editedShipped
-                                    : Number(alloc.quantity_allocated || 0);
-                                  return {
-                                    ...alloc.order_items,
-                                    quantity: qty,
-                                    shipped_quantity: qty,
-                                    unit_price: alloc.order_items?.unit_price || 0
-                                  };
-                                });
-                            }
-                          }
-
-                          // Create order data with correct items
                           const orderForPdf = {
                             ...orderData,
-                            order_items: itemsForPdf
+                            order_items: itemsOverride || orderData.order_items || []
                           };
 
-                          // Mirror layout: child shipment invoice drawing down a paid blanket
-                          let invoiceForPdf: any = invoice;
-                          if (!isBlanket && (invoice as any).parent_invoice_id) {
-                            const { data: parentInv } = await supabase
-                              .from('invoices')
-                              .select('invoice_number, subtotal, shipping_cost, total_paid, invoice_type')
-                              .eq('id', (invoice as any).parent_invoice_id)
-                              .maybeSingle();
-                            const parentPaid = Number(parentInv?.total_paid || 0);
-                            if (parentInv && parentInv.invoice_type === 'full' && parentPaid > 0) {
-                              invoiceForPdf = {
-                                ...invoice,
-                                mirror_subtotal: Number(parentInv.subtotal || 0),
-                                mirror_shipping: Number(parentInv.shipping_cost || 0),
-                                deposit_credit: parentPaid,
-                                deposit_credit_label: `Less Deposit Paid (Inv #${parentInv.invoice_number})`,
-                              };
-                            } else {
-                              // Deposit may live on a sibling child invoice
-                              const { data: siblings } = await supabase
-                                .from('invoices')
-                                .select('invoice_number, total_paid')
-                                .eq('parent_invoice_id', (invoice as any).parent_invoice_id)
-                                .neq('id', invoice.id);
-                              const paidSiblings = (siblings || []).filter((s: any) => Number(s.total_paid || 0) > 0);
-                              const siblingPaid = paidSiblings.reduce((s: number, r: any) => s + Number(r.total_paid || 0), 0);
-                              if (siblingPaid > 0.005) {
-                                invoiceForPdf = {
-                                  ...invoice,
-                                  mirror_subtotal: Number(invoice.subtotal || 0),
-                                  deposit_credit: siblingPaid,
-                                  deposit_credit_label: `Less Deposit Paid (Inv #${paidSiblings.map((r: any) => r.invoice_number).join(', #')})`,
-                                };
-                              }
-                            }
-                          }
+                          const invoiceForPdf: any = credit.amount > 0
+                            ? { ...invoice, deposit_credit: credit.amount, deposit_credit_label: credit.label }
+                            : invoice;
 
                           await generateInvoicePDF(invoiceForPdf, orderForPdf);
 

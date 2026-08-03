@@ -9,6 +9,7 @@ import { Loader2, Send, X, Plus, Truck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { generateInvoicePDFBase64 } from "@/lib/invoicePdfUtils";
+import { fetchChildPdfInputs } from "@/lib/invoiceBalance";
 
 interface LegInfo {
   carrier: string | null;
@@ -153,9 +154,16 @@ export function SendDeliveryNotificationDialog({
             .single();
 
           if (orderData) {
+            // Child invoices bill from their own allocation lines with a prorated
+            // blanket-payment credit (src/lib/invoiceBalance.ts) — the emailed PDF
+            // must match the portal and downloaded PDFs exactly.
+            const { itemsOverride, credit } = await fetchChildPdfInputs(supabase, inv);
+            const invForPdf = credit.amount > 0
+              ? { ...inv, deposit_credit: credit.amount, deposit_credit_label: credit.label }
+              : inv;
             invoicePdfBase64 = await generateInvoicePDFBase64(
-              inv,
-              { ...orderData, order_items: orderItems || [] }
+              invForPdf,
+              { ...orderData, order_items: itemsOverride || orderItems || [] }
             );
             invoiceFileName = `Invoice_${inv.invoice_number}.pdf`;
           }
