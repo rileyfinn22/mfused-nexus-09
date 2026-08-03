@@ -1272,44 +1272,26 @@ const OrderDetail = () => {
         (sum, i: any) => sum + Number(i.quantity || 0) * Number(i.unit_price || 0),
         0
       );
-      const newTotal = newSubtotal + Number(editedOrder.tax || 0);
+      const newTotal = newSubtotal
+        + Number(editedOrder.tax || 0)
+        + Number(editedOrder.shipping_cost || 0);
 
       await supabase
         .from('orders')
         .update({ subtotal: newSubtotal, total: newTotal })
         .eq('id', orderId);
 
-      // Keep the blanket invoice in sync. Existing rows use invoice_type='full'
-      // (legacy) — match both 'full' and 'blanket'. shipment_number=1 so we never
-      // touch child invoices.
-      await supabase
-        .from('invoices')
-        .update({
-          subtotal: newSubtotal,
-          total: newTotal + Number(editedOrder.shipping_cost || 0)
-        })
-        .eq('order_id', orderId)
-        .in('invoice_type', ['full', 'blanket'])
-        .eq('shipment_number', 1)
-        .is('deleted_at', null);
+      // Blanket invoice totals are owned by the DB trigger
+      // (recalc_blanket_invoices_for_order): open blankets track
+      // GREATEST(ordered, shipped) per line; closed, paid, and QB-synced blankets
+      // are protected. The client-side invoice write that used to live here
+      // bypassed all of those guards.
 
 
-      // PHASE 3: Recalculate vendor PO totals in parallel
-      const affectedPoIds = [...new Set(allVendorPoItems.map(poi => poi.vendor_po_id))];
-      if (affectedPoIds.length > 0) {
-        const poUpdatePromises = affectedPoIds.map(async (poId) => {
-          const { data: poItems } = await supabase
-            .from('vendor_po_items')
-            .select('total')
-            .eq('vendor_po_id', poId);
-          
-          if (poItems) {
-            const poTotal = poItems.reduce((sum, item) => sum + Number(item.total || 0), 0);
-            await supabase.from('vendor_pos').update({ total: poTotal }).eq('id', poId);
-          }
-        });
-        await Promise.all(poUpdatePromises);
-      }
+      // Vendor PO totals are owned by their DB trigger
+      // (recalculate_vendor_po_totals), which fired on the vendor_po_items writes
+      // above and includes shipping_cost. The client-side rewrite that used to
+      // live here dropped shipping and could stomp the trigger's value.
 
       toast({
         title: "Order Updated",

@@ -64,12 +64,15 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  );
+  // Set once this invocation wins the 'syncing' claim; the catch block uses it
+  // to release the claim after a crash so the payment stays retryable.
+  let claimedPaymentId: string | null = null;
 
+  try {
     const { paymentId } = await req.json();
     console.log('Syncing payment to QuickBooks:', paymentId);
 
@@ -101,6 +104,17 @@ serve(async (req) => {
     }
 
     console.log('Payment found:', payment);
+
+    // Already-synced guard: without this, a double-click or a manual sync racing
+    // the push-pending job creates a SECOND QuickBooks payment, which the pull
+    // job then re-imports as a new local row and total_paid doubles.
+    if (payment.quickbooks_id) {
+      console.log('Payment already synced to QuickBooks:', payment.quickbooks_id);
+      return new Response(
+        JSON.stringify({ success: true, alreadySynced: true, quickbooksPaymentId: payment.quickbooks_id }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Check if invoice is synced to QuickBooks
     if (!payment.invoices.quickbooks_id) {
@@ -269,6 +283,27 @@ serve(async (req) => {
 
     console.log('Creating payment in QuickBooks:', JSON.stringify(paymentData, null, 2));
 
+    // Claim the payment atomically before calling QuickBooks so a concurrent
+    // invocation (double-click, or push-pending racing a manual sync) can't push
+    // the same payment twice. The QB-error path below and the success path both
+    // replace the 'syncing' claim, so a failed attempt stays retryable.
+    const { data: claimed } = await supabase
+      .from('payments')
+      .update({ quickbooks_sync_status: 'syncing' })
+      .eq('id', paymentId)
+      .is('quickbooks_id', null)
+      .neq('quickbooks_sync_status', 'syncing')
+      .select('id');
+
+    if (!claimed || claimed.length === 0) {
+      console.log('Payment sync already in flight or completed; skipping duplicate push');
+      return new Response(
+        JSON.stringify({ success: true, alreadySynced: true }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    claimedPaymentId = paymentId;
+
     const qbResponse = await fetch(
       `https://quickbooks.api.intuit.com/v3/company/${qbSettings.realm_id}/payment?minorversion=65`,
       {
@@ -347,6 +382,19 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error in quickbooks-sync-payment:', error);
+    // Release the 'syncing' claim after a crash mid-push (only if the payment
+    // never got its QuickBooks id) so it stays retryable.
+    if (claimedPaymentId) {
+      try {
+        await supabase
+          .from('payments')
+          .update({ quickbooks_sync_status: 'error', updated_at: new Date().toISOString() })
+          .eq('id', claimedPaymentId)
+          .is('quickbooks_id', null);
+      } catch (releaseError) {
+        console.error('Failed to release syncing claim:', releaseError);
+      }
+    }
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -1434,7 +1434,23 @@ const InvoiceDetail = () => {
     if (!order?.order_items) return;
     setSavingQuickShip(true);
     try {
-      // Update each order_item's shipped_quantity
+      // Persist child-shipment shipping onto the blanket FIRST, so the DB trigger
+      // (which owns blanket subtotal/total) folds it into the total it computes
+      // when the shipped_quantity writes below fire it. No client-side
+      // subtotal/total write — the trigger applies the draw-down rule
+      // (GREATEST(ordered, shipped) while open) and its settled-invoice guards.
+      const newShipping = (relatedInvoices || [])
+        .filter((ri: any) => ri.parent_invoice_id === invoiceId)
+        .reduce((sum: number, ri: any) => sum + Number(ri.shipping_cost || 0), 0);
+      if (isBlanketDisplay && newShipping > 0) {
+        const { error: invErr } = await supabase
+          .from('invoices')
+          .update({ shipping_cost: newShipping })
+          .eq('id', invoiceId);
+        if (invErr) throw invErr;
+      }
+
+      // Update each order_item's shipped_quantity (each write fires the recalc trigger)
       for (const oi of order.order_items) {
         const raw = quickShipQtys[oi.id];
         if (raw === undefined) continue;
@@ -1449,26 +1465,7 @@ const InvoiceDetail = () => {
         if (error) throw error;
       }
 
-      // Recompute blanket subtotal/total to match shipped × price + child shipping
-      const newSubtotal = order.order_items.reduce((sum: number, oi: any) => {
-        const raw = quickShipQtys[oi.id];
-        const qty = raw !== undefined ? Number(raw) : Number(oi.shipped_quantity || 0);
-        return sum + (isFinite(qty) ? qty : 0) * Number(oi.unit_price || 0);
-      }, 0);
-      const newShipping = (relatedInvoices || [])
-        .filter((ri: any) => ri.parent_invoice_id === invoiceId)
-        .reduce((sum: number, ri: any) => sum + Number(ri.shipping_cost || 0), 0);
-      const newTotal = newSubtotal + Number(invoice?.tax || 0) + newShipping;
-
-      if (isBlanketDisplay) {
-        const { error: invErr } = await supabase
-          .from('invoices')
-          .update({ subtotal: newSubtotal, shipping_cost: newShipping, total: newTotal })
-          .eq('id', invoiceId);
-        if (invErr) throw invErr;
-      }
-
-      toast({ title: 'Shipped Quantities Updated', description: `Blanket total: ${formatCurrency(newTotal)}` });
+      toast({ title: 'Shipped Quantities Updated', description: 'Blanket totals recalculated' });
       setShowQuickShipDialog(false);
       fetchInvoiceDetails();
     } catch (error: any) {
