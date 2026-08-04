@@ -50,7 +50,7 @@ interface OrderData {
   order_items?: OrderItem[];
 }
 
-interface OrderItem {
+export interface OrderItem {
   sku: string;
   name: string;
   quantity: number;
