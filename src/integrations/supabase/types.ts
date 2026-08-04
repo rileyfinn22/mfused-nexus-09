@@ -3350,6 +3350,71 @@ export type Database = {
           },
         ]
       }
+      vendor_bills: {
+        Row: {
+          bill_date: string | null
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          document_name: string | null
+          document_path: string | null
+          due_date: string | null
+          freight: number
+          id: string
+          invoice_number: string | null
+          notes: string | null
+          subtotal: number
+          total: number
+          updated_at: string
+          vendor_po_id: string
+        }
+        Insert: {
+          bill_date?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          document_name?: string | null
+          document_path?: string | null
+          due_date?: string | null
+          freight?: number
+          id?: string
+          invoice_number?: string | null
+          notes?: string | null
+          subtotal?: number
+          total?: number
+          updated_at?: string
+          vendor_po_id: string
+        }
+        Update: {
+          bill_date?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          document_name?: string | null
+          document_path?: string | null
+          due_date?: string | null
+          freight?: number
+          id?: string
+          invoice_number?: string | null
+          notes?: string | null
+          subtotal?: number
+          total?: number
+          updated_at?: string
+          vendor_po_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_bills_vendor_po_id_fkey"
+            columns: ["vendor_po_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_pos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendor_invitations: {
         Row: {
           accepted_at: string | null
@@ -4312,6 +4377,7 @@ export type Database = {
         Returns: Json
       }
       validate_vendor_invitation: { Args: { p_token: string }; Returns: Json }
+      vendor_po_recalc: { Args: { target_po_id: string }; Returns: undefined }
       vendor_po_sheet_info: {
         Args: { p_po_ids: string[] }
         Returns: {
