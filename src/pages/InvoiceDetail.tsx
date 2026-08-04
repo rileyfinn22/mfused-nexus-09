@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+﻿import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -31,7 +31,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 import { generateInvoicePDF } from "@/lib/invoicePdfUtils";
-import { computeChildCredit, isOrderFullyShipped } from "@/lib/invoiceBalance";
+import { computeChildCredit, computeRemainingUnshippedValue } from "@/lib/invoiceBalance";
 import { EditableDescription } from "@/components/EditableDescription";
 import { InlineTrackingEditor } from "@/components/InlineTrackingEditor";
 import { InvoicePackingListSection } from "@/components/InvoicePackingListSection";
@@ -606,7 +606,7 @@ const InvoiceDetail = () => {
       ? relatedInvoices.filter((ri: any) => ri.parent_invoice_id === invoiceId).reduce((s: number, ri: any) => s + Number(ri.total_paid || 0), 0)
       : 0;
 
-    // Prorated blanket-payment credit for child invoices — single source of truth
+    // Prorated blanket-payment credit for child invoices â€” single source of truth
     // in src/lib/invoiceBalance.ts (same math as the totals section below and the
     // invoice list PDF, so every surface shows the same balance).
     const parentBlanketForPdf = !isBlanket && invoice.parent_invoice_id
@@ -617,7 +617,7 @@ const InvoiceDetail = () => {
           ri.id !== invoice.id && ri.parent_invoice_id === invoice.parent_invoice_id)]
       : [];
     const pdfCredit = computeChildCredit(invoice, parentBlanketForPdf, childrenForPdf, {
-      orderFullyShipped: isOrderFullyShipped(order?.order_items || []),
+      remainingUnshippedValue: computeRemainingUnshippedValue(order?.order_items || []),
     });
 
     const invoiceData = {
@@ -748,7 +748,7 @@ const InvoiceDetail = () => {
       const shipCity = String(invoice.shipping_city || order.shipping_city || '');
       const shipState = String(invoice.shipping_state || order.shipping_state || '');
       const shipZip = String(invoice.shipping_zip || order.shipping_zip || '');
-      doc.text(shipName || '—', leftColX, yPos + 8);
+      doc.text(shipName || 'â€”', leftColX, yPos + 8);
 
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
@@ -759,7 +759,7 @@ const InvoiceDetail = () => {
         doc.text(shipStreet, leftColX, shipY);
         shipY += 5;
       }
-      doc.text([shipCity, shipState, shipZip].filter(Boolean).join(', ').replace(', ,', ',') || '—', leftColX, shipY);
+      doc.text([shipCity, shipState, shipZip].filter(Boolean).join(', ').replace(', ,', ',') || 'â€”', leftColX, shipY);
 
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
@@ -1024,8 +1024,8 @@ const InvoiceDetail = () => {
         console.error('Vendor PO sync error (non-fatal):', syncErr);
       }
 
-      // Recalculate totals using shared calculator - shipped qty × price
-      // Check if this blanket has child (partial) invoices — if so, keep placeholder
+      // Recalculate totals using shared calculator - shipped qty Ã— price
+      // Check if this blanket has child (partial) invoices â€” if so, keep placeholder
       const hasChildren = relatedInvoices.some(
         (ri: any) => ri.parent_invoice_id === invoiceId
       );
@@ -1212,7 +1212,7 @@ const InvoiceDetail = () => {
       }
 
       // Re-sync to get updated payment link.
-      // billed_percentage is a one-shot deposit flag — once an invoice already exists in QBO,
+      // billed_percentage is a one-shot deposit flag â€” once an invoice already exists in QBO,
       // refreshing the link should always bill the full remaining balance (100%), otherwise
       // the QBO invoice/link stays stuck at the original deposit amount.
       const { error } = await supabase.functions.invoke('quickbooks-sync-invoice', {
@@ -1382,7 +1382,7 @@ const InvoiceDetail = () => {
         `${unshippedLines.length === 1 ? 'has' : 'have'} nothing shipped and will bill zero ` +
         `(${formatCurrency(unshippedValue)} as ordered):\n` +
         unshippedLines.slice(0, 8).map((oi: any) =>
-          `  • ${oi.sku || oi.name} — ordered ${Number(oi.quantity || 0).toLocaleString()}, shipped ${oi.shipped_quantity === null || oi.shipped_quantity === undefined ? 'not recorded' : '0'}`
+          `  â€¢ ${oi.sku || oi.name} â€” ordered ${Number(oi.quantity || 0).toLocaleString()}, shipped ${oi.shipped_quantity === null || oi.shipped_quantity === undefined ? 'not recorded' : '0'}`
         ).join('\n') +
         (unshippedLines.length > 8 ? `\n  ...and ${unshippedLines.length - 8} more` : '') +
         `\n\nIf any of those actually shipped, cancel and record the quantities first.`
@@ -1392,7 +1392,7 @@ const InvoiceDetail = () => {
       !confirm(
         `Finalise this blanket at ${formatCurrency(newTotal)}?\n\n` +
         `Current total: ${formatCurrency(Number(invoice.total || 0))}\n` +
-        `Shipped × price: ${formatCurrency(newSubtotal)}\n` +
+        `Shipped Ã— price: ${formatCurrency(newSubtotal)}\n` +
         `Freight${children.length > 0 && childShipping > 0 ? ' (from shipments)' : ''}: ${formatCurrency(newShipping)}\n` +
         `Tax: ${formatCurrency(Number(invoice.tax || 0))}` +
         reconciliation +
@@ -1425,7 +1425,7 @@ const InvoiceDetail = () => {
       toast({
         title: 'Blanket Finalised',
         description: Math.abs(written - newTotal) > 0.01
-          ? `Total is ${formatCurrency(written)}. It did not move to ${formatCurrency(newTotal)} — a paid or QuickBooks-synced blanket is left alone.`
+          ? `Total is ${formatCurrency(written)}. It did not move to ${formatCurrency(newTotal)} â€” a paid or QuickBooks-synced blanket is left alone.`
           : `Final total: ${formatCurrency(written)}`,
         variant: Math.abs(written - newTotal) > 0.01 ? 'destructive' : undefined,
       });
@@ -1459,7 +1459,7 @@ const InvoiceDetail = () => {
       // Persist child-shipment shipping onto the blanket FIRST, so the DB trigger
       // (which owns blanket subtotal/total) folds it into the total it computes
       // when the shipped_quantity writes below fire it. No client-side
-      // subtotal/total write — the trigger applies the draw-down rule
+      // subtotal/total write â€” the trigger applies the draw-down rule
       // (GREATEST(ordered, shipped) while open) and its settled-invoice guards.
       const newShipping = (relatedInvoices || [])
         .filter((ri: any) => ri.parent_invoice_id === invoiceId)
@@ -1577,7 +1577,7 @@ const InvoiceDetail = () => {
   
   const { subtotal: displaySubtotal, total: rawDisplayTotal } = computeDisplayTotals();
   // For blanket invoices with children, roll up child shipping for display.
-  // NOTE: "Update Blanket Total" / "Set Shipped Qty" persist Σ(child shipping) into the
+  // NOTE: "Update Blanket Total" / "Set Shipped Qty" persist Î£(child shipping) into the
   // blanket's own shipping_cost. To avoid double counting, only add child shipping on top
   // when the blanket's stored shipping_cost is 0 (legacy / not yet rolled up).
   const rawChildShipping = isBlanketDisplay
@@ -1596,11 +1596,11 @@ const InvoiceDetail = () => {
     : 0;
   const displayTotalPaid = Number(invoice?.total_paid || 0) + childPaymentsTotal;
   const billedPct = invoice?.billed_percentage;
-  // Hide the "Deposit (X%)" deduction line on blankets once any payment has been recorded —
+  // Hide the "Deposit (X%)" deduction line on blankets once any payment has been recorded â€”
   // the deposit was billed and (presumably) paid; "Less Payments" already accounts for it.
   // Otherwise we double-deduct (deposit line + payments line).
   // Deposit billing line only applies to parent blanket invoices, never child shipment/deposit invoices.
-  // Once any shipment exists on the order, the deposit % no longer caps the bill — use realized total.
+  // Once any shipment exists on the order, the deposit % no longer caps the bill â€” use realized total.
   const anyShippedOnOrder = (order?.order_items || []).some((it: any) => Number(it.shipped_quantity || 0) > 0);
   const isDepositBilling = isBlanketDisplay && !anyShippedOnOrder && billedPct != null && billedPct > 0 && billedPct < 100 && displayTotalPaid === 0;
   const displayBilledTotal = isDepositBilling ? displayTotal * (billedPct / 100) : displayTotal;
@@ -1664,7 +1664,7 @@ const InvoiceDetail = () => {
                     Save Changes
                   </Button>
                 </> : <>
-                  {/* PRIMARY ACTIONS — always visible */}
+                  {/* PRIMARY ACTIONS â€” always visible */}
                   {invoice.quickbooks_sync_status === 'synced' && invoice.quickbooks_id ? (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -1740,7 +1740,7 @@ const InvoiceDetail = () => {
                       Finalise Blanket
                     </Button>}
 
-                  {/* CONSOLIDATED ACTIONS DROPDOWN — secondary actions */}
+                  {/* CONSOLIDATED ACTIONS DROPDOWN â€” secondary actions */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button size="sm" variant="outline">
@@ -1890,7 +1890,7 @@ const InvoiceDetail = () => {
                     <div className="flex-1 min-w-[180px]">
                       <EditableDescription
                         value={(invoice as any)?.customer_po_number ?? order?.po_number ?? ""}
-                        placeholder="Add customer PO…"
+                        placeholder="Add customer POâ€¦"
                         onSave={async (newValue) => {
                           if (!invoice?.id) return;
                           const val = newValue?.trim() ? newValue.trim() : null;
@@ -1922,7 +1922,7 @@ const InvoiceDetail = () => {
                       </div>
                       <EditableDescription
                         value={order?.description}
-                        placeholder="Add description…"
+                        placeholder="Add descriptionâ€¦"
                         onSave={async (newValue) => {
                           if (!order?.id) return;
 
@@ -1956,7 +1956,7 @@ const InvoiceDetail = () => {
                         </div>
                         <EditableDescription
                           value={invoice.description}
-                          placeholder="Add invoice description…"
+                          placeholder="Add invoice descriptionâ€¦"
                           onSave={async (newValue) => {
                             const { error } = await supabase
                               .from("invoices")
@@ -2217,7 +2217,7 @@ const InvoiceDetail = () => {
                     }}
                   />
                 ) : (
-                  <p className="text-sm text-muted-foreground">{invoice?.shipping_method || '—'}</p>
+                  <p className="text-sm text-muted-foreground">{invoice?.shipping_method || 'â€”'}</p>
                 )}
               </div>
               <div>
@@ -2272,11 +2272,11 @@ const InvoiceDetail = () => {
                       rel="noreferrer"
                       className="text-sm text-primary hover:underline inline-flex items-center gap-1"
                     >
-                      {CARRIERS.find(c => c.value === invoice.tracking_carrier)?.label || invoice.tracking_carrier} — {invoice.tracking_number}
+                      {CARRIERS.find(c => c.value === invoice.tracking_carrier)?.label || invoice.tracking_carrier} â€” {invoice.tracking_number}
                       <ExternalLink className="h-3 w-3" />
                     </a>
                   ) : (
-                    <p className="text-sm text-muted-foreground">—</p>
+                    <p className="text-sm text-muted-foreground">â€”</p>
                   )
                 )}
               </div>
@@ -2712,14 +2712,14 @@ const InvoiceDetail = () => {
                           <Popover open={openCombobox[`inv-item-${item.id}`]} onOpenChange={(open) => setOpenCombobox(prev => ({ ...prev, [`inv-item-${item.id}`]: open }))}>
                             <PopoverTrigger asChild>
                               <Button variant="outline" className="w-full justify-between text-left font-medium h-auto py-1.5 px-2">
-                                <span className="truncate text-sm">{item.name || 'Pick product / type name…'}</span>
+                                <span className="truncate text-sm">{item.name || 'Pick product / type nameâ€¦'}</span>
                                 <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
                               </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-[350px] p-0" align="start">
                               <Command>
                                 <CommandInput
-                                  placeholder="Search products or type custom name…"
+                                  placeholder="Search products or type custom nameâ€¦"
                                   onValueChange={(val) => setEditedItems(items => items.map(i => i.id === item.id ? { ...i, _typedName: val } : i))}
                                 />
                                 <CommandList>
@@ -2811,9 +2811,9 @@ const InvoiceDetail = () => {
                           </TableCell>
                           <TableCell className="text-center">
                             {isEditMode ? (
-                              <Input type="number" min="0" value={isShippedPlaceholder ? '' : shippedQty} placeholder="0" onChange={e => handleQuantityChange(item.id, parseInt(e.target.value) || 0)} className={`w-24 text-center ${isShippedPlaceholder ? 'text-muted-foreground/50 italic' : ''}`} title={isShippedPlaceholder ? 'Placeholder — not yet shipped. Type 0 to intentionally record no shipment.' : ''} />
+                              <Input type="number" min="0" value={isShippedPlaceholder ? '' : shippedQty} placeholder="0" onChange={e => handleQuantityChange(item.id, parseInt(e.target.value) || 0)} className={`w-24 text-center ${isShippedPlaceholder ? 'text-muted-foreground/50 italic' : ''}`} title={isShippedPlaceholder ? 'Placeholder â€” not yet shipped. Type 0 to intentionally record no shipment.' : ''} />
                             ) : isShippedPlaceholder ? (
-                              <span className="inline-flex items-center gap-1 text-muted-foreground/50 italic" title="Placeholder — not yet shipped. Click Quick Ship to record actual qty.">0</span>
+                              <span className="inline-flex items-center gap-1 text-muted-foreground/50 italic" title="Placeholder â€” not yet shipped. Click Quick Ship to record actual qty.">0</span>
                             ) : (
                               <span className="inline-flex items-center gap-1">
                                 {shippedQty}
@@ -2892,7 +2892,7 @@ const InvoiceDetail = () => {
             {/* Invoice Totals */}
             {(() => {
               // Child invoices always show their OWN numbers (subtotal, shipping, total).
-              // Blanket-level payments appear as a prorated credit line — computed by
+              // Blanket-level payments appear as a prorated credit line â€” computed by
               // src/lib/invoiceBalance.ts, the same math as the PDF and list downloads,
               // so this page and the customer's PDF can never disagree.
               const isPartialChild = invoice && invoice.invoice_type !== 'full' && invoice.parent_invoice_id;
@@ -2905,7 +2905,7 @@ const InvoiceDetail = () => {
                   )]
                 : [];
               const pageCredit = computeChildCredit(invoice, parentBlanket, allBlanketChildren, {
-                orderFullyShipped: isOrderFullyShipped(order?.order_items || []),
+                remainingUnshippedValue: computeRemainingUnshippedValue(order?.order_items || []),
               });
 
               const depositLabel = pageCredit.label || 'Less Blanket Payments';
@@ -2947,7 +2947,7 @@ const InvoiceDetail = () => {
                         value={editShippingNote}
                         onChange={(e) => setEditShippingNote(e.target.value)}
                         className="text-xs h-7"
-                        placeholder="Shipping note/description…"
+                        placeholder="Shipping note/descriptionâ€¦"
                       />
                     ) : invoice?.shipping_note ? (
                       <p className="text-xs text-muted-foreground pl-1">{invoice.shipping_note}</p>
@@ -3201,7 +3201,7 @@ const InvoiceDetail = () => {
         </CardContent>
       </Card>
 
-      {/* Shipments & Invoices Section — blanket invoices only, admin only */}
+      {/* Shipments & Invoices Section â€” blanket invoices only, admin only */}
       {isVibeAdmin && invoice && invoice.invoice_type === 'full' && invoice.shipment_number === 1 && (
         <Card className="shadow-lg">
           <CardContent className="p-8">
@@ -3216,7 +3216,7 @@ const InvoiceDetail = () => {
                   const billingProgress = order ? (totalBilled / Number(order.total)) * 100 : 0;
                   return (
                     <p className="text-sm text-muted-foreground mt-1">
-                      {shipmentInvoicesForBlanket.length} shipment invoice(s) • {formatCurrency(totalBilled)} billed ({billingProgress.toFixed(1)}% of order total)
+                      {shipmentInvoicesForBlanket.length} shipment invoice(s) â€¢ {formatCurrency(totalBilled)} billed ({billingProgress.toFixed(1)}% of order total)
                     </p>
                   );
                 })()}
@@ -3263,7 +3263,7 @@ const InvoiceDetail = () => {
                           <div className="flex items-center gap-4 text-xs text-muted-foreground">
                             <span>Created: {new Date(relInvoice.created_at).toLocaleDateString()}</span>
                             {relInvoice.shipping_cost > 0 && (
-                              <span>• Shipping: {formatCurrency(Number(relInvoice.shipping_cost))}</span>
+                              <span>â€¢ Shipping: {formatCurrency(Number(relInvoice.shipping_cost))}</span>
                             )}
                           </div>
                         </div>
@@ -3376,7 +3376,7 @@ const InvoiceDetail = () => {
                                   <TableCell className="font-mono text-muted-foreground py-2">{item.sku}</TableCell>
                                   <TableCell className="text-right py-2">{item.quantity?.toLocaleString()}</TableCell>
                                   <TableCell className={cn("text-right py-2 font-medium", shipped > 0 ? "text-success" : "text-muted-foreground")}>
-                                    {shipped > 0 ? shipped.toLocaleString() : '—'}
+                                    {shipped > 0 ? shipped.toLocaleString() : 'â€”'}
                                   </TableCell>
                                   <TableCell className="text-right py-2">{formatUnitPrice(unitCost)}</TableCell>
                                   <TableCell className="text-right py-2 font-medium">{formatCurrency(itemTotal)}</TableCell>
@@ -3673,7 +3673,7 @@ const InvoiceDetail = () => {
           <DialogHeader>
             <DialogTitle>Set Shipped Quantities</DialogTitle>
             <DialogDescription>
-              Quickly enter shipped quantity for each line item. The blanket total will be recalculated as Σ(shipped × price) + child shipping.
+              Quickly enter shipped quantity for each line item. The blanket total will be recalculated as Î£(shipped Ã— price) + child shipping.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 max-h-[60vh] overflow-y-auto py-2">
@@ -3696,7 +3696,7 @@ const InvoiceDetail = () => {
                     value={quickShipQtys[oi.id] ?? ''}
                     onChange={(e) => setQuickShipQtys((prev) => ({ ...prev, [oi.id]: e.target.value }))}
                     className={(quickShipQtys[oi.id] ?? '') === '' ? 'text-muted-foreground/50 italic' : ''}
-                    title={(quickShipQtys[oi.id] ?? '') === '' ? 'Placeholder — leave blank until shipped, or type 0 to intentionally record no shipment' : ''}
+                    title={(quickShipQtys[oi.id] ?? '') === '' ? 'Placeholder â€” leave blank until shipped, or type 0 to intentionally record no shipment' : ''}
                   />
                 </div>
               </div>

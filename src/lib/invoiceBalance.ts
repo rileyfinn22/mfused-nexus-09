@@ -13,13 +13,15 @@ import type { OrderItem } from "./invoicePdfUtils";
  *   released once there is nothing left to ship, landing on the LAST shipment and
  *   working backwards. That collects full cash on every shipment and settles the
  *   deposit against the closing invoice.
- * - "Nothing left to ship" is detected automatically — every line shipped at least
- *   what was ordered — so a normally-completed order releases the deposit on its
- *   own. $100 blanket, $30 deposit, $50 first shipment, $60 second (with overs):
- *   the second shipment shows $60 less the $30 deposit = $30 due, and the customer
- *   has paid $110 for $110 of goods. Finalising the blanket also releases it, which
- *   is what covers UNDER-shipments, where the order will never draw down in full
- *   and only a human can say it is finished.
+ * - How much is released is worked out automatically: the deposit only stays behind
+ *   to cover the value still to ship, and any surplus is credited straight away.
+ *   $100 blanket, $30 deposit, $50 first shipment, $60 second (with overs): nothing
+ *   is left to ship by the second, so it shows $60 less the full $30 = $30 due, and
+ *   the customer has paid $110 for $110 of goods. If instead the order sat $10 from
+ *   complete, $20 of the deposit would release now and $10 would stay back — a small
+ *   remainder never holds the whole deposit hostage.
+ * - Finalising the blanket releases whatever is left, which is what covers an order
+ *   that will never draw down in full: only a human can say it is finished.
  * - Crediting late also avoids a trap: if the credit chased the earliest child, a
  *   newly created shipment would move it and retroactively raise the balance on an
  *   invoice already sent and part-paid.
@@ -61,25 +63,31 @@ const NO_CREDIT: ChildCreditResult = { amount: 0, label: null };
 export interface OrderItemShipState {
   quantity?: number | null;
   shipped_quantity?: number | null;
+  unit_price?: number | null;
 }
 
 /**
- * True when no line still owes a shipment. Overs count as complete — shipping 60 against 50
- * ordered leaves nothing outstanding on that line.
+ * Value of the goods still owed on this order: per line, whatever is left of the ordered
+ * quantity, priced. Overs contribute nothing — shipping 60 against 50 ordered leaves that
+ * line owing zero, not minus ten.
  *
- * A line sitting at 0/blank shipped is NOT complete: that is either "nobody recorded it yet" or
- * a genuine zero, and we cannot tell which, so the deposit stays put until a human finalises.
+ * A line sitting at 0/blank shipped counts as fully outstanding: that is either "nobody
+ * recorded it yet" or a genuine zero, and the data cannot tell which.
  */
-export function isOrderFullyShipped(items: OrderItemShipState[] | null | undefined): boolean {
-  if (!items || items.length === 0) return false;
-  return items.every(
-    (i) => Number(i.shipped_quantity || 0) >= Number(i.quantity || 0)
-  );
+export function computeRemainingUnshippedValue(
+  items: OrderItemShipState[] | null | undefined
+): number {
+  if (!items || items.length === 0) return 0;
+  const total = items.reduce((sum, i) => {
+    const owed = Math.max(0, Number(i.quantity || 0) - Number(i.shipped_quantity || 0));
+    return sum + owed * Number(i.unit_price || 0);
+  }, 0);
+  return Math.round(total * 100) / 100;
 }
 
 export interface ChildCreditOptions {
-  /** Every line has shipped what it owed, so the order has drawn down in full. */
-  orderFullyShipped?: boolean;
+  /** Value of goods still to ship on this order; what the deposit must stay behind to cover. */
+  remainingUnshippedValue?: number;
 }
 
 const childOrder = (a: ChildInvoiceLike, b: ChildInvoiceLike): number => {
@@ -98,10 +106,10 @@ const childOrder = (a: ChildInvoiceLike, b: ChildInvoiceLike): number => {
  * payments); whatever remains flows back to the shipment before it. Returns the
  * credit that lands on `child`.
  *
- * Nothing is released while shipments are still outstanding — every child bills its
- * goods in full and the deposit stays on the blanket, so no already-sent invoice
- * ever has its balance moved underneath it. The release happens on its own once
- * the order has drawn down in full, or when a human finalises the blanket.
+ * The deposit only stays behind to cover goods still to ship. Anything beyond that
+ * is released immediately, so a $30 deposit on an order $10 from complete releases
+ * $20 now and keeps $10 back — it is never held hostage by a small remainder.
+ * Finalising the blanket releases all of it, since nothing more is coming.
  */
 export function computeChildCredit(
   child: ChildInvoiceLike,
@@ -110,8 +118,16 @@ export function computeChildCredit(
   opts?: ChildCreditOptions
 ): ChildCreditResult {
   if (!parent || parent.invoice_type !== "full") return NO_CREDIT;
-  if (!parent.blanket_closed_at && !opts?.orderFullyShipped) return NO_CREDIT;
-  let remaining = Number(parent.total_paid || 0);
+
+  const deposit = Number(parent.total_paid || 0);
+  if (deposit <= 0.005) return NO_CREDIT;
+
+  const stillToShip = parent.blanket_closed_at
+    ? 0
+    : Math.max(0, Number(opts?.remainingUnshippedValue || 0));
+
+  // Hold back only what the outstanding shipments will need; release the surplus now.
+  let remaining = Math.round(Math.max(0, deposit - stillToShip) * 100) / 100;
   if (remaining <= 0.005) return NO_CREDIT;
 
   const ordered = [...allChildren];
@@ -196,7 +212,7 @@ export async function fetchChildPdfInputs(
   const orderItemsPromise = invoice.order_id
     ? supabase
         .from("order_items")
-        .select("quantity, shipped_quantity")
+        .select("quantity, shipped_quantity, unit_price")
         .eq("order_id", invoice.order_id)
     : Promise.resolve({ data: [] as OrderItemShipState[] });
 
@@ -231,7 +247,7 @@ export async function fetchChildPdfInputs(
     (parentRes as any).data,
     ((siblingsRes as any).data || []) as ChildInvoiceLike[],
     {
-      orderFullyShipped: isOrderFullyShipped(
+      remainingUnshippedValue: computeRemainingUnshippedValue(
         ((orderItemsRes as any).data || []) as OrderItemShipState[]
       ),
     }

@@ -881,18 +881,24 @@ serve(async (req) => {
 
       const parentPaidTotal = Number(parentInvoice?.total_paid || 0);
 
-      // Overs count as complete; a line still at 0/blank does not, since that is either
-      // "not recorded yet" or a genuine zero and we cannot tell which.
+      // Value still owed on the order. Overs contribute nothing; a line at 0/blank counts as
+      // fully outstanding, since that is either "not recorded yet" or a genuine zero.
       const { data: orderShipState } = await supabase
         .from('order_items')
-        .select('quantity, shipped_quantity')
+        .select('quantity, shipped_quantity, unit_price')
         .eq('order_id', invoice.order_id);
 
-      const orderFullyShipped = !!orderShipState
-        && orderShipState.length > 0
-        && orderShipState.every((oi: any) => Number(oi.shipped_quantity || 0) >= Number(oi.quantity || 0));
+      const remainingUnshippedValue = (orderShipState || []).reduce((sum: number, oi: any) => {
+        const owed = Math.max(0, Number(oi.quantity || 0) - Number(oi.shipped_quantity || 0));
+        return sum + owed * Number(oi.unit_price || 0);
+      }, 0);
 
-      if (parentPaidTotal > 0 && (parentInvoice?.blanket_closed_at || orderFullyShipped)) {
+      // Hold back only what the outstanding shipments need; release the surplus now.
+      const releasableDeposit = parentInvoice?.blanket_closed_at
+        ? parentPaidTotal
+        : Math.max(0, parentPaidTotal - remainingUnshippedValue);
+
+      if (releasableDeposit > 0.005) {
         const { data: siblingInvoices } = await supabase
           .from('invoices')
           .select('id, invoice_number, shipment_number, subtotal, created_at')
@@ -911,7 +917,7 @@ serve(async (req) => {
               .reduce((sum: number, child: any) => sum + Math.max(0, Number(child.subtotal || 0)), 0)
           : 0;
 
-        const remainingDepositCredit = Math.max(0, parentPaidTotal - priorShipmentValue);
+        const remainingDepositCredit = Math.max(0, releasableDeposit - priorShipmentValue);
         const depositCredit = Math.min(remainingDepositCredit, Math.max(0, calculatedSubtotal));
 
         if (depositCredit > 0.005) {
