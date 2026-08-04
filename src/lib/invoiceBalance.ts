@@ -1,4 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { OrderItem } from "./invoicePdfUtils";
+
 
 /**
  * Draw-down math for blanket invoices and their child shipment invoices.
