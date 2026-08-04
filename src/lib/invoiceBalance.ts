@@ -1,4 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { OrderItem } from "./invoicePdfUtils";
+
 
 /**
  * Draw-down math for blanket invoices and their child shipment invoices.
@@ -92,9 +94,7 @@ export function computeChildCredit(
 
 export interface ChildPdfInputs {
   /** Line items billed on THIS invoice (from its allocations); null → caller keeps its fallback. */
-  itemsOverride:
-    | Array<Record<string, unknown> & { quantity: number; shipped_quantity: number; unit_price: number }>
-    | null;
+  itemsOverride: OrderItem[] | null;
   credit: ChildCreditResult;
 }
 
