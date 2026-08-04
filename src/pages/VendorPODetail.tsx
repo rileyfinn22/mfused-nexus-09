@@ -22,6 +22,24 @@ import { InlineTrackingEditor } from "@/components/InlineTrackingEditor";
 import { normalizeStorageObjectPath, openStorageObjectInNewTab } from "@/lib/storageUrl";
 import VendorProductionPanel from "@/components/vendor/VendorProductionPanel";
 
+// Shipping lives on a SHIPPING line item on some POs and on vendor_pos.shipping_cost on others,
+// and on a few it is on both. The line wins when present; summing both double-counted freight.
+const isShippingItem = (item: any) =>
+  item?.sku === 'SHIPPING' || item?.item_type === 'shipping';
+
+// Mirrors public.vendor_po_recalc in the database so PDFs, the page and the stored
+// vendor_pos.total can never disagree.
+const splitPOTotals = (items: any[], shippingCost: any) => {
+  const shippingLineSum = items
+    .filter(isShippingItem)
+    .reduce((sum, item) => sum + Number(item.total || 0), 0);
+  const itemsTotal = items
+    .filter(item => !isShippingItem(item))
+    .reduce((sum, item) => sum + Number(item.total || 0), 0);
+  const shipping = shippingLineSum !== 0 ? shippingLineSum : Number(shippingCost || 0);
+  return { itemsTotal, shipping, totalAmount: Math.round((itemsTotal + shipping) * 100) / 100 };
+};
+
 const VendorPODetail = () => {
   const { poId } = useParams();
   const navigate = useNavigate();
@@ -619,7 +637,8 @@ const VendorPODetail = () => {
     yPos = drawCaseStickerCallout(doc, yPos, pageWidth, csInfoDownload);
 
     // ============ ITEMS TABLE ============
-    const tableData = poItems.map(item => [
+    // Shipping is summarised in the totals section below, so it must not also appear as a line.
+    const tableData = poItems.filter(item => !isShippingItem(item)).map(item => [
       item.sku,
       item.name,
       item.quantity.toLocaleString(),
@@ -663,9 +682,7 @@ const VendorPODetail = () => {
 
     // ============ TOTALS SECTION ============
     const finalY = (doc as any).lastAutoTable.finalY + 10;
-    const itemsTotal = poItems.reduce((sum, item) => sum + Number(item.total), 0);
-    const shippingCost = Number(po.shipping_cost || 0);
-    const totalAmount = itemsTotal + shippingCost;
+    const { itemsTotal, shipping: shippingCost, totalAmount } = splitPOTotals(poItems, po.shipping_cost);
     
     const totalsWidth = 80;
     const totalsX = pageWidth - totalsWidth - 14;
@@ -872,7 +889,8 @@ const VendorPODetail = () => {
     yPos = drawCaseStickerCallout(doc, yPos, pageWidth, csInfoEmail);
 
     // ============ ITEMS TABLE ============
-    const tableData = poItems.map(item => [
+    // Shipping is summarised in the totals section below, so it must not also appear as a line.
+    const tableData = poItems.filter(item => !isShippingItem(item)).map(item => [
       item.sku,
       item.name,
       item.quantity.toLocaleString(),
@@ -916,9 +934,7 @@ const VendorPODetail = () => {
 
     // ============ TOTALS SECTION ============
     const finalY = (doc as any).lastAutoTable.finalY + 10;
-    const itemsTotal = poItems.reduce((sum, item) => sum + Number(item.total), 0);
-    const shippingCost = Number(po.shipping_cost || 0);
-    const totalAmount = itemsTotal + shippingCost;
+    const { itemsTotal, shipping: shippingCost, totalAmount } = splitPOTotals(poItems, po.shipping_cost);
     
     const totalsWidth = 80;
     const totalsX = pageWidth - totalsWidth - 14;
@@ -1104,21 +1120,30 @@ Thank you for your business.`;
     );
   }
 
+  const productItems = poItems.filter(item => !isShippingItem(item));
+  const shippingItems = poItems.filter(isShippingItem);
+
   // Subtotal must match the per-line amounts shown in the table:
   // when final qty/cost are in play, the line total is final_quantity * final_unit_cost.
-  const displayedItemsTotal = poItems.reduce((sum, item) => {
+  const billedLineAmount = (item: any) => {
     const useFinal = po.final_total && item.final_quantity != null && item.final_unit_cost != null;
-    return sum + (useFinal
+    return useFinal
       ? Number(item.final_quantity) * Number(item.final_unit_cost)
-      : Number(item.total || 0));
-  }, 0);
+      : Number(item.total || 0);
+  };
+  const displayedItemsTotal = productItems.reduce((sum, item) => sum + billedLineAmount(item), 0);
 
-  const poShippingCost = Number(po.shipping_cost || 0);
+  const shippingFrom = (lineSum: number) => (lineSum !== 0 ? lineSum : Number(po.shipping_cost || 0));
+  const orderedShipping = shippingFrom(
+    shippingItems.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_cost || 0), 0)
+  );
+  const billedShipping = shippingFrom(shippingItems.reduce((sum, item) => sum + billedLineAmount(item), 0));
+
   // What the PO was originally cut for (ordered quantities)
   const orderedGrandTotal =
-    Math.round((poItems.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_cost || 0), 0) + poShippingCost) * 100) / 100;
+    Math.round((productItems.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_cost || 0), 0) + orderedShipping) * 100) / 100;
   // What is actually owed based on shipped/final quantities shown in the table
-  const adjustedGrandTotal = Math.round((displayedItemsTotal + poShippingCost) * 100) / 100;
+  const adjustedGrandTotal = Math.round((displayedItemsTotal + billedShipping) * 100) / 100;
   const effectiveBillTotal = po.final_total != null ? Number(po.final_total) : adjustedGrandTotal;
 
   return (
@@ -1735,7 +1760,7 @@ Thank you for your business.`;
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Shipping</span>
-                  {isEditMode ? (
+                  {isEditMode && shippingItems.length === 0 ? (
                     <Input
                       type="number"
                       step="0.01"
@@ -1745,13 +1770,20 @@ Thank you for your business.`;
                       className="w-28 text-right"
                     />
                   ) : (
-                    <span className="font-medium">${Number(po.shipping_cost || 0).toFixed(2)}</span>
+                    <span className="font-medium">
+                      ${billedShipping.toFixed(2)}
+                      {shippingItems.length > 0 && (
+                        <span className="ml-2 text-xs text-muted-foreground">(line item)</span>
+                      )}
+                    </span>
                   )}
                 </div>
                 <div className="flex justify-between items-center pt-3 border-t">
                   <span className="text-sm font-semibold">Total</span>
                   <span className="text-2xl font-bold">
-                    ${(displayedItemsTotal + Number(isEditMode ? (editedPO.shipping_cost || 0) : (po.shipping_cost || 0))).toFixed(2)}
+                    ${(displayedItemsTotal + (isEditMode && shippingItems.length === 0
+                        ? Number(editedPO.shipping_cost || 0)
+                        : billedShipping)).toFixed(2)}
                   </span>
                 </div>
               </div>

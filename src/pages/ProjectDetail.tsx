@@ -278,7 +278,9 @@ const ProjectDetail = () => {
         .reduce((sum, inv) => sum + (inv.total_paid || 0), 0)
     : 0;
   const totalPaid = billedInvoices.reduce((sum, inv) => sum + (inv.total_paid || 0), 0) + parentPaid;
-  const totalCosts = vendorPOs.reduce((sum, po) => sum + (po.total || 0), 0);
+  // Cost = what the vendor actually billed us, falling back to the PO we cut when nothing has
+  // been billed yet. Matches AP, Send to Finance and the Projects list.
+  const totalCosts = vendorPOs.reduce((sum, po) => sum + (po.final_total ?? po.total ?? 0), 0);
   const totalCostsPaid = vendorPOs.reduce((sum, po) => sum + (po.total_paid || 0), 0);
   const accrualProfit = totalRevenue - totalCosts;
   const cashProfit = totalPaid - totalCostsPaid;
@@ -499,7 +501,7 @@ const ProjectDetail = () => {
                       date: new Date(po.order_date),
                       details: (po.vendors as any)?.name || 'Unknown Vendor',
                       status: po.status,
-                      amount: po.total || 0,
+                      amount: po.final_total ?? po.total ?? 0,
                       isOrder: false,
                       onClick: () => navigate(`/vendor-pos/${po.id}?returnTo=/projects/${projectId}`)
                     })),
@@ -809,7 +811,8 @@ const ProjectDetail = () => {
                 </TableHeader>
                 <TableBody>
                   {vendorPOs.map((po) => {
-                    const poOwed = (po.total || 0) - (po.total_paid || 0);
+                    const poBilled = po.final_total ?? po.total ?? 0;
+                    const poOwed = poBilled - (po.total_paid || 0);
                     return (
                       <TableRow 
                         key={po.id}
@@ -834,7 +837,7 @@ const ProjectDetail = () => {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right text-red-600 font-medium">
-                          {formatCurrency(po.total)}
+                          {formatCurrency(poBilled)}
                         </TableCell>
                         <TableCell className="text-right text-green-600">
                           {formatCurrency(po.total_paid || 0)}

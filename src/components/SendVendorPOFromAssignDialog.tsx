@@ -109,22 +109,19 @@ export function SendVendorPOFromAssignDialog({
   const saveEdits = async () => {
     setSavingEdits(true);
     try {
-      let newTotal = 0;
       for (const item of poItems) {
         const edit = editingItems[item.id];
         if (!edit) continue;
         const unitCost = parseFloat(edit.unit_cost);
         const qty = parseInt(edit.quantity);
-        const itemTotal = unitCost * qty;
-        newTotal += itemTotal;
 
         await supabase
           .from("vendor_po_items")
-          .update({ unit_cost: unitCost, quantity: qty, total: itemTotal })
+          .update({ unit_cost: unitCost, quantity: qty, total: unitCost * qty })
           .eq("id", item.id);
       }
-
-      await supabase.from("vendor_pos").update({ total: newTotal }).eq("id", vendorPoId);
+      // vendor_pos.total is recalculated by the vendor_po_recalc trigger. Summing it here
+      // dropped shipping, which is how POs ended up short by their freight amount.
 
       setIsEditing(false);
       setEditingItems({});

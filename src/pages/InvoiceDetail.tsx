@@ -995,7 +995,6 @@ const InvoiceDetail = () => {
 
       // Sync shipped quantities to linked vendor PO items IN PARALLEL
       try {
-        const affectedPoIds = new Set<string>();
         await Promise.all(editedItems.map(async (item) => {
           const newShippedQty = preserveChildShipmentQuantities
             ? Math.max(Number(item.shipped_quantity) || 0, dbShippedMap[item.id] ?? 0)
@@ -1010,7 +1009,6 @@ const InvoiceDetail = () => {
 
           await Promise.all(linkedVPOItems.map(async (vpoItem: any) => {
             const vpoTotal = Math.round(newShippedQty * Number(vpoItem.unit_cost) * 100) / 100;
-            affectedPoIds.add(vpoItem.vendor_po_id);
             await supabase
               .from('vendor_po_items')
               .update({ shipped_quantity: newShippedQty, total: vpoTotal })
@@ -1018,17 +1016,8 @@ const InvoiceDetail = () => {
           }));
         }));
 
-        // Recalculate each affected PO total once (parallel)
-        await Promise.all([...affectedPoIds].map(async (vpId) => {
-          const { data: allItems } = await supabase
-            .from('vendor_po_items')
-            .select('total')
-            .eq('vendor_po_id', vpId);
-          if (allItems) {
-            const poTotal = Math.round(allItems.reduce((s: number, i: any) => s + Number(i.total), 0) * 100) / 100;
-            await supabase.from('vendor_pos').update({ total: poTotal }).eq('id', vpId);
-          }
-        }));
+        // PO totals are recalculated by the vendor_po_recalc trigger as the items above are
+        // written. Re-summing item.total here dropped shipping and raced the trigger.
       } catch (syncErr) {
         console.error('Vendor PO sync error (non-fatal):', syncErr);
       }

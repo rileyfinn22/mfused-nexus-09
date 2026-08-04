@@ -94,7 +94,7 @@ const Projects = () => {
               .is('deleted_at', null),
             supabase
               .from('vendor_pos')
-              .select('id, order_id, total, total_paid')
+              .select('id, order_id, total, final_total, total_paid')
               .in('order_id', orderIds),
           ])
         : [{ data: [] as any[] }, { data: [] as any[] }];
@@ -128,7 +128,10 @@ const Projects = () => {
         const totalPaid = childInvoices.length > 0
           ? childrenPaid + parentPaid
           : invoices.reduce((sum, inv) => sum + (inv.total_paid || 0), 0);
-        const totalCosts = vendorPOs.reduce((sum, po) => sum + (po.total || 0), 0);
+        // Cost = what the vendor actually billed us (final_total), falling back to the PO we
+        // cut when nothing has been billed yet. Same basis AP and Send to Finance use, so
+        // project profit no longer disagrees with the payables screens.
+        const totalCosts = vendorPOs.reduce((sum, po) => sum + (po.final_total ?? po.total ?? 0), 0);
         const totalCostsPaid = vendorPOs.reduce((sum, po) => sum + (po.total_paid || 0), 0);
 
         return {

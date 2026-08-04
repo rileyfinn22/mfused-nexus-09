@@ -53,10 +53,14 @@ export function UpdateBillDialog({ open, onOpenChange, vendorPO, poItems, onSucc
         editedSku: item.sku,
         editedName: item.name
       })));
-      // Check for existing shipping line item
+      // Shipping lives on a SHIPPING line item when there is one, otherwise on the PO column.
+      // Seeding from the line alone made the dialog show $0 shipping on column-only POs, so the
+      // bill total shown here understated what the PO actually came to.
       const existingShipping = poItems.find(item => item.sku === 'SHIPPING');
       if (existingShipping) {
         setShippingCost(String(existingShipping.total || 0));
+      } else if (Number(vendorPO?.shipping_cost || 0) > 0) {
+        setShippingCost(String(vendorPO.shipping_cost));
       } else {
         setShippingCost("");
       }
@@ -144,12 +148,13 @@ export function UpdateBillDialog({ open, onOpenChange, vendorPO, poItems, onSucc
       for (const item of productItems.filter(i => !i.isNew)) {
         const qty = numOr0(item.editedQty);
         const cost = numOr0(item.editedCost);
+        // quantity/unit_cost stay as ORDERED -- they are the PO we cut and sent the vendor.
+        // What the vendor actually billed goes in final_quantity/final_unit_cost only.
         const { error } = await supabase
           .from('vendor_po_items')
           .update({
             sku: item.editedSku,
             name: item.editedName,
-            unit_cost: cost,
             total: qty * cost,
             final_quantity: qty,
             final_unit_cost: cost
@@ -222,11 +227,11 @@ export function UpdateBillDialog({ open, onOpenChange, vendorPO, poItems, onSucc
           .eq('id', existingShipping.id);
       }
 
-      // Update vendor PO with final total
+      // total and final_total are owned by the vendor_po_recalc trigger -- writing them here
+      // is what used to leave a frozen final_total behind after later line-item edits.
       const { error: poError } = await supabase
         .from('vendor_pos')
         .update({
-          final_total: finalTotal,
           status: vendorPO.status === 'draft' ? 'unpaid' : vendorPO.status
         })
         .eq('id', vendorPO.id);

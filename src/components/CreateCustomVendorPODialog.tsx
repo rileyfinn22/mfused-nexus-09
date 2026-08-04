@@ -279,14 +279,7 @@ export function CreateCustomVendorPODialog({
 
       if (itemsError) throw itemsError;
 
-      // Update PO total (existing total + new items)
-      const addedTotal = calculateTotal();
-      const newTotal = Number(targetPO.total || 0) + addedTotal;
-      await supabase
-        .from("vendor_pos")
-        .update({ total: newTotal })
-        .eq("id", targetPO.id);
-
+      // vendor_pos.total is recalculated by the vendor_po_recalc trigger once the items land.
       setCreatedPOId(targetPO.id);
       setCreatedPONumber(targetPO.po_number || existingPO?.po_number);
 

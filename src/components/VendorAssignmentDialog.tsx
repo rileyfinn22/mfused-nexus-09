@@ -217,20 +217,7 @@ export const VendorAssignmentDialog = ({
             .delete()
             .eq('id', oldPOItem.id);
 
-          // Update old vendor PO total
-          const { data: oldPO } = await supabase
-            .from('vendor_pos')
-            .select('total')
-            .eq('id', oldPOItem.vendor_po_id)
-            .single();
-
-          if (oldPO) {
-            const newOldTotal = Number(oldPO.total) - Number(oldPOItem.total);
-            await supabase
-              .from('vendor_pos')
-              .update({ total: Math.max(0, newOldTotal) })
-              .eq('id', oldPOItem.vendor_po_id);
-          }
+          // The old PO's totals are recalculated by the vendor_po_recalc trigger on delete.
         }
       }
 
@@ -272,10 +259,6 @@ export const VendorAssignmentDialog = ({
           .maybeSingle();
 
         if (existingPOItem) {
-          // Update existing item - recalculate adjustment
-          const oldItemTotal = Number(existingPOItem.total);
-          const totalAdjustment = newItemTotal - oldItemTotal;
-          
           await supabase
             .from('vendor_po_items')
             .update({
@@ -283,13 +266,6 @@ export const VendorAssignmentDialog = ({
               total: newItemTotal
             })
             .eq('id', existingPOItem.id);
-
-          // Update PO total
-          const newTotal = Number(existingPO.total) + totalAdjustment;
-          await supabase
-            .from('vendor_pos')
-            .update({ total: newTotal })
-            .eq('id', existingPO.id);
         } else {
           // Create new PO item for this vendor
           await supabase
@@ -305,13 +281,6 @@ export const VendorAssignmentDialog = ({
               unit_cost: parseFloat(assignment.vendorCost),
               total: newItemTotal
             } as any);
-
-          // Update PO total
-          const newTotal = Number(existingPO.total) + newItemTotal;
-          await supabase
-            .from('vendor_pos')
-            .update({ total: newTotal })
-            .eq('id', existingPO.id);
         }
       } else {
         // Create new vendor PO
@@ -475,19 +444,7 @@ export const VendorAssignmentDialog = ({
               .delete()
               .eq('id', oldPOItem.id);
 
-            const { data: oldPO } = await supabase
-              .from('vendor_pos')
-              .select('total')
-              .eq('id', oldPOItem.vendor_po_id)
-              .single();
-
-            if (oldPO) {
-              const newOldTotal = Number(oldPO.total) - Number(oldPOItem.total);
-              await supabase
-                .from('vendor_pos')
-                .update({ total: Math.max(0, newOldTotal) })
-                .eq('id', oldPOItem.vendor_po_id);
-            }
+            // Totals on the old PO are recalculated by the vendor_po_recalc trigger.
           }
         }
 
@@ -524,10 +481,6 @@ export const VendorAssignmentDialog = ({
             .maybeSingle();
 
           if (existingPOItem) {
-            // Update existing item
-            const oldItemTotal = Number(existingPOItem.total);
-            const totalAdjustment = newItemTotal - oldItemTotal;
-            
             await supabase
               .from('vendor_po_items')
               .update({
@@ -535,12 +488,6 @@ export const VendorAssignmentDialog = ({
                 total: newItemTotal
               })
               .eq('id', existingPOItem.id);
-
-            const newTotal = Number(existingPO.total) + totalAdjustment;
-            await supabase
-              .from('vendor_pos')
-              .update({ total: newTotal })
-              .eq('id', existingPO.id);
           } else {
             // Create new PO item
             await supabase
@@ -556,12 +503,6 @@ export const VendorAssignmentDialog = ({
                 unit_cost: parseFloat(bulkCost),
                 total: newItemTotal
               } as any);
-
-            const newTotal = Number(existingPO.total) + newItemTotal;
-            await supabase
-              .from('vendor_pos')
-              .update({ total: newTotal })
-              .eq('id', existingPO.id);
           }
         } else {
           // Create new vendor PO
