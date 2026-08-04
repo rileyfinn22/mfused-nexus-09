@@ -145,6 +145,33 @@ serve(async (req) => {
     console.log('Invoice stored billed_percentage:', invoice.billed_percentage);
     console.log('Inventory allocations found:', allocations?.length || 0);
 
+    // A blanket with shipment invoices under it must NOT go to QuickBooks as well. The children
+    // bill the goods; the blanket is the umbrella they draw down against. Syncing both put the
+    // same goods on two QBO invoices and doubled the receivable -- six orders were sitting like
+    // that when this was found (10962, 10969, 10970, 10971, 10993, 10994). If the blanket is
+    // already in QBO from before this guard, leave it alone: that is a bookkeeping cleanup with
+    // customer payments attached, not something a sync should silently undo.
+    if (!invoice.parent_invoice_id) {
+      const { count: childCount } = await supabase
+        .from('invoices')
+        .select('id', { count: 'exact', head: true })
+        .eq('parent_invoice_id', invoice.id)
+        .is('deleted_at', null);
+
+      if ((childCount || 0) > 0 && !invoice.quickbooks_id) {
+        console.log(`Blanket ${invoice.invoice_number} has ${childCount} shipment invoice(s); they carry the billing. Not syncing the blanket.`);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            skipped: true,
+            reason: 'blanket_has_shipment_invoices',
+            message: `Invoice ${invoice.invoice_number} has ${childCount} shipment invoice(s) billing against it. Those go to QuickBooks; sending the blanket as well would bill the same goods twice.`,
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     // Determine effective billing percentage (explicit request wins)
     const orderTotal = Number(invoice.orders?.total || 0);
     const invoiceTotal = Number(invoice.total || 0);
