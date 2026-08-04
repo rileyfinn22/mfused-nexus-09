@@ -17,6 +17,7 @@ import { EmailPreviewDialog, AdditionalAttachment, ArtworkFile } from "@/compone
 import { RecordVendorPOPaymentDialog } from "@/components/RecordVendorPOPaymentDialog";
 import { UpdateBillDialog } from "@/components/UpdateBillDialog";
 import { VendorPOPackingListSection } from "@/components/VendorPOPackingListSection";
+import { VendorBillsSection } from "@/components/VendorBillsSection";
 import { getTrackingUrl, CARRIERS } from "@/lib/trackingUtils";
 import { InlineTrackingEditor } from "@/components/InlineTrackingEditor";
 import { normalizeStorageObjectPath, openStorageObjectInNewTab } from "@/lib/storageUrl";
@@ -1875,6 +1876,11 @@ Thank you for your business.`;
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Vendor Bills -- their invoice is what we actually owe */}
+      {po && isAdmin && (
+        <VendorBillsSection vendorPO={po} onChanged={fetchPODetails} />
       )}
 
       {/* Packing Lists Section */}

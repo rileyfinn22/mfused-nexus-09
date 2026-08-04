@@ -92,3 +92,6 @@ verify_jwt = false
 
 [functions.create-vendor-user]
 verify_jwt = true
+
+[functions.parse-vendor-bill]
+verify_jwt = true
