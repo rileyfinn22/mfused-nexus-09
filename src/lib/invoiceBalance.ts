@@ -94,9 +94,7 @@ export function computeChildCredit(
 
 export interface ChildPdfInputs {
   /** Line items billed on THIS invoice (from its allocations); null → caller keeps its fallback. */
-  itemsOverride:
-    | Array<Record<string, unknown> & { quantity: number; shipped_quantity: number; unit_price: number }>
-    | null;
+  itemsOverride: OrderItem[] | null;
   credit: ChildCreditResult;
 }
 
