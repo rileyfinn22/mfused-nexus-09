@@ -15,7 +15,6 @@ import autoTable from "jspdf-autotable";
 import { VIBE_COMPANY } from "@/lib/pdfBranding";
 import { EmailPreviewDialog, AdditionalAttachment, ArtworkFile } from "@/components/EmailPreviewDialog";
 import { RecordVendorPOPaymentDialog } from "@/components/RecordVendorPOPaymentDialog";
-import { UpdateBillDialog } from "@/components/UpdateBillDialog";
 import { VendorPOPackingListSection } from "@/components/VendorPOPackingListSection";
 import { VendorBillsSection } from "@/components/VendorBillsSection";
 import { getTrackingUrl, CARRIERS } from "@/lib/trackingUtils";
@@ -28,15 +27,20 @@ import VendorProductionPanel from "@/components/vendor/VendorProductionPanel";
 const isShippingItem = (item: any) =>
   item?.sku === 'SHIPPING' || item?.item_type === 'shipping';
 
-// Mirrors public.vendor_po_recalc in the database so PDFs, the page and the stored
+// The PO document is what we ordered, so every figure on it is quantity x unit_cost. What the
+// vendor later billed is a separate document (vendor_bills) and never appears here.
+// Mirrors the ordered half of public.vendor_po_recalc so the PDF, the page and the stored
 // vendor_pos.total can never disagree.
+const orderedLineAmount = (item: any) =>
+  Number(item?.quantity || 0) * Number(item?.unit_cost || 0);
+
 const splitPOTotals = (items: any[], shippingCost: any) => {
   const shippingLineSum = items
     .filter(isShippingItem)
-    .reduce((sum, item) => sum + Number(item.total || 0), 0);
+    .reduce((sum, item) => sum + orderedLineAmount(item), 0);
   const itemsTotal = items
     .filter(item => !isShippingItem(item))
-    .reduce((sum, item) => sum + Number(item.total || 0), 0);
+    .reduce((sum, item) => sum + orderedLineAmount(item), 0);
   const shipping = shippingLineSum !== 0 ? shippingLineSum : Number(shippingCost || 0);
   return { itemsTotal, shipping, totalAmount: Math.round((itemsTotal + shipping) * 100) / 100 };
 };
@@ -61,7 +65,6 @@ const VendorPODetail = () => {
   const [sendingEmail, setSendingEmail] = useState(false);
   const [showEmailPreview, setShowEmailPreview] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
-  const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [artworkFiles, setArtworkFiles] = useState<ArtworkFile[]>([]);
   const [loadingArtwork, setLoadingArtwork] = useState(false);
@@ -644,7 +647,7 @@ const VendorPODetail = () => {
       item.name,
       item.quantity.toLocaleString(),
       `$${Number(item.unit_cost).toFixed(3)}`,
-      `$${Number(item.total).toFixed(2)}`
+      `$${orderedLineAmount(item).toFixed(2)}`
     ]);
 
     autoTable(doc, {
@@ -896,7 +899,7 @@ const VendorPODetail = () => {
       item.name,
       item.quantity.toLocaleString(),
       `$${Number(item.unit_cost).toFixed(3)}`,
-      `$${Number(item.total).toFixed(2)}`
+      `$${orderedLineAmount(item).toFixed(2)}`
     ]);
 
     autoTable(doc, {
@@ -1124,28 +1127,17 @@ Thank you for your business.`;
   const productItems = poItems.filter(item => !isShippingItem(item));
   const shippingItems = poItems.filter(isShippingItem);
 
-  // Subtotal must match the per-line amounts shown in the table:
-  // when final qty/cost are in play, the line total is final_quantity * final_unit_cost.
-  const billedLineAmount = (item: any) => {
-    const useFinal = po.final_total && item.final_quantity != null && item.final_unit_cost != null;
-    return useFinal
-      ? Number(item.final_quantity) * Number(item.final_unit_cost)
-      : Number(item.total || 0);
-  };
-  const displayedItemsTotal = productItems.reduce((sum, item) => sum + billedLineAmount(item), 0);
+  // This page shows the PO as we cut and sent it -- ordered quantities at ordered prices.
+  // What the vendor actually charged is a different document and lives in Vendor Bills.
+  const orderedItemsTotal = productItems.reduce(
+    (sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_cost || 0), 0);
+  const orderedShipping = shippingItems.length > 0
+    ? shippingItems.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_cost || 0), 0)
+    : Number(po.shipping_cost || 0);
+  const orderedGrandTotal = Math.round((orderedItemsTotal + orderedShipping) * 100) / 100;
 
-  const shippingFrom = (lineSum: number) => (lineSum !== 0 ? lineSum : Number(po.shipping_cost || 0));
-  const orderedShipping = shippingFrom(
-    shippingItems.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_cost || 0), 0)
-  );
-  const billedShipping = shippingFrom(shippingItems.reduce((sum, item) => sum + billedLineAmount(item), 0));
-
-  // What the PO was originally cut for (ordered quantities)
-  const orderedGrandTotal =
-    Math.round((productItems.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_cost || 0), 0) + orderedShipping) * 100) / 100;
-  // What is actually owed based on shipped/final quantities shown in the table
-  const adjustedGrandTotal = Math.round((displayedItemsTotal + billedShipping) * 100) / 100;
-  const effectiveBillTotal = po.final_total != null ? Number(po.final_total) : adjustedGrandTotal;
+  // Payables figures. Not shown as part of the PO document -- only where money owed is the point.
+  const effectiveBillTotal = po.final_total != null ? Number(po.final_total) : orderedGrandTotal;
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -1188,10 +1180,6 @@ Thank you for your business.`;
           </Button>
           {isAdmin && (
             <>
-              <Button variant="outline" onClick={() => setShowFinalizeDialog(true)}>
-                <FileCheck className="h-4 w-4 mr-2" />
-                Update Bill
-              </Button>
               <Button variant="outline" onClick={() => setShowPaymentDialog(true)}>
                 <DollarSign className="h-4 w-4 mr-2" />
                 Record Payment
@@ -1284,18 +1272,10 @@ Thank you for your business.`;
 
             {/* Payment Summary */}
             <div className="mt-6 bg-background/80 backdrop-blur rounded-lg p-4">
-              <div className="grid grid-cols-5 gap-4 text-center">
+              <div className="grid grid-cols-4 gap-4 text-center">
                 <div>
                   <p className="text-xs text-muted-foreground">Original PO</p>
                   <p className="text-lg font-bold">${orderedGrandTotal.toFixed(2)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">
-                    {po.final_total != null ? 'Final Bill' : 'Adjusted (shipped)'}
-                  </p>
-                  <p className={`text-lg font-bold ${po.final_total != null || adjustedGrandTotal !== orderedGrandTotal ? 'text-primary' : 'text-muted-foreground'}`}>
-                    ${effectiveBillTotal.toFixed(2)}
-                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Total Paid</p>
@@ -1582,9 +1562,7 @@ Thank you for your business.`;
                   <TableHead>Product</TableHead>
                   <TableHead className="text-center">Ordered</TableHead>
                   <TableHead className="text-center">Shipped</TableHead>
-                  {po.final_total && <TableHead className="text-center">Final Qty</TableHead>}
                   <TableHead className="text-right">Unit Cost</TableHead>
-                  {po.final_total && <TableHead className="text-right">Final Cost</TableHead>}
                   <TableHead className="text-right">Total</TableHead>
                   {isAdmin && isEditMode && <TableHead className="text-center">Actions</TableHead>}
                 </TableRow>
@@ -1688,11 +1666,6 @@ Thank you for your business.`;
                         )
                       )}
                     </TableCell>
-                    {po.final_total && (
-                      <TableCell className="text-center font-medium">
-                        {item.sku === 'SHIPPING' ? '-' : (item.final_quantity ?? '-')}
-                      </TableCell>
-                    )}
                     <TableCell className="text-right">
                       {isEditMode ? (
                         <Input
@@ -1716,16 +1689,8 @@ Thank you for your business.`;
                         `$${Number(item.unit_cost).toFixed(3)}`
                       )}
                     </TableCell>
-                    {po.final_total && (
-                      <TableCell className="text-right font-medium">
-                        {item.final_unit_cost ? `$${Number(item.final_unit_cost).toFixed(3)}` : '-'}
-                      </TableCell>
-                    )}
                     <TableCell className="text-right font-medium">
-                      ${po.final_total && item.final_quantity != null && item.final_unit_cost != null
-                        ? (Number(item.final_quantity) * Number(item.final_unit_cost)).toFixed(2)
-                        : Number(item.total).toFixed(2)
-                      }
+                      ${(Number(item.quantity || 0) * Number(item.unit_cost || 0)).toFixed(2)}
                     </TableCell>
                     {isAdmin && isEditMode && (
                       <TableCell className="text-center">
@@ -1757,7 +1722,7 @@ Thank you for your business.`;
               <div className="w-72 space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Subtotal</span>
-                  <span className="font-medium">${displayedItemsTotal.toFixed(2)}</span>
+                  <span className="font-medium">${orderedItemsTotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Shipping</span>
@@ -1772,7 +1737,7 @@ Thank you for your business.`;
                     />
                   ) : (
                     <span className="font-medium">
-                      ${billedShipping.toFixed(2)}
+                      ${orderedShipping.toFixed(2)}
                       {shippingItems.length > 0 && (
                         <span className="ml-2 text-xs text-muted-foreground">(line item)</span>
                       )}
@@ -1780,11 +1745,11 @@ Thank you for your business.`;
                   )}
                 </div>
                 <div className="flex justify-between items-center pt-3 border-t">
-                  <span className="text-sm font-semibold">Total</span>
+                  <span className="text-sm font-semibold">PO Total</span>
                   <span className="text-2xl font-bold">
-                    ${(displayedItemsTotal + (isEditMode && shippingItems.length === 0
+                    ${(orderedItemsTotal + (isEditMode && shippingItems.length === 0
                         ? Number(editedPO.shipping_cost || 0)
-                        : billedShipping)).toFixed(2)}
+                        : orderedShipping)).toFixed(2)}
                   </span>
                 </div>
               </div>
@@ -1920,16 +1885,6 @@ Thank you for your business.`;
         }}
       />
 
-      {/* Update Bill Dialog */}
-      <UpdateBillDialog
-        open={showFinalizeDialog}
-        onOpenChange={setShowFinalizeDialog}
-        vendorPO={po}
-        poItems={poItems}
-        onSuccess={() => {
-          fetchPODetails();
-        }}
-      />
     </div>
   );
 };

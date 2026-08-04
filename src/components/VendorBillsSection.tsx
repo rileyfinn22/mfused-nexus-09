@@ -69,6 +69,8 @@ export function VendorBillsSection({ vendorPO, onChanged }: VendorBillsSectionPr
   const billedTotal = bills.reduce((sum, b) => sum + Number(b.total || 0), 0);
   const orderedTotal = Number(vendorPO?.total || 0);
   const variance = Math.round((billedTotal - orderedTotal) * 100) / 100;
+  const paid = Number(vendorPO?.total_paid || 0);
+  const owed = Math.round((billedTotal - paid) * 100) / 100;
 
   return (
     <>
@@ -157,9 +159,9 @@ export function VendorBillsSection({ vendorPO, onChanged }: VendorBillsSectionPr
               </Table>
 
               <div className="mt-4 flex justify-end">
-                <div className="w-72 space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">PO as ordered</span>
+                <div className="w-80 space-y-2 text-sm">
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>PO as ordered</span>
                     <span>{formatCurrency(orderedTotal)}</span>
                   </div>
                   <div className="flex justify-between border-t pt-2 font-semibold">
@@ -172,6 +174,14 @@ export function VendorBillsSection({ vendorPO, onChanged }: VendorBillsSectionPr
                       <span>{variance > 0 ? '+' : ''}{formatCurrency(variance)}</span>
                     </div>
                   )}
+                  <div className="flex justify-between text-green-600">
+                    <span>Paid</span>
+                    <span>{formatCurrency(paid)}</span>
+                  </div>
+                  <div className="flex justify-between border-t pt-2 text-base font-bold">
+                    <span>Still owed</span>
+                    <span className={owed > 0 ? 'text-destructive' : ''}>{formatCurrency(owed)}</span>
+                  </div>
                   <p className="pt-1 text-xs text-muted-foreground">
                     <FileText className="mr-1 inline h-3 w-3" />
                     Project profit, AP and payments all use the billed figure.
