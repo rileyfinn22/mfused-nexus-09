@@ -1547,7 +1547,10 @@ serve(async (req) => {
         quickbooks_synced_at: new Date().toISOString(),
         quickbooks_sync_status: 'synced',
         quickbooks_payment_link: qbPaymentLink,
-        billed_percentage: isPullShipInvoice || isChildInvoice ? null : billingPercentage,
+        // billed_percentage is the DEPOSIT the user set, and only they may change it. Writing
+        // the effective percentage back here turned a derived value into a stored one: a
+        // partial invoice smaller than its order got a percentage inferred at line ~196 and
+        // then saved, so it came back as a permanent "deposit" nobody had asked for.
         status: 'billed',
         invoice_date: new Date().toISOString(),
       })

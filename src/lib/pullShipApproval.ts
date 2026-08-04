@@ -298,22 +298,11 @@ export async function approvePullShipOrder({
     }
   }
 
-  // 10. Update blanket invoice billed_percentage (only for partial shipments)
-  if (!isFullShipment && existingInvoices && existingInvoices.length > 0) {
-    // Sum all existing child percentages + this new one
-    const existingChildPercent = existingInvoices
-      .filter((inv) => inv.invoice_type === "partial")
-      .reduce((sum, inv) => sum + (inv.billed_percentage || 0), 0);
-    const totalBilledPercent = existingChildPercent + percentageOfOrder;
-
-    const fullInvoice = existingInvoices.find((inv) => inv.invoice_type === "full");
-    if (fullInvoice) {
-      await supabase
-        .from("invoices")
-        .update({ billed_percentage: Number(totalBilledPercent.toFixed(2)) })
-        .eq("id", fullInvoice.id);
-    }
-  }
+  // The blanket's billed_percentage is NOT touched here. It means one thing only -- the deposit
+  // percentage a human set on that invoice -- and this used to overwrite it with the cumulative
+  // child drawdown, so a 30% deposit silently became 45% as shipments went out, changing both
+  // the deposit line on the PDF and what QuickBooks billed. How much of the blanket has been
+  // drawn down is already answerable from the child invoices themselves.
 
   return { invoiceNumber, percentageOfOrder };
 }

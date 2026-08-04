@@ -1497,6 +1497,38 @@ const InvoiceDetail = () => {
     }
   };
 
+  // Removing a deposit had no explicit action: you had to re-open the Bill Deposit dialog and
+  // enter 100, which reads like billing a 100% deposit rather than cancelling one.
+  const handleClearDeposit = async () => {
+    if (!invoice) return;
+    const pct = Number(invoice.billed_percentage);
+    if (
+      !confirm(
+        `Remove the ${pct}% deposit from invoice ${invoice.invoice_number}?\n\n` +
+        `It will bill the full ${formatCurrency(Number(invoice.total || 0))} instead of ${formatCurrency(Number(invoice.total || 0) * pct / 100)}.\n\n` +
+        `Payments already recorded are not affected. Re-sync to QuickBooks afterwards to push the change.`
+      )
+    ) {
+      return;
+    }
+    try {
+      const { error } = await supabase
+        .from('invoices')
+        .update({ billed_percentage: null, quickbooks_sync_status: invoice.quickbooks_id ? 'pending' : null })
+        .eq('id', invoiceId);
+      if (error) throw error;
+      toast({
+        title: 'Deposit Removed',
+        description: invoice.quickbooks_id
+          ? 'This invoice now bills in full. Re-sync to QuickBooks to update it there.'
+          : 'This invoice now bills in full.',
+      });
+      fetchInvoiceDetails();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message || 'Failed to remove deposit', variant: 'destructive' });
+    }
+  };
+
   const handleReopenInvoice = async () => {
     if (!confirm('Reopen this invoice? This will set the status back to open.')) {
       return;
@@ -1557,6 +1589,12 @@ const InvoiceDetail = () => {
   // For edit mode, recalculate. Otherwise use stored invoice.total
   const displayItems = editedItems;
   const isBlanketDisplay = invoice?.invoice_type === 'full' && invoice?.shipment_number === 1;
+  // billed_percentage means exactly one thing: the deposit rate someone set on this invoice.
+  // null or 100 both mean no deposit.
+  const hasDeposit =
+    invoice?.billed_percentage != null &&
+    Number(invoice.billed_percentage) > 0 &&
+    Number(invoice.billed_percentage) < 100;
   
   const displayShipping = isEditMode ? Number(editShippingCost || 0) : Number(invoice?.shipping_cost || 0);
   
@@ -1729,7 +1767,11 @@ const InvoiceDetail = () => {
                     </Button>}
                   {invoice.invoice_type === 'full' && invoice.shipment_number === 1 && <Button size="sm" variant="outline" onClick={() => setShowDepositDialog(true)} className="border-blue-500 text-blue-700 hover:bg-blue-50">
                       <DollarSign className="h-4 w-4 mr-1.5" />
-                      Bill Deposit
+                      {hasDeposit ? `Deposit ${Number(invoice.billed_percentage)}%` : 'Bill Deposit'}
+                    </Button>}
+                  {hasDeposit && <Button size="sm" variant="outline" onClick={handleClearDeposit} className="border-amber-500 text-amber-700 hover:bg-amber-50">
+                      <X className="h-4 w-4 mr-1.5" />
+                      Clear Deposit
                     </Button>}
                   {invoice.invoice_type === 'full' && invoice.status !== 'closed' && <Button size="sm" variant="outline" onClick={() => navigate(`/invoices/${invoiceId}/shipped`)} className="border-purple-500 text-purple-700 hover:bg-purple-50">
                       <Package className="h-4 w-4 mr-1.5" />
