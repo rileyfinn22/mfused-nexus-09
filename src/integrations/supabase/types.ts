@@ -4248,6 +4248,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      recalc_blanket_invoices_for_order: {
+        Args: {
+          p_include_closed?: boolean
+          p_only_invoice_id?: string
+          p_order_id: string
+        }
+        Returns: undefined
+      }
       reorder_shipment_leg_public: {
         Args: { p_direction: string; p_leg_id: string; p_token: string }
         Returns: Json
