@@ -1581,7 +1581,9 @@ const InvoiceDetail = () => {
     return totalOrdered > 0 ? Math.min((totalShipped / totalOrdered) * 100, 100) : 0;
   };
   const shippedPercentage = calculateShippedPercentage();
-  const totalVendorCost = vendorPOs.reduce((sum, po) => sum + Number(po.total), 0);
+  // Cost is what the vendor billed us, falling back to the PO we cut when nothing is billed yet.
+  // Same basis as Projects, AP and Send to Finance.
+  const totalVendorCost = vendorPOs.reduce((sum, po) => sum + Number(po.final_total ?? po.total ?? 0), 0);
   const totalProfit = displayTotal - totalVendorCost;
   const profitMargin = displayTotal > 0 ? (totalProfit / displayTotal * 100).toFixed(2) : '0.00';
   const shipmentInvoicesForBlanket = isBlanketDisplay && invoice
