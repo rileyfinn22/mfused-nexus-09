@@ -56,7 +56,7 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
     setLoadingPOs(true);
     const { data } = await supabase
       .from("vendor_pos")
-      .select("id, po_number, total, description, notes, vendor_id, company_id, vendors(name), orders(order_number, customer_name, description), vendor_po_items(name)")
+      .select("id, po_number, total, final_total, description, notes, vendor_id, company_id, vendors(name), orders(order_number, customer_name, description), vendor_po_items(name)")
       .order("created_at", { ascending: false })
       .limit(500);
     setVendorPOs(data || []);
@@ -87,7 +87,10 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
   const handleSelectPO = (po: any) => {
     setSelectedPO(po);
     setSearchQuery(po.po_number);
-    const usd = po.total?.toString() || "";
+    // Same number the "Send to Finance" button passes: the reconciled final
+    // bill when one exists, otherwise the PO total.
+    const effective = po.final_total ?? po.total;
+    const usd = effective?.toString() || "";
     setFinancedAmount(usd);
     setRmbAmount(usd ? (parseFloat(usd) * parseFloat(exchangeRate)).toFixed(2) : "");
   };
@@ -171,7 +174,7 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
                     <p className="text-xs text-muted-foreground truncate">{selectedPO.description}</p>
                   )}
                 </div>
-                <Badge variant="secondary">${selectedPO.total?.toFixed(2)}</Badge>
+                <Badge variant="secondary">${Number(selectedPO.final_total ?? selectedPO.total ?? 0).toFixed(2)}</Badge>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -204,7 +207,7 @@ export function AddFinancedInvoiceDialog({ open, onOpenChange, onSuccess, presel
                       >
                         <div className="flex items-center justify-between">
                           <span className="font-mono font-medium">PO #{po.po_number}</span>
-                          <span className="text-muted-foreground">${po.total?.toFixed(2)}</span>
+                          <span className="text-muted-foreground">${Number(po.final_total ?? po.total ?? 0).toFixed(2)}</span>
                         </div>
                         <div className="text-xs text-muted-foreground truncate">
                           {po.description || (po.orders as any)?.description || (po.orders as any)?.customer_name || "—"}
