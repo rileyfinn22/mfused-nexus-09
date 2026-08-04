@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { allocateDepositCredits } from "../_shared/depositCredit.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -867,8 +868,8 @@ serve(async (req) => {
 
     // Child shipment invoices send the actual shipped lines, then apply the blanket's deposit
     // as a credit spread across the shipments AT THE RATE IT WAS PAID AT -- a 30% deposit bills
-    // every shipment at 70% of itself. Mirrors computeChildCredit in src/lib/invoiceBalance.ts;
-    // QBO and the emailed PDFs must never disagree about a customer's balance.
+    // every shipment at 70% of itself. This calls the SAME allocateDepositCredits the app and
+    // the PDFs use, not a copy, so QBO cannot drift from a customer's emailed invoice.
     if (isChildInvoice && billingPercentage === 100) {
       const { data: parentInvoice } = await supabase
         .from('invoices')
@@ -881,47 +882,15 @@ serve(async (req) => {
       if (parentPaidTotal > 0.005) {
         const { data: siblingInvoices } = await supabase
           .from('invoices')
-          .select('id, invoice_number, shipment_number, total, total_paid, subtotal, created_at')
+          .select('id, invoice_number, shipment_number, total, total_paid, created_at')
           .eq('parent_invoice_id', invoice.parent_invoice_id)
-          .is('deleted_at', null)
-          .order('shipment_number', { ascending: true })
-          .order('created_at', { ascending: true });
+          .is('deleted_at', null);
 
-        const siblings = siblingInvoices || [];
-        const childrenValue = siblings.reduce(
-          (sum: number, c: any) => sum + Math.max(0, Number(c.total || 0)), 0);
-
-        // Rate basis is the whole expected receivable and does NOT change on finalise --
-        // re-deriving it from the children would restate credits on shipments already sent.
-        const basis = Math.max(Number(parentInvoice?.total || 0), childrenValue);
-        const rate = basis > 0.005 ? Math.min(1, parentPaidTotal / basis) : 0;
-
-        const outstandingOf = (c: any) =>
-          Math.max(0, Number(c.total || 0) - Number(c.total_paid || 0));
-
-        // Spread at that rate in shipment order, capped by the pool and each child's balance.
-        let pool = parentPaidTotal;
-        const credited: Record<string, number> = {};
-        for (const sib of siblings) {
-          const share = Math.min(rate * Math.max(0, Number(sib.total || 0)), pool, outstandingOf(sib));
-          const amt = Math.max(0, Math.round(share * 100) / 100);
-          credited[sib.id] = amt;
-          pool -= amt;
-          if (pool <= 0.005) break;
-        }
-
-        // Short order, finalised: the tail settles on the closing shipment.
-        if (parentInvoice?.blanket_closed_at && pool > 0.005) {
-          for (let i = siblings.length - 1; i >= 0 && pool > 0.005; i--) {
-            const sib: any = siblings[i];
-            const already = credited[sib.id] || 0;
-            const extra = Math.min(pool, Math.max(0, outstandingOf(sib) - already));
-            if (extra > 0.005) {
-              credited[sib.id] = Math.round((already + extra) * 100) / 100;
-              pool -= extra;
-            }
-          }
-        }
+        const credited = allocateDepositCredits(
+          parentInvoice as any,
+          (siblingInvoices || []) as any,
+          { blanketValue: Number(parentInvoice?.total || 0) }
+        );
 
         const depositCredit = Math.min(credited[invoice.id] || 0, Math.max(0, calculatedSubtotal));
 
