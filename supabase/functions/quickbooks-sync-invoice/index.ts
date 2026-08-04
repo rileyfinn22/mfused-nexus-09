@@ -867,16 +867,20 @@ serve(async (req) => {
 
     // Child shipment invoices should send the actual shipped lines, then apply any
     // parent blanket deposit/payment as a credit exactly once across child invoices.
+    //
+    // Credit LATE, matching src/lib/invoiceBalance.ts: nothing is released while shipments are
+    // still going out, and once the blanket is finalised the credit lands on the closing
+    // shipment and works backwards. QBO and the PDFs must never disagree about this.
     if (isChildInvoice && billingPercentage === 100) {
       const { data: parentInvoice } = await supabase
         .from('invoices')
-        .select('id, invoice_number, total_paid')
+        .select('id, invoice_number, total_paid, blanket_closed_at')
         .eq('id', invoice.parent_invoice_id)
         .maybeSingle();
 
       const parentPaidTotal = Number(parentInvoice?.total_paid || 0);
 
-      if (parentPaidTotal > 0) {
+      if (parentPaidTotal > 0 && parentInvoice?.blanket_closed_at) {
         const { data: siblingInvoices } = await supabase
           .from('invoices')
           .select('id, invoice_number, shipment_number, subtotal, created_at')
@@ -885,7 +889,9 @@ serve(async (req) => {
           .order('shipment_number', { ascending: true })
           .order('created_at', { ascending: true });
 
-        const siblings = siblingInvoices || [];
+        // Later shipments settle the deposit first, so "prior" here means everything AFTER this
+        // one in shipment order.
+        const siblings = (siblingInvoices || []).slice().reverse();
         const currentIndex = siblings.findIndex((child: any) => child.id === invoice.id);
         const priorShipmentValue = currentIndex > 0
           ? siblings

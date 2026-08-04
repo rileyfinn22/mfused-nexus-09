@@ -1367,6 +1367,25 @@ const InvoiceDetail = () => {
           : `\n\nThose reconcile to the new total.`)
       : '';
 
+    // A shipped quantity of 0 or blank means one of two different things: nobody has recorded a
+    // shipment on that line yet, or it genuinely shipped nothing. Finalising bills both at zero,
+    // so the lines get listed here for a human to confirm rather than silently dropping value.
+    const unshippedLines = (order.order_items || []).filter(
+      (oi: any) => Number(oi.quantity || 0) > 0 && Number(oi.shipped_quantity || 0) === 0
+    );
+    const unshippedValue = unshippedLines.reduce(
+      (sum: number, oi: any) => sum + Number(oi.quantity || 0) * Number(oi.unit_price || 0), 0);
+    const unshippedWarning = unshippedLines.length > 0
+      ? `\n\n${unshippedLines.length} line${unshippedLines.length === 1 ? '' : 's'} ` +
+        `${unshippedLines.length === 1 ? 'has' : 'have'} nothing shipped and will bill zero ` +
+        `(${formatCurrency(unshippedValue)} as ordered):\n` +
+        unshippedLines.slice(0, 8).map((oi: any) =>
+          `  • ${oi.sku || oi.name} — ordered ${Number(oi.quantity || 0).toLocaleString()}, shipped ${oi.shipped_quantity === null || oi.shipped_quantity === undefined ? 'not recorded' : '0'}`
+        ).join('\n') +
+        (unshippedLines.length > 8 ? `\n  ...and ${unshippedLines.length - 8} more` : '') +
+        `\n\nIf any of those actually shipped, cancel and record the quantities first.`
+      : '';
+
     if (
       !confirm(
         `Finalise this blanket at ${formatCurrency(newTotal)}?\n\n` +
@@ -1375,6 +1394,7 @@ const InvoiceDetail = () => {
         `Freight${children.length > 0 && childShipping > 0 ? ' (from shipments)' : ''}: ${formatCurrency(newShipping)}\n` +
         `Tax: ${formatCurrency(Number(invoice.tax || 0))}` +
         reconciliation +
+        unshippedWarning +
         `\n\nThis freezes the blanket and releases any deposit paid on it to the final shipment. You can reopen it later.`
       )
     ) {
