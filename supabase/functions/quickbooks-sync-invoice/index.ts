@@ -865,60 +865,65 @@ serve(async (req) => {
       });
     }
 
-    // Child shipment invoices should send the actual shipped lines, then apply any
-    // parent blanket deposit/payment as a credit exactly once across child invoices.
-    //
-    // Credit LATE, matching src/lib/invoiceBalance.ts: nothing is released while shipments are
-    // still outstanding, and once the order has drawn down in full (or a human finalises the
-    // blanket, which is what covers under-shipments) the credit lands on the closing shipment
-    // and works backwards. QBO and the PDFs must never disagree about this.
+    // Child shipment invoices send the actual shipped lines, then apply the blanket's deposit
+    // as a credit spread across the shipments AT THE RATE IT WAS PAID AT -- a 30% deposit bills
+    // every shipment at 70% of itself. Mirrors computeChildCredit in src/lib/invoiceBalance.ts;
+    // QBO and the emailed PDFs must never disagree about a customer's balance.
     if (isChildInvoice && billingPercentage === 100) {
       const { data: parentInvoice } = await supabase
         .from('invoices')
-        .select('id, invoice_number, total_paid, blanket_closed_at')
+        .select('id, invoice_number, total_paid, total, blanket_closed_at')
         .eq('id', invoice.parent_invoice_id)
         .maybeSingle();
 
       const parentPaidTotal = Number(parentInvoice?.total_paid || 0);
 
-      // Value still owed on the order. Overs contribute nothing; a line at 0/blank counts as
-      // fully outstanding, since that is either "not recorded yet" or a genuine zero.
-      const { data: orderShipState } = await supabase
-        .from('order_items')
-        .select('quantity, shipped_quantity, unit_price')
-        .eq('order_id', invoice.order_id);
-
-      const remainingUnshippedValue = (orderShipState || []).reduce((sum: number, oi: any) => {
-        const owed = Math.max(0, Number(oi.quantity || 0) - Number(oi.shipped_quantity || 0));
-        return sum + owed * Number(oi.unit_price || 0);
-      }, 0);
-
-      // Hold back only what the outstanding shipments need; release the surplus now.
-      const releasableDeposit = parentInvoice?.blanket_closed_at
-        ? parentPaidTotal
-        : Math.max(0, parentPaidTotal - remainingUnshippedValue);
-
-      if (releasableDeposit > 0.005) {
+      if (parentPaidTotal > 0.005) {
         const { data: siblingInvoices } = await supabase
           .from('invoices')
-          .select('id, invoice_number, shipment_number, subtotal, created_at')
+          .select('id, invoice_number, shipment_number, total, total_paid, subtotal, created_at')
           .eq('parent_invoice_id', invoice.parent_invoice_id)
           .is('deleted_at', null)
           .order('shipment_number', { ascending: true })
           .order('created_at', { ascending: true });
 
-        // Later shipments settle the deposit first, so "prior" here means everything AFTER this
-        // one in shipment order.
-        const siblings = (siblingInvoices || []).slice().reverse();
-        const currentIndex = siblings.findIndex((child: any) => child.id === invoice.id);
-        const priorShipmentValue = currentIndex > 0
-          ? siblings
-              .slice(0, currentIndex)
-              .reduce((sum: number, child: any) => sum + Math.max(0, Number(child.subtotal || 0)), 0)
-          : 0;
+        const siblings = siblingInvoices || [];
+        const childrenValue = siblings.reduce(
+          (sum: number, c: any) => sum + Math.max(0, Number(c.total || 0)), 0);
 
-        const remainingDepositCredit = Math.max(0, releasableDeposit - priorShipmentValue);
-        const depositCredit = Math.min(remainingDepositCredit, Math.max(0, calculatedSubtotal));
+        // Rate basis is the whole expected receivable and does NOT change on finalise --
+        // re-deriving it from the children would restate credits on shipments already sent.
+        const basis = Math.max(Number(parentInvoice?.total || 0), childrenValue);
+        const rate = basis > 0.005 ? Math.min(1, parentPaidTotal / basis) : 0;
+
+        const outstandingOf = (c: any) =>
+          Math.max(0, Number(c.total || 0) - Number(c.total_paid || 0));
+
+        // Spread at that rate in shipment order, capped by the pool and each child's balance.
+        let pool = parentPaidTotal;
+        const credited: Record<string, number> = {};
+        for (const sib of siblings) {
+          const share = Math.min(rate * Math.max(0, Number(sib.total || 0)), pool, outstandingOf(sib));
+          const amt = Math.max(0, Math.round(share * 100) / 100);
+          credited[sib.id] = amt;
+          pool -= amt;
+          if (pool <= 0.005) break;
+        }
+
+        // Short order, finalised: the tail settles on the closing shipment.
+        if (parentInvoice?.blanket_closed_at && pool > 0.005) {
+          for (let i = siblings.length - 1; i >= 0 && pool > 0.005; i--) {
+            const sib: any = siblings[i];
+            const already = credited[sib.id] || 0;
+            const extra = Math.min(pool, Math.max(0, outstandingOf(sib) - already));
+            if (extra > 0.005) {
+              credited[sib.id] = Math.round((already + extra) * 100) / 100;
+              pool -= extra;
+            }
+          }
+        }
+
+        const depositCredit = Math.min(credited[invoice.id] || 0, Math.max(0, calculatedSubtotal));
 
         if (depositCredit > 0.005) {
           console.log(

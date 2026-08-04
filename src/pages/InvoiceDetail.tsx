@@ -31,7 +31,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 import { generateInvoicePDF } from "@/lib/invoicePdfUtils";
-import { computeChildCredit, computeRemainingUnshippedValue } from "@/lib/invoiceBalance";
+import { computeChildCredit } from "@/lib/invoiceBalance";
 import { EditableDescription } from "@/components/EditableDescription";
 import { InlineTrackingEditor } from "@/components/InlineTrackingEditor";
 import { InvoicePackingListSection } from "@/components/InvoicePackingListSection";
@@ -617,7 +617,7 @@ const InvoiceDetail = () => {
           ri.id !== invoice.id && ri.parent_invoice_id === invoice.parent_invoice_id)]
       : [];
     const pdfCredit = computeChildCredit(invoice, parentBlanketForPdf, childrenForPdf, {
-      remainingUnshippedValue: computeRemainingUnshippedValue(order?.order_items || []),
+      blanketValue: Number(parentBlanketForPdf?.total || 0),
     });
 
     const invoiceData = {
@@ -2905,7 +2905,7 @@ const InvoiceDetail = () => {
                   )]
                 : [];
               const pageCredit = computeChildCredit(invoice, parentBlanket, allBlanketChildren, {
-                remainingUnshippedValue: computeRemainingUnshippedValue(order?.order_items || []),
+                blanketValue: Number(parentBlanket?.total || 0),
               });
 
               const depositLabel = pageCredit.label || 'Less Blanket Payments';

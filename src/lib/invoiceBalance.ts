@@ -8,23 +8,21 @@ import type { OrderItem } from "./invoicePdfUtils";
  * Business rules (Riley, 2026-08-03, deposit timing revised 2026-08-04):
  * - The blanket is the whole receivable; child invoices bill portions AGAINST it,
  *   never in addition to it.
- * - Payments recorded on the blanket itself (deposits/prepayments) are credited
- *   LATE: children bill their goods in full as they ship, and the deposit is only
- *   released once there is nothing left to ship, landing on the LAST shipment and
- *   working backwards. That collects full cash on every shipment and settles the
- *   deposit against the closing invoice.
- * - How much is released is worked out automatically: the deposit only stays behind
- *   to cover the value still to ship, and any surplus is credited straight away.
- *   $100 blanket, $30 deposit, $50 first shipment, $60 second (with overs): nothing
- *   is left to ship by the second, so it shows $60 less the full $30 = $30 due, and
- *   the customer has paid $110 for $110 of goods. If instead the order sat $10 from
- *   complete, $20 of the deposit would release now and $10 would stay back — a small
- *   remainder never holds the whole deposit hostage.
- * - Finalising the blanket releases whatever is left, which is what covers an order
- *   that will never draw down in full: only a human can say it is finished.
- * - Crediting late also avoids a trap: if the credit chased the earliest child, a
- *   newly created shipment would move it and retroactively raise the balance on an
- *   invoice already sent and part-paid.
+ * - A deposit paid on the blanket is spread across the shipments AT THE RATE IT WAS
+ *   PAID AT: a 30% deposit means every shipment bills at 70% of itself. That is the
+ *   sentence a customer would use to describe their own arrangement, and no shipment
+ *   comes out oddly free or oddly full-price.
+ *   $100 blanket, $30 deposit, $50 first shipment, $60 second (with overs):
+ *     ship 1  bills 50  credit 15  due 35
+ *     ship 2  bills 60  credit 15  due 45   (deposit exhausted)
+ *   30 + 35 + 45 = 110 collected for 110 of goods.
+ * - Timing is ALL this decides. The deposit is cash already received, so nothing here
+ *   withholds anything from anyone — the only question is which shipment invoice
+ *   prints the smaller balance. Every scheme collects the value of goods shipped.
+ * - An order that ends SHORT leaves a tail: 30% of 80 shipped credits 24 of a 30
+ *   deposit. Finalising the blanket releases that remainder onto the CLOSING shipment,
+ *   added there rather than re-spread, so an invoice already sent and part-paid never
+ *   has its balance moved underneath it.
  * - A sibling's own payments pay for that sibling's goods; they are never credited
  *   against another child.
  *
@@ -47,7 +45,9 @@ export interface ParentInvoiceLike {
   invoice_number?: string | null;
   invoice_type?: string | null;
   total_paid?: number | null;
-  /** Set once the blanket is finalized. Until then the deposit is not released to children. */
+  /** The whole receivable; denominator for the deposit rate. */
+  total?: number | null;
+  /** Set once the blanket is finalized, which releases any unspread tail of the deposit. */
   blanket_closed_at?: string | null;
 }
 
@@ -60,34 +60,12 @@ export interface ChildCreditResult {
 
 const NO_CREDIT: ChildCreditResult = { amount: 0, label: null };
 
-export interface OrderItemShipState {
-  quantity?: number | null;
-  shipped_quantity?: number | null;
-  unit_price?: number | null;
-}
-
-/**
- * Value of the goods still owed on this order: per line, whatever is left of the ordered
- * quantity, priced. Overs contribute nothing — shipping 60 against 50 ordered leaves that
- * line owing zero, not minus ten.
- *
- * A line sitting at 0/blank shipped counts as fully outstanding: that is either "nobody
- * recorded it yet" or a genuine zero, and the data cannot tell which.
- */
-export function computeRemainingUnshippedValue(
-  items: OrderItemShipState[] | null | undefined
-): number {
-  if (!items || items.length === 0) return 0;
-  const total = items.reduce((sum, i) => {
-    const owed = Math.max(0, Number(i.quantity || 0) - Number(i.shipped_quantity || 0));
-    return sum + owed * Number(i.unit_price || 0);
-  }, 0);
-  return Math.round(total * 100) / 100;
-}
-
 export interface ChildCreditOptions {
-  /** Value of goods still to ship on this order; what the deposit must stay behind to cover. */
-  remainingUnshippedValue?: number;
+  /**
+   * The whole expected receivable — the blanket's own total. Used as the denominator for the
+   * deposit rate, so a $30 deposit against a $100 blanket bills every shipment at 70%.
+   */
+  blanketValue?: number;
 }
 
 const childOrder = (a: ChildInvoiceLike, b: ChildInvoiceLike): number => {
@@ -101,15 +79,23 @@ const childOrder = (a: ChildInvoiceLike, b: ChildInvoiceLike): number => {
 };
 
 /**
- * Release the parent blanket's payments to its children, LAST shipment first: the
- * closing shipment consumes credit up to its own outstanding balance (total − own
- * payments); whatever remains flows back to the shipment before it. Returns the
- * credit that lands on `child`.
+ * Spread the blanket's deposit across its child shipments at the rate it was paid at,
+ * and return the slice landing on `child`.
  *
- * The deposit only stays behind to cover goods still to ship. Anything beyond that
- * is released immediately, so a $30 deposit on an order $10 from complete releases
- * $20 now and keeps $10 back — it is never held hostage by a small remainder.
- * Finalising the blanket releases all of it, since nothing more is coming.
+ * A 30% deposit means every shipment bills at 70% of itself. Each child takes
+ * `rate × its own value`, in shipment order, capped by what is left of the deposit
+ * and by that child's own outstanding balance. Nothing is ever credited twice, and
+ * the customer always ends up paying exactly the value of the goods shipped.
+ *
+ * Note this is only a question of WHICH invoice shows the smaller balance — the
+ * deposit is cash already received, so no scheme here withholds anything from anyone.
+ *
+ * The rate is deposit ÷ the whole expected receivable (the blanket total), so on an
+ * order that ships in full the slices add up to exactly the deposit. Overs make the
+ * blanket grow, which lowers the rate and keeps the total credited at the deposit.
+ * An order that ends SHORT leaves a remainder — 30% of 80 shipped is 24 of a 30
+ * deposit — and finalising the blanket releases that tail onto the closing shipment,
+ * added there rather than re-spread, so an invoice already sent never moves.
  */
 export function computeChildCredit(
   child: ChildInvoiceLike,
@@ -122,36 +108,53 @@ export function computeChildCredit(
   const deposit = Number(parent.total_paid || 0);
   if (deposit <= 0.005) return NO_CREDIT;
 
-  const stillToShip = parent.blanket_closed_at
-    ? 0
-    : Math.max(0, Number(opts?.remainingUnshippedValue || 0));
-
-  // Hold back only what the outstanding shipments will need; release the surplus now.
-  let remaining = Math.round(Math.max(0, deposit - stillToShip) * 100) / 100;
-  if (remaining <= 0.005) return NO_CREDIT;
-
   const ordered = [...allChildren];
   if (!ordered.some((c) => c.id === child.id)) ordered.push(child);
-  ordered.sort(childOrder).reverse();
+  ordered.sort(childOrder);
 
+  const childrenValue = ordered.reduce((sum, c) => sum + Math.max(0, Number(c.total || 0)), 0);
+  // Rate basis is the whole expected receivable and does NOT change when the blanket is
+  // finalised. Re-deriving it from the children at that point would re-spread the deposit and
+  // silently restate the credit on shipments already sent; the tail-fill below handles the
+  // remainder instead, on the closing shipment only.
+  const basis = Math.max(Number(opts?.blanketValue || 0), childrenValue);
+  if (basis <= 0.005) return NO_CREDIT;
+
+  const rate = Math.min(1, deposit / basis);
+  const outstandingOf = (c: ChildInvoiceLike) =>
+    Math.max(0, Number(c.total || 0) - Number(c.total_paid || 0));
+
+  let pool = deposit;
+  const credited = new Map<string, number>();
   for (const sibling of ordered) {
-    const outstanding = Math.max(
-      0,
-      Number(sibling.total || 0) - Number(sibling.total_paid || 0)
-    );
-    const consumed = Math.min(remaining, outstanding);
-    if (sibling.id === child.id) {
-      const amount = Math.round(consumed * 100) / 100;
-      if (amount <= 0.005) return NO_CREDIT;
-      return {
-        amount,
-        label: `Less Deposit Paid (Inv #${parent.invoice_number || ""})`,
-      };
-    }
-    remaining -= consumed;
-    if (remaining <= 0.005) return NO_CREDIT;
+    const share = Math.min(rate * Math.max(0, Number(sibling.total || 0)), pool, outstandingOf(sibling));
+    const amount = Math.max(0, Math.round(share * 100) / 100);
+    credited.set(sibling.id, amount);
+    pool -= amount;
+    if (pool <= 0.005) break;
   }
-  return NO_CREDIT;
+
+  // Short order, human has called it done: the unspread tail settles on the closing shipment
+  // rather than being re-spread over invoices that have already gone out.
+  if (parent.blanket_closed_at && pool > 0.005) {
+    for (let i = ordered.length - 1; i >= 0 && pool > 0.005; i--) {
+      const sibling = ordered[i];
+      const already = credited.get(sibling.id) || 0;
+      const room = Math.max(0, outstandingOf(sibling) - already);
+      const extra = Math.min(pool, room);
+      if (extra > 0.005) {
+        credited.set(sibling.id, Math.round((already + extra) * 100) / 100);
+        pool -= extra;
+      }
+    }
+  }
+
+  const amount = credited.get(child.id) || 0;
+  if (amount <= 0.005) return NO_CREDIT;
+  return {
+    amount,
+    label: `Less Deposit Paid (Inv #${parent.invoice_number || ""})`,
+  };
 }
 
 export interface ChildPdfInputs {
@@ -194,7 +197,7 @@ export async function fetchChildPdfInputs(
   const parentPromise = invoice.parent_invoice_id
     ? supabase
         .from("invoices")
-        .select("id, invoice_number, invoice_type, total_paid, blanket_closed_at")
+        .select("id, invoice_number, invoice_type, total_paid, total, blanket_closed_at")
         .eq("id", invoice.parent_invoice_id)
         .maybeSingle()
     : Promise.resolve({ data: null });
@@ -207,20 +210,10 @@ export async function fetchChildPdfInputs(
         .is("deleted_at", null)
     : Promise.resolve({ data: [] as ChildInvoiceLike[] });
 
-  // Used to decide whether the order has drawn down in full, which releases the deposit
-  // without anyone having to press anything.
-  const orderItemsPromise = invoice.order_id
-    ? supabase
-        .from("order_items")
-        .select("quantity, shipped_quantity, unit_price")
-        .eq("order_id", invoice.order_id)
-    : Promise.resolve({ data: [] as OrderItemShipState[] });
-
-  const [allocationsRes, parentRes, siblingsRes, orderItemsRes] = await Promise.all([
+  const [allocationsRes, parentRes, siblingsRes] = await Promise.all([
     allocationsPromise,
     parentPromise,
     siblingsPromise,
-    orderItemsPromise,
   ]);
 
   let itemsOverride: ChildPdfInputs["itemsOverride"] = null;
@@ -246,11 +239,7 @@ export async function fetchChildPdfInputs(
     invoice,
     (parentRes as any).data,
     ((siblingsRes as any).data || []) as ChildInvoiceLike[],
-    {
-      remainingUnshippedValue: computeRemainingUnshippedValue(
-        ((orderItemsRes as any).data || []) as OrderItemShipState[]
-      ),
-    }
+    { blanketValue: Number((parentRes as any).data?.total || 0) }
   );
 
   return { itemsOverride, credit };
