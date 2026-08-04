@@ -5,11 +5,17 @@ import type { OrderItem } from "./invoicePdfUtils";
 /**
  * Draw-down math for blanket invoices and their child shipment invoices.
  *
- * Business rules (Riley, 2026-08-03):
+ * Business rules (Riley, 2026-08-03, deposit timing revised 2026-08-04):
  * - The blanket is the whole receivable; child invoices bill portions AGAINST it,
  *   never in addition to it.
- * - Payments recorded on the blanket itself (deposits/prepayments) flow to the
- *   earliest child with an outstanding balance, and are never credited twice.
+ * - Payments recorded on the blanket itself (deposits/prepayments) are credited
+ *   LATE: children bill their goods in full as they ship, and the deposit is only
+ *   released once the blanket is finalized, landing on the LAST shipment and
+ *   working backwards. That collects full cash on every shipment and settles the
+ *   deposit against the closing invoice.
+ * - Crediting late also avoids a trap: if the credit chased the earliest child, a
+ *   newly created shipment would move it and retroactively raise the balance on an
+ *   invoice already sent and part-paid.
  * - A sibling's own payments pay for that sibling's goods; they are never credited
  *   against another child.
  *
@@ -32,6 +38,8 @@ export interface ParentInvoiceLike {
   invoice_number?: string | null;
   invoice_type?: string | null;
   total_paid?: number | null;
+  /** Set once the blanket is finalized. Until then the deposit is not released to children. */
+  blanket_closed_at?: string | null;
 }
 
 export interface ChildCreditResult {
@@ -54,10 +62,14 @@ const childOrder = (a: ChildInvoiceLike, b: ChildInvoiceLike): number => {
 };
 
 /**
- * Allocate the parent blanket's payments across its children in shipment order:
- * each child consumes credit up to its own outstanding balance (total − own
- * payments); whatever remains flows to the next child. Returns the credit that
- * lands on `child`.
+ * Release the parent blanket's payments to its children, LAST shipment first: the
+ * closing shipment consumes credit up to its own outstanding balance (total − own
+ * payments); whatever remains flows back to the shipment before it. Returns the
+ * credit that lands on `child`.
+ *
+ * Nothing is released until the blanket is finalized — while shipments are still
+ * going out every child bills its goods in full and the deposit stays on the
+ * blanket, so no already-sent invoice ever has its balance moved underneath it.
  */
 export function computeChildCredit(
   child: ChildInvoiceLike,
@@ -65,12 +77,13 @@ export function computeChildCredit(
   allChildren: ChildInvoiceLike[]
 ): ChildCreditResult {
   if (!parent || parent.invoice_type !== "full") return NO_CREDIT;
+  if (!parent.blanket_closed_at) return NO_CREDIT;
   let remaining = Number(parent.total_paid || 0);
   if (remaining <= 0.005) return NO_CREDIT;
 
   const ordered = [...allChildren];
   if (!ordered.some((c) => c.id === child.id)) ordered.push(child);
-  ordered.sort(childOrder);
+  ordered.sort(childOrder).reverse();
 
   for (const sibling of ordered) {
     const outstanding = Math.max(
@@ -83,7 +96,7 @@ export function computeChildCredit(
       if (amount <= 0.005) return NO_CREDIT;
       return {
         amount,
-        label: `Less Blanket Payments (Inv #${parent.invoice_number || ""})`,
+        label: `Less Deposit Paid (Inv #${parent.invoice_number || ""})`,
       };
     }
     remaining -= consumed;
@@ -131,7 +144,7 @@ export async function fetchChildPdfInputs(
   const parentPromise = invoice.parent_invoice_id
     ? supabase
         .from("invoices")
-        .select("id, invoice_number, invoice_type, total_paid")
+        .select("id, invoice_number, invoice_type, total_paid, blanket_closed_at")
         .eq("id", invoice.parent_invoice_id)
         .maybeSingle()
     : Promise.resolve({ data: null });

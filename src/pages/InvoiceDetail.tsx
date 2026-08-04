@@ -1335,72 +1335,83 @@ const InvoiceDetail = () => {
     }
   };
 
-  const handleCloseInvoice = async () => {
-    if (!confirm('Close this blanket invoice? This finalizes the blanket. Use "Update Blanket" first if the subtotal needs to be recalculated to actual shipped totals.')) {
-      return;
-    }
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase.from('invoices').update({
-        status: 'closed',
-        blanket_closed_at: new Date().toISOString(),
-        blanket_closed_by: user?.id ?? null,
-      }).eq('id', invoiceId);
-      if (error) throw error;
-      toast({
-        title: "Blanket Closed",
-        description: "Blanket has been finalized."
-      });
-      fetchInvoiceDetails();
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to close invoice",
-        variant: "destructive"
-      });
-    }
-  };
 
 
 
 
+  // Finalising a blanket used to be two actions that computed different totals. It is one now,
+  // and the arithmetic lives in the DB (recalc_blanket_invoices_for_order) so the number here is
+  // only a preview of what the database will write.
   const handleUpdateBlanketTotal = async () => {
     if (!invoice || !order) return;
+    const children = (relatedInvoices || []).filter((ri: any) => ri.parent_invoice_id === invoiceId);
     const newSubtotal = (order.order_items || []).reduce(
       (sum: number, oi: any) =>
         sum + Number(oi.shipped_quantity || 0) * Number(oi.unit_price || 0),
       0
     );
-    const newShipping = (relatedInvoices || [])
-      .filter((ri: any) => ri.parent_invoice_id === invoiceId)
-      .reduce((sum: number, ri: any) => sum + Number(ri.shipping_cost || 0), 0);
+    const childShipping = children.reduce((sum: number, ri: any) => sum + Number(ri.shipping_cost || 0), 0);
+    // Freight is billed on the shipment that carried it; fall back to the blanket's own when
+    // there are no children.
+    const newShipping = children.length > 0 && childShipping > 0
+      ? childShipping
+      : Number(invoice.shipping_cost || 0);
     const newTotal = newSubtotal + Number(invoice.tax || 0) + newShipping;
+    const childrenTotal = children.reduce((sum: number, ri: any) => sum + Number(ri.total || 0), 0);
+    const blanketPaid = Number(invoice.total_paid || 0);
+
+    const reconciliation = children.length > 0
+      ? `\n\nShipment invoices: ${formatCurrency(childrenTotal)}\nPaid on this blanket: ${formatCurrency(blanketPaid)}` +
+        (Math.abs(childrenTotal + blanketPaid - newTotal) > 0.01
+          ? `\n\nHeads up: shipments + blanket payments come to ${formatCurrency(childrenTotal + blanketPaid)}, which does not match the new total.`
+          : `\n\nThose reconcile to the new total.`)
+      : '';
+
     if (
       !confirm(
-        `Update blanket total to ${formatCurrency(newTotal)}?\n\nSubtotal (Σ shipped × price): ${formatCurrency(newSubtotal)}\nShipping (from shipments): ${formatCurrency(newShipping)}\nTax: ${formatCurrency(Number(invoice.tax || 0))}`
+        `Finalise this blanket at ${formatCurrency(newTotal)}?\n\n` +
+        `Current total: ${formatCurrency(Number(invoice.total || 0))}\n` +
+        `Shipped × price: ${formatCurrency(newSubtotal)}\n` +
+        `Freight${children.length > 0 && childShipping > 0 ? ' (from shipments)' : ''}: ${formatCurrency(newShipping)}\n` +
+        `Tax: ${formatCurrency(Number(invoice.tax || 0))}` +
+        reconciliation +
+        `\n\nThis freezes the blanket and releases any deposit paid on it to the final shipment. You can reopen it later.`
       )
     ) {
       return;
     }
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      // Setting blanket_closed_at fires trg_recalc_blanket_on_close, which writes the totals.
       const { error } = await supabase
         .from('invoices')
         .update({
-          subtotal: newSubtotal,
-          shipping_cost: newShipping,
-          total: newTotal,
+          status: 'closed',
+          blanket_closed_at: new Date().toISOString(),
+          blanket_closed_by: user?.id ?? null,
         })
         .eq('id', invoiceId);
       if (error) throw error;
+
+      const { data: after } = await supabase
+        .from('invoices')
+        .select('total')
+        .eq('id', invoiceId)
+        .maybeSingle();
+
+      const written = Number(after?.total ?? newTotal);
       toast({
-        title: 'Blanket Total Updated',
-        description: `New total: ${formatCurrency(newTotal)}`,
+        title: 'Blanket Finalised',
+        description: Math.abs(written - newTotal) > 0.01
+          ? `Total is ${formatCurrency(written)}. It did not move to ${formatCurrency(newTotal)} — a paid or QuickBooks-synced blanket is left alone.`
+          : `Final total: ${formatCurrency(written)}`,
+        variant: Math.abs(written - newTotal) > 0.01 ? 'destructive' : undefined,
       });
       fetchInvoiceDetails();
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to update blanket total',
+        description: error.message || 'Failed to finalise blanket',
         variant: 'destructive',
       });
     }
@@ -1703,8 +1714,8 @@ const InvoiceDetail = () => {
                       Edit Shipped Qty
                     </Button>}
                   {invoice.invoice_type === 'full' && invoice.status !== 'closed' && <Button size="sm" variant="outline" onClick={handleUpdateBlanketTotal} className="border-blue-500 text-blue-700 hover:bg-blue-50">
-                      <RotateCcw className="h-4 w-4 mr-1.5" />
-                      Update Blanket
+                      <CheckCircle2 className="h-4 w-4 mr-1.5" />
+                      Finalise Blanket
                     </Button>}
 
                   {/* CONSOLIDATED ACTIONS DROPDOWN — secondary actions */}
@@ -1762,12 +1773,6 @@ const InvoiceDetail = () => {
 
                       <DropdownMenuSeparator />
                       <DropdownMenuLabel>Status</DropdownMenuLabel>
-                      {invoice.invoice_type === 'full' && invoice.status !== 'closed' && (
-                        <DropdownMenuItem onClick={handleCloseInvoice}>
-                          <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" />
-                          {relatedInvoices && relatedInvoices.some((inv: any) => inv.parent_invoice_id === invoice.id) ? 'Close Blanket' : 'Close Invoice'}
-                        </DropdownMenuItem>
-                      )}
                       {invoice.status === 'closed' && (
                         <DropdownMenuItem onClick={handleReopenInvoice}>
                           <RotateCcw className="h-4 w-4 mr-2 text-amber-600" />
