@@ -193,12 +193,16 @@ serve(async (req) => {
     } else if (typeof requestedPercentage === 'number' && requestedPercentage > 0 && requestedPercentage <= 100) {
       billingPercentage = requestedPercentage;
       console.log('Using requested billing percentage:', billingPercentage);
+    } else if (storedBilledPercentage < 99.99) {
+      // A deposit somebody actually set always beats a percentage inferred from totals. This
+      // used to be the other way round, so a blanket whose stored total had gone stale against
+      // its order silently billed at the inferred rate and the real deposit was ignored --
+      // 11025 sat at 3,368 against a 3,963 order and billed 85% instead of its 50% deposit.
+      billingPercentage = storedBilledPercentage;
+      console.log('Using stored deposit percentage:', billingPercentage);
     } else if (!isChildInvoice && orderTotal > 0 && invoiceTotal > 0 && invoiceTotal < orderTotal) {
       billingPercentage = Math.round((invoiceTotal / orderTotal) * 100);
       console.log(`Calculated billing percentage from totals: ${invoiceTotal}/${orderTotal} = ${billingPercentage}%`);
-    } else if (storedBilledPercentage < 99.99) {
-      billingPercentage = storedBilledPercentage;
-      console.log('Using stored billed_percentage:', billingPercentage);
     }
     console.log('Effective billing percentage:', billingPercentage);
 
