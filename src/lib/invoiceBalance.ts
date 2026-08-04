@@ -10,9 +10,16 @@ import type { OrderItem } from "./invoicePdfUtils";
  *   never in addition to it.
  * - Payments recorded on the blanket itself (deposits/prepayments) are credited
  *   LATE: children bill their goods in full as they ship, and the deposit is only
- *   released once the blanket is finalized, landing on the LAST shipment and
+ *   released once there is nothing left to ship, landing on the LAST shipment and
  *   working backwards. That collects full cash on every shipment and settles the
  *   deposit against the closing invoice.
+ * - "Nothing left to ship" is detected automatically — every line shipped at least
+ *   what was ordered — so a normally-completed order releases the deposit on its
+ *   own. $100 blanket, $30 deposit, $50 first shipment, $60 second (with overs):
+ *   the second shipment shows $60 less the $30 deposit = $30 due, and the customer
+ *   has paid $110 for $110 of goods. Finalising the blanket also releases it, which
+ *   is what covers UNDER-shipments, where the order will never draw down in full
+ *   and only a human can say it is finished.
  * - Crediting late also avoids a trap: if the credit chased the earliest child, a
  *   newly created shipment would move it and retroactively raise the balance on an
  *   invoice already sent and part-paid.
@@ -51,6 +58,30 @@ export interface ChildCreditResult {
 
 const NO_CREDIT: ChildCreditResult = { amount: 0, label: null };
 
+export interface OrderItemShipState {
+  quantity?: number | null;
+  shipped_quantity?: number | null;
+}
+
+/**
+ * True when no line still owes a shipment. Overs count as complete — shipping 60 against 50
+ * ordered leaves nothing outstanding on that line.
+ *
+ * A line sitting at 0/blank shipped is NOT complete: that is either "nobody recorded it yet" or
+ * a genuine zero, and we cannot tell which, so the deposit stays put until a human finalises.
+ */
+export function isOrderFullyShipped(items: OrderItemShipState[] | null | undefined): boolean {
+  if (!items || items.length === 0) return false;
+  return items.every(
+    (i) => Number(i.shipped_quantity || 0) >= Number(i.quantity || 0)
+  );
+}
+
+export interface ChildCreditOptions {
+  /** Every line has shipped what it owed, so the order has drawn down in full. */
+  orderFullyShipped?: boolean;
+}
+
 const childOrder = (a: ChildInvoiceLike, b: ChildInvoiceLike): number => {
   const shipA = a.shipment_number ?? Number.MAX_SAFE_INTEGER;
   const shipB = b.shipment_number ?? Number.MAX_SAFE_INTEGER;
@@ -67,17 +98,19 @@ const childOrder = (a: ChildInvoiceLike, b: ChildInvoiceLike): number => {
  * payments); whatever remains flows back to the shipment before it. Returns the
  * credit that lands on `child`.
  *
- * Nothing is released until the blanket is finalized — while shipments are still
- * going out every child bills its goods in full and the deposit stays on the
- * blanket, so no already-sent invoice ever has its balance moved underneath it.
+ * Nothing is released while shipments are still outstanding — every child bills its
+ * goods in full and the deposit stays on the blanket, so no already-sent invoice
+ * ever has its balance moved underneath it. The release happens on its own once
+ * the order has drawn down in full, or when a human finalises the blanket.
  */
 export function computeChildCredit(
   child: ChildInvoiceLike,
   parent: ParentInvoiceLike | null | undefined,
-  allChildren: ChildInvoiceLike[]
+  allChildren: ChildInvoiceLike[],
+  opts?: ChildCreditOptions
 ): ChildCreditResult {
   if (!parent || parent.invoice_type !== "full") return NO_CREDIT;
-  if (!parent.blanket_closed_at) return NO_CREDIT;
+  if (!parent.blanket_closed_at && !opts?.orderFullyShipped) return NO_CREDIT;
   let remaining = Number(parent.total_paid || 0);
   if (remaining <= 0.005) return NO_CREDIT;
 
@@ -120,6 +153,7 @@ export async function fetchChildPdfInputs(
   supabase: SupabaseClient,
   invoice: {
     id: string;
+    order_id?: string | null;
     invoice_type?: string | null;
     parent_invoice_id?: string | null;
     invoice_number?: string | null;
@@ -157,10 +191,20 @@ export async function fetchChildPdfInputs(
         .is("deleted_at", null)
     : Promise.resolve({ data: [] as ChildInvoiceLike[] });
 
-  const [allocationsRes, parentRes, siblingsRes] = await Promise.all([
+  // Used to decide whether the order has drawn down in full, which releases the deposit
+  // without anyone having to press anything.
+  const orderItemsPromise = invoice.order_id
+    ? supabase
+        .from("order_items")
+        .select("quantity, shipped_quantity")
+        .eq("order_id", invoice.order_id)
+    : Promise.resolve({ data: [] as OrderItemShipState[] });
+
+  const [allocationsRes, parentRes, siblingsRes, orderItemsRes] = await Promise.all([
     allocationsPromise,
     parentPromise,
     siblingsPromise,
+    orderItemsPromise,
   ]);
 
   let itemsOverride: ChildPdfInputs["itemsOverride"] = null;
@@ -185,7 +229,12 @@ export async function fetchChildPdfInputs(
   const credit = computeChildCredit(
     invoice,
     (parentRes as any).data,
-    ((siblingsRes as any).data || []) as ChildInvoiceLike[]
+    ((siblingsRes as any).data || []) as ChildInvoiceLike[],
+    {
+      orderFullyShipped: isOrderFullyShipped(
+        ((orderItemsRes as any).data || []) as OrderItemShipState[]
+      ),
+    }
   );
 
   return { itemsOverride, credit };

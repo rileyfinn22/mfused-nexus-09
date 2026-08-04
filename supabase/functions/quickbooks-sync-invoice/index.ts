@@ -869,8 +869,9 @@ serve(async (req) => {
     // parent blanket deposit/payment as a credit exactly once across child invoices.
     //
     // Credit LATE, matching src/lib/invoiceBalance.ts: nothing is released while shipments are
-    // still going out, and once the blanket is finalised the credit lands on the closing
-    // shipment and works backwards. QBO and the PDFs must never disagree about this.
+    // still outstanding, and once the order has drawn down in full (or a human finalises the
+    // blanket, which is what covers under-shipments) the credit lands on the closing shipment
+    // and works backwards. QBO and the PDFs must never disagree about this.
     if (isChildInvoice && billingPercentage === 100) {
       const { data: parentInvoice } = await supabase
         .from('invoices')
@@ -880,7 +881,18 @@ serve(async (req) => {
 
       const parentPaidTotal = Number(parentInvoice?.total_paid || 0);
 
-      if (parentPaidTotal > 0 && parentInvoice?.blanket_closed_at) {
+      // Overs count as complete; a line still at 0/blank does not, since that is either
+      // "not recorded yet" or a genuine zero and we cannot tell which.
+      const { data: orderShipState } = await supabase
+        .from('order_items')
+        .select('quantity, shipped_quantity')
+        .eq('order_id', invoice.order_id);
+
+      const orderFullyShipped = !!orderShipState
+        && orderShipState.length > 0
+        && orderShipState.every((oi: any) => Number(oi.shipped_quantity || 0) >= Number(oi.quantity || 0));
+
+      if (parentPaidTotal > 0 && (parentInvoice?.blanket_closed_at || orderFullyShipped)) {
         const { data: siblingInvoices } = await supabase
           .from('invoices')
           .select('id, invoice_number, shipment_number, subtotal, created_at')

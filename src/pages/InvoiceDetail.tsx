@@ -31,7 +31,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 import { generateInvoicePDF } from "@/lib/invoicePdfUtils";
-import { computeChildCredit } from "@/lib/invoiceBalance";
+import { computeChildCredit, isOrderFullyShipped } from "@/lib/invoiceBalance";
 import { EditableDescription } from "@/components/EditableDescription";
 import { InlineTrackingEditor } from "@/components/InlineTrackingEditor";
 import { InvoicePackingListSection } from "@/components/InvoicePackingListSection";
@@ -616,7 +616,9 @@ const InvoiceDetail = () => {
       ? [invoice, ...relatedInvoices.filter((ri: any) =>
           ri.id !== invoice.id && ri.parent_invoice_id === invoice.parent_invoice_id)]
       : [];
-    const pdfCredit = computeChildCredit(invoice, parentBlanketForPdf, childrenForPdf);
+    const pdfCredit = computeChildCredit(invoice, parentBlanketForPdf, childrenForPdf, {
+      orderFullyShipped: isOrderFullyShipped(order?.order_items || []),
+    });
 
     const invoiceData = {
       invoice_number: invoice.invoice_number,
@@ -2902,7 +2904,9 @@ const InvoiceDetail = () => {
                     (ri: any) => ri.id !== invoice.id && ri.parent_invoice_id === invoice.parent_invoice_id
                   )]
                 : [];
-              const pageCredit = computeChildCredit(invoice, parentBlanket, allBlanketChildren);
+              const pageCredit = computeChildCredit(invoice, parentBlanket, allBlanketChildren, {
+                orderFullyShipped: isOrderFullyShipped(order?.order_items || []),
+              });
 
               const depositLabel = pageCredit.label || 'Less Blanket Payments';
               const mirroredSubtotal = displaySubtotal;
