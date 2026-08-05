@@ -145,12 +145,15 @@ serve(async (req) => {
     console.log('Invoice stored billed_percentage:', invoice.billed_percentage);
     console.log('Inventory allocations found:', allocations?.length || 0);
 
-    // A blanket with shipment invoices under it must NOT go to QuickBooks as well. The children
-    // bill the goods; the blanket is the umbrella they draw down against. Syncing both put the
-    // same goods on two QBO invoices and doubled the receivable -- six orders were sitting like
-    // that when this was found (10962, 10969, 10970, 10971, 10993, 10994). If the blanket is
-    // already in QBO from before this guard, leave it alone: that is a bookkeeping cleanup with
-    // customer payments attached, not something a sync should silently undo.
+    // A blanket with shipment invoices under it must NOT go to QuickBooks. The children bill the
+    // goods; the blanket is the umbrella they draw down against. Syncing both put the same goods
+    // on two QBO invoices and doubled the receivable -- six orders were sitting like that when
+    // this was found (10962, 10969, 10970, 10971, 10993, 10994).
+    //
+    // This refuses even when the blanket is ALREADY in QuickBooks. Refusing to push is not the
+    // same as undoing: nothing in QBO is touched, the stale copy simply stops being updated.
+    // Unwinding one that is already there means deleting it and re-applying its payments, which
+    // is a bookkeeping decision with real money attached and stays a human's to make.
     if (!invoice.parent_invoice_id) {
       const { count: childCount } = await supabase
         .from('invoices')
@@ -158,14 +161,17 @@ serve(async (req) => {
         .eq('parent_invoice_id', invoice.id)
         .is('deleted_at', null);
 
-      if ((childCount || 0) > 0 && !invoice.quickbooks_id) {
+      if ((childCount || 0) > 0) {
         console.log(`Blanket ${invoice.invoice_number} has ${childCount} shipment invoice(s); they carry the billing. Not syncing the blanket.`);
         return new Response(
           JSON.stringify({
             success: false,
             skipped: true,
             reason: 'blanket_has_shipment_invoices',
-            message: `Invoice ${invoice.invoice_number} has ${childCount} shipment invoice(s) billing against it. Those go to QuickBooks; sending the blanket as well would bill the same goods twice.`,
+            alreadyInQuickBooks: !!invoice.quickbooks_id,
+            message: invoice.quickbooks_id
+              ? `Invoice ${invoice.invoice_number} has ${childCount} shipment invoice(s) billing against it, so they are what belongs in QuickBooks. This blanket is already there as QBO invoice ${invoice.quickbooks_id} and is billing the same goods a second time — it needs removing there, and any payments on it re-applied to the shipment invoice.`
+              : `Invoice ${invoice.invoice_number} has ${childCount} shipment invoice(s) billing against it. Those go to QuickBooks; sending the blanket as well would bill the same goods twice.`,
           }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );

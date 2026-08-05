@@ -8,7 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { ArrowLeft, Download, FileText, Edit, Trash2, RefreshCw, Copy, ExternalLink, CheckCircle2, DollarSign, CalendarIcon, Mail, RotateCcw, ChevronDown, Check, Unlink, Bell, Loader2, AlertCircle, Package, ChevronsUpDown, FileSpreadsheet, Sparkles, Plus, X } from "lucide-react";
+import { ArrowLeft, Download, FileText, Edit, Trash2, RefreshCw, Copy, ExternalLink, CheckCircle2, DollarSign, CalendarIcon, Mail, RotateCcw, ChevronDown, Check, Unlink, Bell, Loader2, AlertCircle, AlertTriangle, Package, ChevronsUpDown, FileSpreadsheet, Sparkles, Plus, X } from "lucide-react";
 
 import { format } from "date-fns";
 import { cn, formatCurrency, formatUnitPrice } from "@/lib/utils";
@@ -1595,6 +1595,19 @@ const InvoiceDetail = () => {
     invoice?.billed_percentage != null &&
     Number(invoice.billed_percentage) > 0 &&
     Number(invoice.billed_percentage) < 100;
+
+  // Value the blanket is still billing that nobody has shipped. Overs contribute nothing.
+  const unshippedLines = (order?.order_items || []).filter(
+    (oi: any) => Number(oi.quantity || 0) - Number(oi.shipped_quantity || 0) > 0
+  );
+  const unshippedLineCount = unshippedLines.length;
+  const unshippedValue = Math.round(
+    unshippedLines.reduce(
+      (sum: number, oi: any) =>
+        sum + (Number(oi.quantity || 0) - Number(oi.shipped_quantity || 0)) * Number(oi.unit_price || 0),
+      0
+    ) * 100
+  ) / 100;
   
   const displayShipping = isEditMode ? Number(editShippingCost || 0) : Number(invoice?.shipping_cost || 0);
   
@@ -1866,6 +1879,33 @@ const InvoiceDetail = () => {
           )}
         </div>
       </div>
+
+      {/* An open blanket that has stopped short used to sit there billing the ordered amount
+          forever, with nothing anywhere saying so. It only corrects when somebody finalises it. */}
+      {isBlanketDisplay && invoice.status !== 'closed' && !invoice.blanket_closed_at && unshippedValue > 0.01 && (
+        <div className="mb-6 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex gap-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+              <div>
+                <p className="font-medium">
+                  This blanket is billing {formatCurrency(unshippedValue)} that has not shipped
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {unshippedLineCount} line{unshippedLineCount === 1 ? '' : 's'} still short.
+                  It bills {formatCurrency(Number(invoice.total || 0))} today; on what has actually
+                  shipped it would be {formatCurrency(Number(invoice.total || 0) - unshippedValue)}.
+                  That is correct while more is still going out — finalise it once nothing more will.
+                </p>
+              </div>
+            </div>
+            <Button size="sm" variant="outline" className="shrink-0 border-amber-600 text-amber-700 hover:bg-amber-100" onClick={handleUpdateBlanketTotal}>
+              <CheckCircle2 className="mr-1.5 h-4 w-4" />
+              Finalise
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Invoice Header Card */}
       <Card className="shadow-lg">
