@@ -1596,7 +1596,9 @@ const InvoiceDetail = () => {
     Number(invoice.billed_percentage) > 0 &&
     Number(invoice.billed_percentage) < 100;
 
-  // Value the blanket is still billing that nobody has shipped. Overs contribute nothing.
+  // Value the blanket is still billing that nobody has shipped. Overs contribute nothing to
+  // this, but they matter to how it reads: an order can be 34 lines over and one line short,
+  // and calling that "still short" on its own makes a finished order look outstanding.
   const unshippedLines = (order?.order_items || []).filter(
     (oi: any) => Number(oi.quantity || 0) - Number(oi.shipped_quantity || 0) > 0
   );
@@ -1608,6 +1610,27 @@ const InvoiceDetail = () => {
       0
     ) * 100
   ) / 100;
+  const overLines = (order?.order_items || []).filter(
+    (oi: any) => Number(oi.shipped_quantity || 0) - Number(oi.quantity || 0) > 0
+  );
+  const overValue = Math.round(
+    overLines.reduce(
+      (sum: number, oi: any) =>
+        sum + (Number(oi.shipped_quantity || 0) - Number(oi.quantity || 0)) * Number(oi.unit_price || 0),
+      0
+    ) * 100
+  ) / 100;
+  // The case worth flagging is an order that STARTED shipping and stopped short. A blanket with
+  // nothing shipped yet is just an order awaiting production -- every one of those is 100%
+  // "short" and saying so would bury the real ones. And a shortfall smaller than 1% of the
+  // invoice is noise: 10996 came up 150 units short on one line while over-shipping 34 others.
+  const anythingShipped = (order?.order_items || []).some(
+    (oi: any) => Number(oi.shipped_quantity || 0) > 0
+  );
+  const shortfallIsMaterial =
+    anythingShipped &&
+    unshippedValue > 0.01 &&
+    unshippedValue > Number(invoice?.total || 0) * 0.01;
   
   const displayShipping = isEditMode ? Number(editShippingCost || 0) : Number(invoice?.shipping_cost || 0);
   
@@ -1882,7 +1905,7 @@ const InvoiceDetail = () => {
 
       {/* An open blanket that has stopped short used to sit there billing the ordered amount
           forever, with nothing anywhere saying so. It only corrects when somebody finalises it. */}
-      {isBlanketDisplay && invoice.status !== 'closed' && !invoice.blanket_closed_at && unshippedValue > 0.01 && (
+      {isBlanketDisplay && invoice.status !== 'closed' && !invoice.blanket_closed_at && shortfallIsMaterial && (
         <div className="mb-6 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4">
           <div className="flex items-start justify-between gap-4">
             <div className="flex gap-3">
@@ -1892,7 +1915,8 @@ const InvoiceDetail = () => {
                   This blanket is billing {formatCurrency(unshippedValue)} that has not shipped
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {unshippedLineCount} line{unshippedLineCount === 1 ? '' : 's'} still short.
+                  {unshippedLineCount} line{unshippedLineCount === 1 ? '' : 's'} short
+                  {overLines.length > 0 && `, ${overLines.length} over by ${formatCurrency(overValue)}`}.
                   It bills {formatCurrency(Number(invoice.total || 0))} today; on what has actually
                   shipped it would be {formatCurrency(Number(invoice.total || 0) - unshippedValue)}.
                   That is correct while more is still going out — finalise it once nothing more will.
