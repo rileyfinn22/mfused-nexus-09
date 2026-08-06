@@ -27,6 +27,7 @@ import SignedImage from "@/components/SignedImage";
 
 import { generateInvoiceNumber } from "@/lib/invoiceUtils";
 import { generateInvoicePDF } from "@/lib/invoicePdfUtils";
+import { fetchChildPdfInputs } from "@/lib/invoiceBalance";
 import { SendOrderConfirmationDialog } from "@/components/SendOrderConfirmationDialog";
 import { getTrackingUrl } from "@/lib/trackingUtils";
 
@@ -1433,11 +1434,19 @@ const OrderDetail = () => {
     });
     
     try {
+      // Same inputs the invoice page uses. Building the payload by hand here meant
+      // billed_percentage never reached the PDF, so an invoice with a deposit downloaded from
+      // this page billed the full amount while the same invoice from the invoice page showed
+      // only the deposit due.
+      const { itemsOverride, credit } = await fetchChildPdfInputs(supabase, targetInvoice as any);
+
       const invoiceData = {
         invoice_number: targetInvoice.invoice_number,
         invoice_date: targetInvoice.invoice_date,
         due_date: targetInvoice.due_date,
         total: targetInvoice.total,
+        deposit_credit: credit.amount > 0 ? credit.amount : null,
+        deposit_credit_label: credit.label,
         total_paid: targetInvoice.total_paid,
         subtotal: targetInvoice.subtotal,
         tax: targetInvoice.tax,
@@ -1445,6 +1454,7 @@ const OrderDetail = () => {
         shipping_note: targetInvoice.shipping_note,
         notes: targetInvoice.notes,
         companies: { name: order.customer_name },
+        billed_percentage: targetInvoice.billed_percentage,
         billing_name: targetInvoice.billing_name,
         billing_street: targetInvoice.billing_street,
         billing_city: targetInvoice.billing_city,
@@ -1469,9 +1479,10 @@ const OrderDetail = () => {
         shipping_city: order.shipping_city,
         shipping_state: order.shipping_state,
         shipping_zip: order.shipping_zip,
-        order_items: order.order_items,
+        // A child shipment bills its own allocation lines, not the whole order.
+        order_items: itemsOverride ?? order.order_items,
       };
-      
+
       await generateInvoicePDF(invoiceData, orderData);
       toast({ title: "Invoice Downloaded" });
     } catch (error) {
