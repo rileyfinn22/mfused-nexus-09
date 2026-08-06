@@ -8,7 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { ArrowLeft, Download, FileText, Edit, Trash2, RefreshCw, Copy, ExternalLink, CheckCircle2, DollarSign, CalendarIcon, Mail, RotateCcw, ChevronDown, Check, Unlink, Bell, Loader2, AlertCircle, AlertTriangle, Package, ChevronsUpDown, FileSpreadsheet, Sparkles, Plus, X } from "lucide-react";
+import { ArrowLeft, Download, FileText, Edit, Trash2, RefreshCw, Copy, ExternalLink, CheckCircle2, DollarSign, CalendarIcon, Mail, RotateCcw, ChevronDown, Check, Unlink, Bell, Loader2, AlertCircle, Package, ChevronsUpDown, FileSpreadsheet, Sparkles, Plus, X } from "lucide-react";
 
 import { format } from "date-fns";
 import { cn, formatCurrency, formatUnitPrice } from "@/lib/utils";
@@ -1596,41 +1596,10 @@ const InvoiceDetail = () => {
     Number(invoice.billed_percentage) > 0 &&
     Number(invoice.billed_percentage) < 100;
 
-  // Value the blanket is still billing that nobody has shipped. Overs contribute nothing to
-  // this, but they matter to how it reads: an order can be 34 lines over and one line short,
-  // and calling that "still short" on its own makes a finished order look outstanding.
-  const unshippedLines = (order?.order_items || []).filter(
-    (oi: any) => Number(oi.quantity || 0) - Number(oi.shipped_quantity || 0) > 0
-  );
-  const unshippedLineCount = unshippedLines.length;
-  const unshippedValue = Math.round(
-    unshippedLines.reduce(
-      (sum: number, oi: any) =>
-        sum + (Number(oi.quantity || 0) - Number(oi.shipped_quantity || 0)) * Number(oi.unit_price || 0),
-      0
-    ) * 100
-  ) / 100;
-  const overLines = (order?.order_items || []).filter(
-    (oi: any) => Number(oi.shipped_quantity || 0) - Number(oi.quantity || 0) > 0
-  );
-  const overValue = Math.round(
-    overLines.reduce(
-      (sum: number, oi: any) =>
-        sum + (Number(oi.shipped_quantity || 0) - Number(oi.quantity || 0)) * Number(oi.unit_price || 0),
-      0
-    ) * 100
-  ) / 100;
-  // The case worth flagging is an order that STARTED shipping and stopped short. A blanket with
-  // nothing shipped yet is just an order awaiting production -- every one of those is 100%
-  // "short" and saying so would bury the real ones. And a shortfall smaller than 1% of the
-  // invoice is noise: 10996 came up 150 units short on one line while over-shipping 34 others.
-  const anythingShipped = (order?.order_items || []).some(
-    (oi: any) => Number(oi.shipped_quantity || 0) > 0
-  );
-  const shortfallIsMaterial =
-    anythingShipped &&
-    unshippedValue > 0.01 &&
-    unshippedValue > Number(invoice?.total || 0) * 0.01;
+  // No short-shipment flag here, deliberately. Entering shipped quantities on an invoice IS
+  // the invoice -- the stored subtotal is already the shipped basis, so comparing it back
+  // against the ordered quantities subtracts the same shortfall twice and invents a gap that
+  // does not exist. 10957 bills 16,075.875 on 8,625 shipped and is simply correct.
   
   const displayShipping = isEditMode ? Number(editShippingCost || 0) : Number(invoice?.shipping_cost || 0);
   
@@ -1902,34 +1871,6 @@ const InvoiceDetail = () => {
           )}
         </div>
       </div>
-
-      {/* An open blanket that has stopped short used to sit there billing the ordered amount
-          forever, with nothing anywhere saying so. It only corrects when somebody finalises it. */}
-      {isBlanketDisplay && invoice.status !== 'closed' && !invoice.blanket_closed_at && shortfallIsMaterial && (
-        <div className="mb-6 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex gap-3">
-              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
-              <div>
-                <p className="font-medium">
-                  This blanket is billing {formatCurrency(unshippedValue)} that has not shipped
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {unshippedLineCount} line{unshippedLineCount === 1 ? '' : 's'} short
-                  {overLines.length > 0 && `, ${overLines.length} over by ${formatCurrency(overValue)}`}.
-                  It bills {formatCurrency(Number(invoice.total || 0))} today; on what has actually
-                  shipped it would be {formatCurrency(Number(invoice.total || 0) - unshippedValue)}.
-                  That is correct while more is still going out — finalise it once nothing more will.
-                </p>
-              </div>
-            </div>
-            <Button size="sm" variant="outline" className="shrink-0 border-amber-600 text-amber-700 hover:bg-amber-100" onClick={handleUpdateBlanketTotal}>
-              <CheckCircle2 className="mr-1.5 h-4 w-4" />
-              Finalise
-            </Button>
-          </div>
-        </div>
-      )}
 
       {/* Invoice Header Card */}
       <Card className="shadow-lg">
