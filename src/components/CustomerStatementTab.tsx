@@ -9,6 +9,7 @@ import { CalendarIcon, Download, FileSpreadsheet, DollarSign, Clock, AlertTriang
 import { supabase } from "@/integrations/supabase/client";
 import { format, differenceInDays, startOfMonth, endOfMonth, subMonths, parseISO, isWithinInterval, subDays } from "date-fns";
 import { cn } from "@/lib/utils";
+import { allocateDepositCredits } from "@/lib/invoiceBalance";
 
 interface CustomerStatementTabProps {
   companyId: string;
@@ -28,6 +29,11 @@ interface Invoice {
   order_id: string;
   quickbooks_sync_status: string | null;
   quickbooks_id: string | null;
+  invoice_type: string | null;
+  billed_percentage: number | null;
+  blanket_closed_at: string | null;
+  shipment_number: number | null;
+  created_at: string | null;
 }
 
 interface Payment {
@@ -82,7 +88,7 @@ export const CustomerStatementTab = ({ companyId, companyName }: CustomerStateme
       // Fetch all invoices for this company (non-deleted)
       const { data: invoicesData, error: invoicesError } = await supabase
         .from('invoices')
-        .select('id, invoice_number, invoice_date, due_date, total, total_paid, status, parent_invoice_id, description, order_id, quickbooks_sync_status, quickbooks_id')
+        .select('id, invoice_number, invoice_date, due_date, total, total_paid, status, parent_invoice_id, description, order_id, quickbooks_sync_status, quickbooks_id, invoice_type, billed_percentage, blanket_closed_at, shipment_number, created_at')
         .eq('company_id', companyId)
         .is('deleted_at', null)
         .order('invoice_date', { ascending: true });
@@ -107,10 +113,43 @@ export const CustomerStatementTab = ({ companyId, companyName }: CustomerStateme
     }
   };
 
-  // Filter invoices to only include those synced to QuickBooks (billed to QBO)
+  // What a customer actually owes on one invoice. A statement that just did
+  // total - total_paid billed them twice for anything that shipped in parts: the shipment
+  // invoices carry the goods while any deposit sits on the blanket, so both looked unpaid.
+  // Same allocator the PDFs and QuickBooks use.
+  const balanceOf = useMemo(() => {
+    const byId = new Map(invoices.map(inv => [inv.id, inv]));
+    const kidsByParent = new Map<string, Invoice[]>();
+    invoices.forEach(inv => {
+      if (!inv.parent_invoice_id) return;
+      const list = kidsByParent.get(inv.parent_invoice_id) || [];
+      list.push(inv);
+      kidsByParent.set(inv.parent_invoice_id, list);
+    });
+
+    return (inv: Invoice): number => {
+      const parent = inv.parent_invoice_id ? byId.get(inv.parent_invoice_id) : null;
+      const credit = parent
+        ? allocateDepositCredits(
+            parent as any,
+            (kidsByParent.get(parent.id) || []) as any,
+            { blanketValue: Number(parent.total || 0) }
+          )[inv.id] || 0
+        : 0;
+      return Math.round((Number(inv.total || 0) - Number(inv.total_paid || 0) - credit) * 100) / 100;
+    };
+  }, [invoices]);
+
+  // Only invoices actually billed to QuickBooks count as receivable -- and a blanket that has
+  // shipment invoices under it is not one of them, however it got synced. Its children bill the
+  // goods; counting the blanket as well double-counts the whole order.
   const billableInvoices = useMemo(() => {
-    return invoices.filter(inv => 
-      inv.quickbooks_sync_status === 'synced' || inv.quickbooks_id
+    const parentsWithKids = new Set(
+      invoices.filter(inv => inv.parent_invoice_id).map(inv => inv.parent_invoice_id as string)
+    );
+    return invoices.filter(inv =>
+      (inv.quickbooks_sync_status === 'synced' || inv.quickbooks_id) &&
+      !parentsWithKids.has(inv.id)
     );
   }, [invoices]);
 
@@ -129,7 +168,7 @@ export const CustomerStatementTab = ({ companyId, companyName }: CustomerStateme
     const buckets = { current: 0, days30: 0, days60: 0, days90Plus: 0 };
 
     billableInvoices.forEach(invoice => {
-      const balance = invoice.total - (invoice.total_paid || 0);
+      const balance = balanceOf(invoice);
       if (balance <= 0) return;
 
       if (!invoice.due_date) {
@@ -152,7 +191,7 @@ export const CustomerStatementTab = ({ companyId, companyName }: CustomerStateme
     });
 
     return buckets;
-  }, [billableInvoices]);
+  }, [billableInvoices, balanceOf]);
 
   // Calculate summary totals
   // Total Open = All blanket (parent) invoices - Total paid
@@ -161,8 +200,11 @@ export const CustomerStatementTab = ({ companyId, companyName }: CustomerStateme
     const blanketInvoices = invoices.filter(inv => inv.parent_invoice_id === null);
     const totalBlankets = blanketInvoices.reduce((sum, inv) => sum + inv.total, 0);
     
-    // Total paid comes from payments on QBO-synced invoices
-    const totalPaid = billableInvoices.reduce((sum, inv) => sum + (inv.total_paid || 0), 0);
+    // Every payment the customer has made, wherever it was recorded. It has to include the
+    // blankets: a deposit sits on the blanket while the shipment invoices carry the goods, and
+    // blankets with children are deliberately not in billableInvoices. Counting only those
+    // would drop the deposits and overstate what is owed.
+    const totalPaid = invoices.reduce((sum, inv) => sum + (inv.total_paid || 0), 0);
     
     // Total Open = All blankets - Total paid
     const outstanding = totalBlankets - totalPaid;
