@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useActiveCompany } from "@/hooks/useActiveCompany";
 
 interface OrderWithPO {
   id: string;
@@ -28,10 +29,11 @@ export default function MyPOs() {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { activeCompanyId } = useActiveCompany();
 
   useEffect(() => {
     fetchOrders();
-  }, []);
+  }, [activeCompanyId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchOrders = async () => {
     try {
@@ -41,14 +43,12 @@ export default function MyPOs() {
         return;
       }
 
-      // Get user's company
-      const { data: userRole } = await supabase
-        .from('user_roles')
-        .select('company_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!userRole) {
+      // Anyone belonging to more than one company saw an empty page: this looked up their
+      // company with .single(), which ERRORS on multiple rows rather than picking one, so the
+      // fetch bailed out. Everyone else's page worked, which is why the broken PO download
+      // buttons could only be hit by single-company users. Use the company switcher's value,
+      // same as the other customer pages.
+      if (!activeCompanyId) {
         setLoading(false);
         return;
       }
@@ -71,7 +71,7 @@ export default function MyPOs() {
             status
           )
         `)
-        .eq('company_id', userRole.company_id)
+        .eq('company_id', activeCompanyId)
         .is('deleted_at', null)
         .not('po_number', 'is', null)
         .neq('status', 'draft')
