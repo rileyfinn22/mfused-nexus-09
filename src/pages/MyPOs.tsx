@@ -108,54 +108,9 @@ export default function MyPOs() {
     }
   };
 
-  const handleDownloadPO = async (poPdfPath: string, poNumber: string) => {
-    try {
-      // These are the customer's own purchase order PDFs, stored in po-documents alongside
-      // everything else keyed off orders.po_pdf_path. There has never been a 'customer-pos'
-      // bucket, so both buttons on this page returned "Bucket not found".
-      const { data, error } = await supabase.storage
-        .from('po-documents')
-        .download(poPdfPath);
-
-      if (error) throw error;
-
-      const url = URL.createObjectURL(data);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `PO-${poNumber}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Error downloading PO:', error);
-      toast({
-        title: "Error",
-        description: "Failed to download PO document",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleViewPO = async (poPdfPath: string) => {
-    try {
-      const { data, error } = await supabase.storage
-        .from('po-documents')
-        .createSignedUrl(poPdfPath, 3600);
-
-      if (error) throw error;
-      if (data?.signedUrl) {
-        window.open(data.signedUrl, '_blank');
-      }
-    } catch (error) {
-      console.error('Error viewing PO:', error);
-      toast({
-        title: "Error",
-        description: "Failed to open PO document",
-        variant: "destructive",
-      });
-    }
-  };
+  // Both PO document handlers are gone. They pointed at a 'customer-pos' bucket that has never
+  // existed, which is what produced the NoSuchBucket error -- but the fix is not to repair the
+  // path. Customers do not open PO documents from this app at all.
 
   // Parse comma-separated PO numbers into array
   const parsePONumbers = (poNumber: string | null): string[] => {
@@ -235,28 +190,10 @@ export default function MyPOs() {
                       </div>
                       
                       <div className="flex gap-2">
-                        {/* View/Download PO PDF if available */}
-                        {order.po_pdf_path && (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleViewPO(order.po_pdf_path!)}
-                            >
-                              <ExternalLink className="h-4 w-4 mr-1" />
-                              View PO
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDownloadPO(order.po_pdf_path!, order.po_number || order.order_number)}
-                            >
-                              <Download className="h-4 w-4 mr-1" />
-                              Download
-                            </Button>
-                          </>
-                        )}
-                        
+                        {/* No View/Download of the PO document here. Customers do not open PO
+                            documents from this app -- the PO number stays as the label on their
+                            own order, which is how they recognise it. */}
+
                         {/* Navigate to order detail */}
                         <Button
                           size="sm"
