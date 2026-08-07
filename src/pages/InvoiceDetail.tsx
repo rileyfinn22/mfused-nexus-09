@@ -1766,26 +1766,34 @@ const InvoiceDetail = () => {
                       Sync to QBO
                     </Button>
                   )}
-                  {invoice.status !== 'paid' && <Button size="sm" onClick={() => setShowPaymentDialog(true)}>
-                      <DollarSign className="h-4 w-4 mr-1.5" />
-                      Record Payment
-                    </Button>}
-                  {invoice.invoice_type === 'full' && invoice.shipment_number === 1 && <Button size="sm" variant="outline" onClick={() => setShowDepositDialog(true)} className="border-blue-500 text-blue-700 hover:bg-blue-50">
-                      <DollarSign className="h-4 w-4 mr-1.5" />
-                      {hasDeposit ? `Deposit ${Number(invoice.billed_percentage)}%` : 'Bill Deposit'}
-                    </Button>}
-                  {hasDeposit && <Button size="sm" variant="outline" onClick={handleClearDeposit} className="border-amber-500 text-amber-700 hover:bg-amber-50">
-                      <X className="h-4 w-4 mr-1.5" />
-                      Clear Deposit
-                    </Button>}
-                  {invoice.invoice_type === 'full' && invoice.status !== 'closed' && <Button size="sm" variant="outline" onClick={() => navigate(`/invoices/${invoiceId}/shipped`)} className="border-purple-500 text-purple-700 hover:bg-purple-50">
-                      <Package className="h-4 w-4 mr-1.5" />
-                      Edit Shipped Qty
-                    </Button>}
-                  {invoice.invoice_type === 'full' && invoice.status !== 'closed' && <Button size="sm" variant="outline" onClick={handleUpdateBlanketTotal} className="border-blue-500 text-blue-700 hover:bg-blue-50">
-                      <CheckCircle2 className="h-4 w-4 mr-1.5" />
-                      Finalise Blanket
-                    </Button>}
+                  {/* Everything below runs the billing: taking payments, setting or clearing a
+                      deposit, editing shipped quantities, closing a blanket out. This page is
+                      reachable by the customer the invoice belongs to -- /invoices/:invoiceId has
+                      no route guard -- so none of it may render for them. */}
+                  {isVibeAdmin && (
+                    <>
+                      {invoice.status !== 'paid' && <Button size="sm" onClick={() => setShowPaymentDialog(true)}>
+                          <DollarSign className="h-4 w-4 mr-1.5" />
+                          Record Payment
+                        </Button>}
+                      {invoice.invoice_type === 'full' && invoice.shipment_number === 1 && <Button size="sm" variant="outline" onClick={() => setShowDepositDialog(true)} className="border-blue-500 text-blue-700 hover:bg-blue-50">
+                          <DollarSign className="h-4 w-4 mr-1.5" />
+                          {hasDeposit ? `Deposit ${Number(invoice.billed_percentage)}%` : 'Bill Deposit'}
+                        </Button>}
+                      {hasDeposit && <Button size="sm" variant="outline" onClick={handleClearDeposit} className="border-amber-500 text-amber-700 hover:bg-amber-50">
+                          <X className="h-4 w-4 mr-1.5" />
+                          Clear Deposit
+                        </Button>}
+                      {invoice.invoice_type === 'full' && invoice.status !== 'closed' && <Button size="sm" variant="outline" onClick={() => navigate(`/invoices/${invoiceId}/shipped`)} className="border-purple-500 text-purple-700 hover:bg-purple-50">
+                          <Package className="h-4 w-4 mr-1.5" />
+                          Edit Shipped Qty
+                        </Button>}
+                      {invoice.invoice_type === 'full' && invoice.status !== 'closed' && <Button size="sm" variant="outline" onClick={handleUpdateBlanketTotal} className="border-blue-500 text-blue-700 hover:bg-blue-50">
+                          <CheckCircle2 className="h-4 w-4 mr-1.5" />
+                          Finalise Blanket
+                        </Button>}
+                    </>
+                  )}
 
                   {/* CONSOLIDATED ACTIONS DROPDOWN â€” secondary actions */}
                   <DropdownMenu>
