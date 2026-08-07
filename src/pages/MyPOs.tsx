@@ -110,8 +110,11 @@ export default function MyPOs() {
 
   const handleDownloadPO = async (poPdfPath: string, poNumber: string) => {
     try {
+      // These are the customer's own purchase order PDFs, stored in po-documents alongside
+      // everything else keyed off orders.po_pdf_path. There has never been a 'customer-pos'
+      // bucket, so both buttons on this page returned "Bucket not found".
       const { data, error } = await supabase.storage
-        .from('customer-pos')
+        .from('po-documents')
         .download(poPdfPath);
 
       if (error) throw error;
@@ -137,7 +140,7 @@ export default function MyPOs() {
   const handleViewPO = async (poPdfPath: string) => {
     try {
       const { data, error } = await supabase.storage
-        .from('customer-pos')
+        .from('po-documents')
         .createSignedUrl(poPdfPath, 3600);
 
       if (error) throw error;
