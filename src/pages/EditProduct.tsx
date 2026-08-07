@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+﻿import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
+import { getSignedArtworkUrl } from "@/lib/signedArtworkUrl";
 import { toast } from "sonner";
 import { ArrowLeft, FileImage, CheckCircle, Clock, Eye, Upload, Trash2 } from "lucide-react";
 import AddArtworkDialog from "@/components/AddArtworkDialog";
@@ -584,7 +585,7 @@ const EditProduct = () => {
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() => window.open(artwork.artwork_url, '_blank')}
+                      onClick={async () => { const signed = await getSignedArtworkUrl(artwork.artwork_url); if (signed) window.open(signed, "_blank"); }}
                     >
                       <Eye className="h-4 w-4" />
                     </Button>

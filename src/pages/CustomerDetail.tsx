@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,7 @@ import { CompanyUsersManager } from "@/components/CompanyUsersManager";
 import { CompanyProductTemplates } from "@/components/CompanyProductTemplates";
 import SignedImage from "@/components/SignedImage";
 import { supabase } from "@/integrations/supabase/client";
+import { getSignedArtworkUrl } from "@/lib/signedArtworkUrl";
 import { toast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -1551,7 +1552,7 @@ const CustomerDetail = () => {
                         )}
                       </div>
                       <div className="col-span-1 text-sm font-medium">
-                        {product.price ? `$${parseFloat(product.price).toFixed(3)}` : '—'}
+                        {product.price ? `$${parseFloat(product.price).toFixed(3)}` : 'â€”'}
                       </div>
                       <div className="col-span-1 flex items-center gap-1">
                         <AssignTemplateDropdown
@@ -2056,7 +2057,7 @@ const CustomerDetail = () => {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => window.open(artwork.artwork_url, '_blank')}
+                          onClick={async () => { const signed = await getSignedArtworkUrl(artwork.artwork_url); if (signed) window.open(signed, "_blank"); }}
                         >
                           <Eye className="h-4 w-4" />
                         </Button>

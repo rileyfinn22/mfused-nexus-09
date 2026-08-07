@@ -24,6 +24,7 @@ import { CreateShipmentInvoiceDialog } from "@/components/CreateShipmentInvoiceD
 import { ProductionStageTimeline } from "@/components/ProductionStageTimeline";
 import { cn } from "@/lib/utils";
 import SignedImage from "@/components/SignedImage";
+import { getSignedArtworkUrl } from "@/lib/signedArtworkUrl";
 
 import { generateInvoiceNumber } from "@/lib/invoiceUtils";
 import { generateInvoicePDF } from "@/lib/invoicePdfUtils";
@@ -3115,9 +3116,9 @@ const OrderDetail = () => {
                       {/* Preview thumbnail */}
                       <div className="flex-shrink-0 w-16 h-16 rounded border border-border bg-muted flex items-center justify-center overflow-hidden">
                         {previewSrc && isImage ? (
-                          <img 
-                            src={previewSrc} 
-                            alt={artwork.filename} 
+                          <SignedImage
+                            src={previewSrc}
+                            alt={artwork.filename}
                             className="w-full h-full object-cover"
                           />
                         ) : artwork.preview_url ? (
@@ -3158,11 +3159,19 @@ const OrderDetail = () => {
                         )}
                         
                         <div className="flex items-center gap-1 mt-2">
+                          {/* artwork_url is a legacy PUBLIC storage URL and the artwork bucket is
+                              private now. Opening one straight gets you Supabase's confusing
+                              "Bucket not found" -- that is what it says when you ask for the
+                              public URL of a private bucket. Sign it first, same as everywhere
+                              else that survived the bucket going private. */}
                           <Button
                             variant="ghost"
                             size="sm"
                             className="h-7 px-2"
-                            onClick={() => window.open(artwork.artwork_url, '_blank')}
+                            onClick={async () => {
+                              const signed = await getSignedArtworkUrl(artwork.artwork_url);
+                              if (signed) window.open(signed, '_blank');
+                            }}
                           >
                             <ExternalLink className="h-3 w-3 mr-1" />
                             View
@@ -3171,11 +3180,15 @@ const OrderDetail = () => {
                             variant="ghost"
                             size="sm"
                             className="h-7 px-2"
-                            onClick={() => {
+                            onClick={async () => {
+                              const signed = await getSignedArtworkUrl(artwork.artwork_url);
+                              if (!signed) return;
                               const link = document.createElement('a');
-                              link.href = artwork.artwork_url;
+                              link.href = signed;
                               link.download = artwork.filename;
+                              document.body.appendChild(link);
                               link.click();
+                              document.body.removeChild(link);
                             }}
                           >
                             <Download className="h-3 w-3 mr-1" />

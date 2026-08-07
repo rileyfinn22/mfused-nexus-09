@@ -1,10 +1,11 @@
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+﻿import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Download, FileImage, FileText, FileCode, CheckCircle, Clock, ExternalLink } from "lucide-react";
 import { useState } from "react";
 import { isUsableArtworkPreviewUrl } from "@/lib/artworkPreview";
 import SignedImage from "@/components/SignedImage";
+import { getSignedArtworkUrl } from "@/lib/signedArtworkUrl";
 
 interface ArtworkFile {
   id: string;
@@ -83,10 +84,10 @@ const ArtworkViewerDialog = ({
                 )}
               </DialogTitle>
               <DialogDescription>
-                SKU: {file.sku} • Uploaded: {new Date(file.created_at).toLocaleDateString()}
+                SKU: {file.sku} â€¢ Uploaded: {new Date(file.created_at).toLocaleDateString()}
                 {file.is_approved && file.approved_at && (
                   <span className="text-green-600 ml-2">
-                    • Approved: {new Date(file.approved_at).toLocaleDateString()}
+                    â€¢ Approved: {new Date(file.approved_at).toLocaleDateString()}
                   </span>
                 )}
               </DialogDescription>
@@ -138,7 +139,7 @@ const ArtworkViewerDialog = ({
                   <div className="flex gap-3">
                     <Button
                       variant="outline"
-                      onClick={() => window.open(file.artwork_url, "_blank")}
+                      onClick={async () => { const signed = await getSignedArtworkUrl(file.artwork_url); if (signed) window.open(signed, "_blank"); }}
                     >
                       <ExternalLink className="h-5 w-5 mr-2" />
                       Open in New Tab
@@ -184,7 +185,7 @@ const ArtworkViewerDialog = ({
             {fileType === "pdf" && (
               <Button
                 variant="outline"
-                onClick={() => window.open(file.artwork_url, "_blank")}
+                onClick={async () => { const signed = await getSignedArtworkUrl(file.artwork_url); if (signed) window.open(signed, "_blank"); }}
               >
                 <ExternalLink className="h-4 w-4 mr-2" />
                 Open in Tab
