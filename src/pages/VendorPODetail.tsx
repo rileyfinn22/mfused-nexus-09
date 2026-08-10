@@ -16,6 +16,7 @@ import { VIBE_COMPANY } from "@/lib/pdfBranding";
 import { EmailPreviewDialog, AdditionalAttachment, ArtworkFile } from "@/components/EmailPreviewDialog";
 import { RecordVendorPOPaymentDialog } from "@/components/RecordVendorPOPaymentDialog";
 import { VendorPOPackingListSection } from "@/components/VendorPOPackingListSection";
+import { Switch } from "@/components/ui/switch";
 import { VendorBillsSection } from "@/components/VendorBillsSection";
 import { getTrackingUrl, CARRIERS } from "@/lib/trackingUtils";
 import { InlineTrackingEditor } from "@/components/InlineTrackingEditor";
@@ -1124,6 +1125,9 @@ Thank you for your business.`;
     );
   }
 
+  // Mirrors public.vendor_po_visible_to_customer: unset means follow the PO type.
+  const customerSheetVisible = po.show_on_customer_sheet ?? ((po.po_type || 'production') === 'production');
+
   const productItems = poItems.filter(item => !isShippingItem(item));
   const shippingItems = poItems.filter(isShippingItem);
 
@@ -1342,6 +1346,48 @@ Thank you for your business.`;
                   />
                 </div>
               </div>
+
+              {/* Whether the customer sees this PO in their production tracking. Unset follows
+                  the PO type -- production POs (the ones raised when a vendor is assigned) track,
+                  custom and expense POs stay internal until switched on here. */}
+              {isAdmin && (
+                <div className="flex items-start justify-between gap-4 rounded-lg border border-border bg-muted/30 p-3">
+                  <div>
+                    <Label className="text-sm font-medium">Show in customer production tracking</Label>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {customerSheetVisible
+                        ? 'The customer can see this PO’s progress, dates and published updates.'
+                        : 'Internal only — the customer will not see this PO at all.'}
+                      {po.show_on_customer_sheet == null && (
+                        <span className="ml-1 opacity-70">
+                          (default for a {po.po_type || 'production'} PO)
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={customerSheetVisible}
+                    onCheckedChange={async (next) => {
+                      const { error } = await supabase
+                        .from('vendor_pos')
+                        .update({ show_on_customer_sheet: next } as any)
+                        .eq('id', po.id);
+                      if (error) {
+                        toast({ title: 'Error', description: error.message, variant: 'destructive' });
+                        return;
+                      }
+                      setPO({ ...po, show_on_customer_sheet: next });
+                      toast({
+                        title: next ? 'Visible to customer' : 'Hidden from customer',
+                        description: next
+                          ? `${po.po_number} now appears in their production tracking.`
+                          : `${po.po_number} is internal only.`,
+                      });
+                    }}
+                  />
+                </div>
+              )}
+
               <div>
                 <Label className="text-xs text-muted-foreground mb-2 block">Ship To Address</Label>
                 {isEditMode ? (
