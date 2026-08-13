@@ -760,10 +760,19 @@ const Invoices = () => {
                     })()}
                   </div>
                   <div className="col-span-2">
-                    <div className="font-medium text-sm">
-                      {invoice.companies?.name || 'N/A'}
-                    </div>
+                    {isVibeAdmin ? (
+                      <div className="font-medium text-sm">
+                        {invoice.companies?.name || 'N/A'}
+                      </div>
+                    ) : (
+                      <div className="font-medium text-sm font-mono">
+                        {invoice.orders?.po_number
+                          ? `PO: ${invoice.orders.po_number}`
+                          : <span className="text-muted-foreground font-sans">-</span>}
+                      </div>
+                    )}
                   </div>
+
                   <div className="col-span-2">
                     {isVibeAdmin ? (
                       <div className="space-y-2">
