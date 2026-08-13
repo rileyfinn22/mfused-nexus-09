@@ -759,13 +759,13 @@ const Invoices = () => {
                       );
                     })()}
                   </div>
-                  <div className="col-span-2">
+                  <div className="col-span-2 min-w-0">
                     {isVibeAdmin ? (
-                      <div className="font-medium text-sm">
+                      <div className="font-medium text-sm truncate">
                         {invoice.companies?.name || 'N/A'}
                       </div>
                     ) : (
-                      <div className="font-medium text-sm font-mono">
+                      <div className="font-medium text-sm font-mono whitespace-normal break-words min-w-0">
                         {((invoice as any).customer_po_number || invoice.orders?.po_number)
                           ? `PO: ${(invoice as any).customer_po_number || invoice.orders?.po_number}`
                           : <span className="text-muted-foreground font-sans">-</span>}
