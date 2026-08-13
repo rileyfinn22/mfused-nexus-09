@@ -3779,6 +3779,7 @@ export type Database = {
           ship_to_zip: string | null
           shipping_cost: number
           shipping_method: string | null
+          show_on_customer_sheet: boolean | null
           status: string
           total: number
           total_paid: number | null
@@ -3826,6 +3827,7 @@ export type Database = {
           ship_to_zip?: string | null
           shipping_cost?: number
           shipping_method?: string | null
+          show_on_customer_sheet?: boolean | null
           status?: string
           total?: number
           total_paid?: number | null
@@ -3873,6 +3875,7 @@ export type Database = {
           ship_to_zip?: string | null
           shipping_cost?: number
           shipping_method?: string | null
+          show_on_customer_sheet?: boolean | null
           status?: string
           total?: number
           total_paid?: number | null
@@ -4388,6 +4391,10 @@ export type Database = {
           order_number: string
           po_id: string
         }[]
+      }
+      vendor_po_visible_to_customer: {
+        Args: { _po_type: string; _show: boolean }
+        Returns: boolean
       }
       vendor_update_item_final_qty: {
         Args: { p_final_quantity: number; p_item_id: string }
