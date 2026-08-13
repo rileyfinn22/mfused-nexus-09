@@ -800,6 +800,7 @@ const InvoiceDetail = () => {
             item_id: alloc.order_items?.item_id,
             sku: alloc.order_items?.sku,
             name: alloc.order_items?.name,
+            description: alloc.order_items?.description,
             quantity: Number(alloc.quantity_allocated) || 0,
           }));
       }
@@ -809,6 +810,7 @@ const InvoiceDetail = () => {
           item_id: item?.item_id,
           sku: item?.sku,
           name: item?.name,
+          description: item?.description,
           quantity: Number(item?.quantity ?? item?.shipped_quantity ?? 0) || 0,
         }));
       }

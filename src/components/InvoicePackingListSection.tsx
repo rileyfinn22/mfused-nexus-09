@@ -606,6 +606,7 @@ export const InvoicePackingListSection = ({
         item_id: alloc.order_items.item_id,
         sku: alloc.order_items.sku,
         name: alloc.order_items.name,
+        description: alloc.order_items.description,
         quantity: Number(alloc.quantity_allocated || 0),
       }))
       .filter((item: any) => item.quantity > 0);
@@ -615,6 +616,7 @@ export const InvoicePackingListSection = ({
         item_id: item.item_id,
         sku: item.sku,
         name: item.name,
+        description: item.description,
         quantity: Number(item.shipped_quantity ?? item.quantity ?? 0),
       }))
       .filter((item: any) => item.quantity > 0);

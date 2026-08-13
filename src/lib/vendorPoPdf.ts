@@ -27,7 +27,7 @@ export interface PoPdfData {
     zip?: string | null;
   };
   stickerInfo: PoPdfStickerRow[];
-  items: Array<{ sku: string | null; name: string | null; quantity: number; unit_cost: number; total: number }>;
+  items: Array<{ sku: string | null; name: string | null; description?: string | null; quantity: number; unit_cost: number; total: number }>;
   shippingCost: number;
   total: number;
 }

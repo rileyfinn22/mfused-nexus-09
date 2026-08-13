@@ -54,6 +54,7 @@ interface OrderData {
 export interface OrderItem {
   sku: string;
   name: string;
+  description?: string | null;
   quantity: number;
   shipped_quantity?: number;
   unit_price: number;
