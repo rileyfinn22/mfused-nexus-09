@@ -1942,34 +1942,6 @@ const InvoiceDetail = () => {
                     View Source Quote
                   </Button>
                 )}
-                <div className="flex items-start gap-2">
-                  <span className="text-sm text-muted-foreground shrink-0 mt-1">Customer PO:</span>
-                  {isVibeAdmin ? (
-                    <div className="flex-1 min-w-[180px]">
-                      <EditableDescription
-                        value={(invoice as any)?.customer_po_number ?? order?.po_number ?? ""}
-                        placeholder="Add customer POâ€¦"
-                        onSave={async (newValue) => {
-                          if (!invoice?.id) return;
-                          const val = newValue?.trim() ? newValue.trim() : null;
-                          const { error } = await supabase
-                            .from("invoices")
-                            .update({ customer_po_number: val })
-                            .eq("id", invoice.id);
-                          if (error) {
-                            toast({ title: "Error", description: "Failed to save PO", variant: "destructive" });
-                            return;
-                          }
-                          setInvoice({ ...invoice, customer_po_number: val } as any);
-                        }}
-                      />
-                    </div>
-                  ) : (
-                    ((invoice as any)?.customer_po_number || order?.po_number) && (
-                      <p className="text-sm text-muted-foreground">{(invoice as any)?.customer_po_number || order?.po_number}</p>
-                    )
-                  )}
-                </div>
 
                 {/* Descriptions (match Orders: order-level description + optional invoice-level description for child invoices) */}
                 {isVibeAdmin ? (
