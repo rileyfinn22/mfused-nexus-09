@@ -602,7 +602,7 @@ const Invoices = () => {
           <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             <div className="col-span-2">Invoice ID</div>
             <div className="col-span-1">Due / Shipped</div>
-            <div className="col-span-2">Company</div>
+            <div className="col-span-2">{isVibeAdmin ? 'Company' : 'PO'}</div>
             <div className="col-span-2">Description</div>
             <div className="col-span-1">Amount</div>
             <div className="col-span-1">Status</div>
@@ -760,10 +760,19 @@ const Invoices = () => {
                     })()}
                   </div>
                   <div className="col-span-2">
-                    <div className="font-medium text-sm">
-                      {invoice.companies?.name || 'N/A'}
-                    </div>
+                    {isVibeAdmin ? (
+                      <div className="font-medium text-sm">
+                        {invoice.companies?.name || 'N/A'}
+                      </div>
+                    ) : (
+                      <div className="font-medium text-sm font-mono">
+                        {invoice.orders?.po_number
+                          ? `PO: ${invoice.orders.po_number}`
+                          : <span className="text-muted-foreground font-sans">-</span>}
+                      </div>
+                    )}
                   </div>
+
                   <div className="col-span-2">
                     {isVibeAdmin ? (
                       <div className="space-y-2">
@@ -813,6 +822,15 @@ const Invoices = () => {
                     </Badge>
                   </div>
                   <div className="col-span-2 flex gap-1 items-center justify-end">
+                    {isVibeAdmin && invoice.orders?.po_number && (
+                      <span
+                        className="mr-auto text-xs font-mono text-muted-foreground truncate max-w-[110px]"
+                        title={`Customer PO: ${invoice.orders.po_number}`}
+                      >
+                        PO: {invoice.orders.po_number}
+                      </span>
+                    )}
+
                     <ExpandToggleButton
                       expanded={detailExpanded}
                       onToggle={() => toggleDetailRow(invoice.id)}
