@@ -603,11 +603,11 @@ const Invoices = () => {
             <div className="col-span-2">Invoice ID</div>
             <div className="col-span-1">Due / Shipped</div>
             <div className="col-span-2">{isVibeAdmin ? 'Company' : 'PO'}</div>
-            <div className="col-span-2">Description</div>
+            <div className={isVibeAdmin ? 'col-span-2' : 'col-span-3'}>Description</div>
             <div className="col-span-1">Amount</div>
             <div className="col-span-1">Status</div>
-            <div className="col-span-1">Type</div>
-            <div className="col-span-2">Actions</div>
+            <div className={isVibeAdmin ? 'col-span-1' : 'col-span-2'}>Type</div>
+            {isVibeAdmin && <div className="col-span-2">CPO</div>}
           </div>
         </div>
 
