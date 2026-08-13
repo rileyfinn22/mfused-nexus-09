@@ -817,7 +817,7 @@ const Invoices = () => {
                       <span className={getStatusColor(displayStatus)}>{displayStatus}</span>
                     </div>
                   </div>
-                  <div className="col-span-1">
+                  <div className={isVibeAdmin ? 'col-span-1' : 'col-span-2'}>
                     <Badge className={getInvoiceTypeColor(invoice.invoice_type || 'full')}>
                       {invoice.invoice_type === 'full' || !invoice.invoice_type ? 'Blanket' : invoice.invoice_type === 'partial' ? 'Shipped' : (invoice.invoice_type.charAt(0).toUpperCase() + invoice.invoice_type.slice(1))}
                     </Badge>
