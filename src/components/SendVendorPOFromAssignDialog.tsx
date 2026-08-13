@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { pdfItemDescription } from "@/lib/pdfItemText";
 import {
   Dialog,
   DialogContent,
@@ -383,7 +384,7 @@ export function SendVendorPOFromAssignDialog({
     // Items table
     const tableData = poItems.map((item) => [
       item.sku,
-      item.name,
+      pdfItemDescription(item),
       item.quantity.toLocaleString(),
       `$${Number(item.unit_cost).toFixed(3)}`,
       `$${Number(item.total).toFixed(2)}`,

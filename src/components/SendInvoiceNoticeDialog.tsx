@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { pdfItemDescription } from "@/lib/pdfItemText";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -313,7 +314,7 @@ export function SendInvoiceNoticeDialog({
 
     const tableData = items.map((item) => [
       item.sku || '',
-      item.name || '',
+      pdfItemDescription(item),
       (item.quantity || item.shipped_quantity || 0).toLocaleString(),
       formatUnitPrice(item.unit_price || 0),
       formatCurrency((item.quantity || item.shipped_quantity || 0) * (item.unit_price || 0))

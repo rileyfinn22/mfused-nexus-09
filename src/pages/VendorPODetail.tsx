@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { pdfItemDescription } from "@/lib/pdfItemText";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -645,7 +646,7 @@ const VendorPODetail = () => {
     // Shipping is summarised in the totals section below, so it must not also appear as a line.
     const tableData = poItems.filter(item => !isShippingItem(item)).map(item => [
       item.sku,
-      item.name,
+      pdfItemDescription(item),
       item.quantity.toLocaleString(),
       `$${Number(item.unit_cost).toFixed(3)}`,
       `$${orderedLineAmount(item).toFixed(2)}`
@@ -897,7 +898,7 @@ const VendorPODetail = () => {
     // Shipping is summarised in the totals section below, so it must not also appear as a line.
     const tableData = poItems.filter(item => !isShippingItem(item)).map(item => [
       item.sku,
-      item.name,
+      pdfItemDescription(item),
       item.quantity.toLocaleString(),
       `$${Number(item.unit_cost).toFixed(3)}`,
       `$${orderedLineAmount(item).toFixed(2)}`

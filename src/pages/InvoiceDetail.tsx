@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect, useRef } from "react";
+import { pdfItemDescription } from "@/lib/pdfItemText";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -815,7 +816,7 @@ const InvoiceDetail = () => {
       const tableData = itemsForPacking.map((item: any) => [
         String(item?.item_id || 'N/A'),
         String(item?.sku || ''),
-        String(item?.name || ''),
+        pdfItemDescription(item),
         (Number(item?.quantity) || 0).toLocaleString(),
       ]);
 

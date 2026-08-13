@@ -1,4 +1,5 @@
 import jsPDF from "jspdf";
+import { pdfItemDescription } from "@/lib/pdfItemText";
 import autoTable from "jspdf-autotable";
 import { format } from "date-fns";
 import { formatCurrency, formatUnitPrice } from "@/lib/utils";
@@ -206,7 +207,7 @@ const renderInvoiceToDoc = async (
       : Number(item.quantity || 0);
     return [
       item.sku || '',
-      item.name || '',
+      pdfItemDescription(item),
       qty.toLocaleString(),
       formatUnitPrice(item.unit_price || 0),
       formatCurrency(qty * (item.unit_price || 0))

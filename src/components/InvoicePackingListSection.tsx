@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { pdfItemDescription } from "@/lib/pdfItemText";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -622,7 +623,7 @@ export const InvoicePackingListSection = ({
     const tableData = itemsForPacking.map((item: any) => [
       item.item_id || 'N/A',
       item.sku || '',
-      item.name || '',
+      pdfItemDescription(item),
       item.quantity.toLocaleString()
     ]);
 
