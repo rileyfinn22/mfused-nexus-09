@@ -766,12 +766,13 @@ const Invoices = () => {
                       </div>
                     ) : (
                       <div className="font-medium text-sm font-mono">
-                        {invoice.orders?.po_number
-                          ? `PO: ${invoice.orders.po_number}`
+                        {((invoice as any).customer_po_number || invoice.orders?.po_number)
+                          ? `PO: ${(invoice as any).customer_po_number || invoice.orders?.po_number}`
                           : <span className="text-muted-foreground font-sans">-</span>}
                       </div>
                     )}
                   </div>
+
 
                   <div className="col-span-2">
                     {isVibeAdmin ? (
