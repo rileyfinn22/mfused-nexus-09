@@ -31,13 +31,13 @@ export function calculateFinanceFee(financedAmount: number, financedDate: string
 
 export function getAgingColor(days: number): string {
   if (days <= 60) return 'text-green-500';
-  if (days <= 90) return 'text-amber-500';
+  if (days <= 75) return 'text-amber-500';
   return 'text-red-500';
 }
 
 export function getAgingBadgeVariant(days: number): 'default' | 'secondary' | 'destructive' {
   if (days <= 60) return 'default';
-  if (days <= 90) return 'secondary';
+  if (days <= 75) return 'secondary';
   return 'destructive';
 }
 
