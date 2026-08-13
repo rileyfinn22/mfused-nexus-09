@@ -379,6 +379,7 @@ export default function Financing() {
     const vendorPO = inv.vendor_pos as any;
     const rate = inv.exchange_rate || 7.2;
     const feeAmount = (inv.paid_back_amount || 0) - (inv.financed_amount || 0);
+    const fee = calculateFinanceFee(inv.financed_amount || 0, inv.financed_date || inv.created_at, inv.paid_back_amount || 0, inv.paid_back_date);
 
     return (
       <tr key={inv.id} className={`border-b border-border ${idx % 2 === 1 ? "bg-muted/50" : ""} hover:bg-muted/70 cursor-pointer opacity-70`} onClick={() => navigate(`/financing/${inv.id}`)}>
