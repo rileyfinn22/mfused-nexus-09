@@ -759,13 +759,13 @@ const Invoices = () => {
                       );
                     })()}
                   </div>
-                  <div className="col-span-2">
+                  <div className="col-span-2 min-w-0">
                     {isVibeAdmin ? (
-                      <div className="font-medium text-sm">
+                      <div className="font-medium text-sm truncate">
                         {invoice.companies?.name || 'N/A'}
                       </div>
                     ) : (
-                      <div className="font-medium text-sm font-mono">
+                      <div className="font-medium text-sm font-mono whitespace-normal break-words min-w-0">
                         {((invoice as any).customer_po_number || invoice.orders?.po_number)
                           ? `PO: ${(invoice as any).customer_po_number || invoice.orders?.po_number}`
                           : <span className="text-muted-foreground font-sans">-</span>}
@@ -823,10 +823,10 @@ const Invoices = () => {
                     </Badge>
                   </div>
                   {isVibeAdmin && (
-                    <div className="col-span-2 flex flex-col gap-1 justify-center">
+                    <div className="col-span-2 flex flex-col gap-1 justify-center min-w-0">
                       {((invoice as any).customer_po_number || invoice.orders?.po_number) && (
                         <div
-                          className="text-left text-xs font-mono font-medium text-foreground"
+                          className="text-left text-xs font-mono font-medium text-foreground whitespace-normal break-words min-w-0"
                           title={`Customer PO: ${(invoice as any).customer_po_number || invoice.orders?.po_number}`}
                         >
                           CPO#: {(invoice as any).customer_po_number || invoice.orders?.po_number}
