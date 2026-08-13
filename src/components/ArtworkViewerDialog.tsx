@@ -84,10 +84,10 @@ const ArtworkViewerDialog = ({
                 )}
               </DialogTitle>
               <DialogDescription>
-                SKU: {file.sku} â€¢ Uploaded: {new Date(file.created_at).toLocaleDateString()}
+                SKU: {file.sku} • Uploaded: {new Date(file.created_at).toLocaleDateString()}
                 {file.is_approved && file.approved_at && (
                   <span className="text-green-600 ml-2">
-                    â€¢ Approved: {new Date(file.approved_at).toLocaleDateString()}
+                    • Approved: {new Date(file.approved_at).toLocaleDateString()}
                   </span>
                 )}
               </DialogDescription>
