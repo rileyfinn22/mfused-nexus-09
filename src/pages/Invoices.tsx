@@ -823,14 +823,15 @@ const Invoices = () => {
                     </Badge>
                   </div>
                   <div className="col-span-2 flex gap-1 items-center justify-end">
-                    {isVibeAdmin && invoice.orders?.po_number && (
+                    {isVibeAdmin && ((invoice as any).customer_po_number || invoice.orders?.po_number) && (
                       <span
                         className="mr-auto text-xs font-mono text-muted-foreground truncate max-w-[110px]"
-                        title={`Customer PO: ${invoice.orders.po_number}`}
+                        title={`Customer PO: ${(invoice as any).customer_po_number || invoice.orders?.po_number}`}
                       >
-                        PO: {invoice.orders.po_number}
+                        PO: {(invoice as any).customer_po_number || invoice.orders?.po_number}
                       </span>
                     )}
+
 
                     <ExpandToggleButton
                       expanded={detailExpanded}
