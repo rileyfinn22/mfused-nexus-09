@@ -10,7 +10,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Plus, AlertTriangle, Banknote, Link2, RefreshCw, ChevronDown, AlertCircle, Clock, CheckCircle2, Search, Download } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { calculateFinanceFee, getAgingBadgeVariant, formatUSD, formatRMB } from "@/lib/financeUtils";
+import { calculateFinanceFee, getAgingColor, getAgingBadgeVariant, formatUSD, formatRMB } from "@/lib/financeUtils";
 import { AddFinancedInvoiceDialog } from "@/components/AddFinancedInvoiceDialog";
 import { RecordFinanceRepaymentDialog } from "@/components/RecordFinanceRepaymentDialog";
 import { RecordFinanceDepositDialog } from "@/components/RecordFinanceDepositDialog";
@@ -312,7 +312,7 @@ export default function Financing() {
         <td className="px-2 py-1.5 text-right whitespace-nowrap">{renderDualAmount(inv.financed_amount, rate)}</td>
         <td className="px-2 py-1.5 whitespace-nowrap">{new Date(String(inv.financed_date).split("T")[0] + "T00:00:00").toLocaleDateString()}</td>
         <td className="px-2 py-1.5 text-center"><Badge variant={getAgingBadgeVariant(fee.daysAging)} className="text-[10px] px-1.5 py-0">{fee.daysAging}{t("days")}</Badge></td>
-        <td className={`px-2 py-1.5 text-right whitespace-nowrap font-medium ${fee.daysAging <= 60 ? "text-yellow-500" : "text-orange-600"}`}>
+        <td className={`px-2 py-1.5 text-right whitespace-nowrap font-medium ${getAgingColor(fee.daysAging)}`}>
           {renderDualAmount(fee.feeAmount, rate)} <span className="text-[10px] opacity-75">(5%)</span>
         </td>
         <td className="px-2 py-1.5 text-right whitespace-nowrap">{renderDualAmount(inv.paid_back_amount, rate)}</td>
@@ -379,6 +379,7 @@ export default function Financing() {
     const vendorPO = inv.vendor_pos as any;
     const rate = inv.exchange_rate || 7.2;
     const feeAmount = (inv.paid_back_amount || 0) - (inv.financed_amount || 0);
+    const fee = calculateFinanceFee(inv.financed_amount || 0, inv.financed_date || inv.created_at, inv.paid_back_amount || 0, inv.paid_back_date);
 
     return (
       <tr key={inv.id} className={`border-b border-border ${idx % 2 === 1 ? "bg-muted/50" : ""} hover:bg-muted/70 cursor-pointer opacity-70`} onClick={() => navigate(`/financing/${inv.id}`)}>
@@ -406,7 +407,7 @@ export default function Financing() {
           />
         </td>
         <td className="px-2 py-1.5 text-right whitespace-nowrap">{renderDualAmount(inv.financed_amount, rate)}</td>
-        <td className="px-2 py-1.5 text-right whitespace-nowrap text-yellow-600">
+        <td className={`px-2 py-1.5 text-right whitespace-nowrap ${getAgingColor(fee.daysAging)}`}>
           {feeAmount > 0.01 ? <>+{renderDualAmount(feeAmount, rate)} <span className="text-[10px] opacity-75">(5%)</span></> : <span className="text-muted-foreground">—</span>}
         </td>
         <td className="px-2 py-1.5 whitespace-nowrap">{new Date(String(inv.financed_date).split("T")[0] + "T00:00:00").toLocaleDateString()}</td>
