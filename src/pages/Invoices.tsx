@@ -602,7 +602,7 @@ const Invoices = () => {
           <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             <div className="col-span-2">Invoice ID</div>
             <div className="col-span-1">Due / Shipped</div>
-            <div className="col-span-2">Company</div>
+            <div className="col-span-2">{isVibeAdmin ? 'Company' : 'PO'}</div>
             <div className="col-span-2">Description</div>
             <div className="col-span-1">Amount</div>
             <div className="col-span-1">Status</div>
