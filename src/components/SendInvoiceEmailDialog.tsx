@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { pdfItemDescription } from "@/lib/pdfItemText";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -434,7 +435,7 @@ Thank you for your business.`;
         : Number(item.quantity || 0);
       return [
         item.sku || '',
-        item.name || '',
+        pdfItemDescription(item),
         qty.toLocaleString(),
         formatUnitPrice(item.unit_price || 0),
         formatCurrency(qty * (item.unit_price || 0))

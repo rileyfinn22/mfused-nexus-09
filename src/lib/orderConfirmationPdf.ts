@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { pdfItemDescription } from "@/lib/pdfItemText";
 
 interface OrderConfirmationData {
   order_number: string;
@@ -179,7 +180,7 @@ export async function generateOrderConfirmationPdf(
       const lineTotal = item.quantity * price;
       return [
         (i + 1).toString(),
-        item.name,
+        pdfItemDescription(item),
         item.sku,
         qtyStr,
         `$${price.toFixed(3)}`,
@@ -188,7 +189,7 @@ export async function generateOrderConfirmationPdf(
     }
     return [
       (i + 1).toString(),
-      item.name,
+      pdfItemDescription(item),
       item.sku,
       qtyStr,
       item.description || "",

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { pdfItemDescription } from "@/lib/pdfItemText";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -590,7 +591,7 @@ export const InvoicePackingListSection = ({
       .from('inventory_allocations')
       .select(`
         quantity_allocated,
-        order_items(item_id, sku, name, id)
+        order_items(item_id, sku, name, description, id)
       `)
       .eq('invoice_id', invoiceId)
       .gt('quantity_allocated', 0);
@@ -605,6 +606,7 @@ export const InvoicePackingListSection = ({
         item_id: alloc.order_items.item_id,
         sku: alloc.order_items.sku,
         name: alloc.order_items.name,
+        description: alloc.order_items.description,
         quantity: Number(alloc.quantity_allocated || 0),
       }))
       .filter((item: any) => item.quantity > 0);
@@ -614,6 +616,7 @@ export const InvoicePackingListSection = ({
         item_id: item.item_id,
         sku: item.sku,
         name: item.name,
+        description: item.description,
         quantity: Number(item.shipped_quantity ?? item.quantity ?? 0),
       }))
       .filter((item: any) => item.quantity > 0);
@@ -622,7 +625,7 @@ export const InvoicePackingListSection = ({
     const tableData = itemsForPacking.map((item: any) => [
       item.item_id || 'N/A',
       item.sku || '',
-      item.name || '',
+      pdfItemDescription(item),
       item.quantity.toLocaleString()
     ]);
 

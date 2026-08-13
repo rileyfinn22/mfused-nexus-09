@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect, useRef } from "react";
+import { pdfItemDescription } from "@/lib/pdfItemText";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -799,6 +800,7 @@ const InvoiceDetail = () => {
             item_id: alloc.order_items?.item_id,
             sku: alloc.order_items?.sku,
             name: alloc.order_items?.name,
+            description: alloc.order_items?.description,
             quantity: Number(alloc.quantity_allocated) || 0,
           }));
       }
@@ -808,6 +810,7 @@ const InvoiceDetail = () => {
           item_id: item?.item_id,
           sku: item?.sku,
           name: item?.name,
+          description: item?.description,
           quantity: Number(item?.quantity ?? item?.shipped_quantity ?? 0) || 0,
         }));
       }
@@ -815,7 +818,7 @@ const InvoiceDetail = () => {
       const tableData = itemsForPacking.map((item: any) => [
         String(item?.item_id || 'N/A'),
         String(item?.sku || ''),
-        String(item?.name || ''),
+        pdfItemDescription(item),
         (Number(item?.quantity) || 0).toLocaleString(),
       ]);
 

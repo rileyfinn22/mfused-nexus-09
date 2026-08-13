@@ -3,6 +3,7 @@
 // case-sticker callout with Vibe Invoice # / Customer PO #, items table,
 // totals). Used by the vendor portal's Download PDF button.
 import jsPDF from "jspdf";
+import { pdfItemDescription } from "@/lib/pdfItemText";
 import autoTable from "jspdf-autotable";
 
 export interface PoPdfStickerRow {
@@ -26,7 +27,7 @@ export interface PoPdfData {
     zip?: string | null;
   };
   stickerInfo: PoPdfStickerRow[];
-  items: Array<{ sku: string | null; name: string | null; quantity: number; unit_cost: number; total: number }>;
+  items: Array<{ sku: string | null; name: string | null; description?: string | null; quantity: number; unit_cost: number; total: number }>;
   shippingCost: number;
   total: number;
 }
@@ -207,7 +208,7 @@ export async function downloadVendorPoPdf(data: PoPdfData) {
   // ============ ITEMS ============
   const tableData = data.items.map((item) => [
     item.sku || "",
-    item.name || "",
+    pdfItemDescription(item),
     Number(item.quantity).toLocaleString(),
     `$${Number(item.unit_cost).toFixed(3)}`,
     `$${Number(item.total).toFixed(2)}`,
