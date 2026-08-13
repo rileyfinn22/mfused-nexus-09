@@ -87,11 +87,13 @@ export function BulkFinancePaymentDialog({ open, onOpenChange, onSuccess, invoic
   const allocated = selectedIds.reduce((s, id) => s + (parseFloat(allocations[id] || "0") || 0), 0);
   const totalNum = parseFloat(total || "0") || 0;
   const remaining = totalNum - allocated;
+  const overage = remaining > 0.005 ? remaining : 0;
+  const shortfall = remaining < -0.005 ? -remaining : 0;
 
   const handleSubmit = async () => {
     if (selectedIds.length === 0 || allocated <= 0) return;
-    if (remaining < -0.005) {
-      toast({ title: "Over-allocated", description: "Allocations exceed the payment total.", variant: "destructive" });
+    if (shortfall > 0 && !shortfallFromDeposit) {
+      toast({ title: "Over-allocated", description: "Allocations exceed the payment total. Cover the difference from deposit or lower the allocations.", variant: "destructive" });
       return;
     }
     setLoading(true);
@@ -113,17 +115,50 @@ export function BulkFinancePaymentDialog({ open, onOpenChange, onSuccess, invoic
       }))
       .filter((r) => r.amount > 0.005);
 
-    const { error } = await supabase.from("finance_repayments").insert(payload);
+    // Shortfall: the cash payment doesn't cover the allocations — fund the difference
+    // from the deposit balance by splitting it off the last allocated PO as a deposit pull.
+    if (shortfall > 0 && payload.length > 0 && paymentMethod !== "deposit") {
+      const last = payload[payload.length - 1];
+      const pull = Math.min(shortfall, last.amount);
+      last.amount = Number((last.amount - pull).toFixed(2));
+      payload.push({
+        ...last,
+        amount: Number(pull.toFixed(2)),
+        payment_method: "deposit",
+        source: "deposit",
+        notes: `Deposit pull to cover ${formatUSD(pull)} shortfall${notes ? ` — ${notes}` : ""}`,
+      });
+    }
 
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+    const { error } = await supabase
+      .from("finance_repayments")
+      .insert(payload.filter((r) => r.amount > 0.005));
+
+    let depositError: string | null = null;
+    // Overage: unallocated cash goes back into the deposit balance as a credit.
+    if (!error && overage > 0 && overageToDeposit) {
+      const { error: depErr } = await supabase.from("finance_deposits").insert({
+        amount: Number(overage.toFixed(2)),
+        payment_date: paymentDate,
+        confirmation_status: "pending",
+        notes: `Overage credit from ${referenceNumber || "bulk payment"} (${formatUSD(totalNum)} paid vs ${formatUSD(allocated)} allocated)`,
+      } as any);
+      if (depErr) depositError = depErr.message;
+    }
+
+    if (error || depositError) {
+      toast({ title: "Error", description: error?.message || depositError!, variant: "destructive" });
     } else {
-      toast({ title: "Bulk payment recorded", description: `${payload.length} financed PO(s) updated.` });
+      toast({
+        title: "Bulk payment recorded",
+        description: `${payload.length} allocation(s) recorded${overage > 0 && overageToDeposit ? `, ${formatUSD(overage)} added to deposit` : ""}${shortfall > 0 ? `, ${formatUSD(shortfall)} pulled from deposit` : ""}.`,
+      });
       onSuccess();
       onOpenChange(false);
     }
     setLoading(false);
   };
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
