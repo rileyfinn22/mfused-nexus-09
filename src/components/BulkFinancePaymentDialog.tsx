@@ -28,6 +28,10 @@ export function BulkFinancePaymentDialog({ open, onOpenChange, onSuccess, invoic
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [allocations, setAllocations] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  /** What to do with money left over / short after allocating. */
+  const [overageToDeposit, setOverageToDeposit] = useState(true);
+  const [shortfallFromDeposit, setShortfallFromDeposit] = useState(true);
+
 
   // Payoff (principal + fee) per financed PO, oldest first.
   const rows = useMemo(() => {
