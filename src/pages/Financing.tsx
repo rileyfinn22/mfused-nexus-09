@@ -14,6 +14,7 @@ import { calculateFinanceFee, getAgingBadgeVariant, formatUSD, formatRMB } from 
 import { AddFinancedInvoiceDialog } from "@/components/AddFinancedInvoiceDialog";
 import { RecordFinanceRepaymentDialog } from "@/components/RecordFinanceRepaymentDialog";
 import { RecordFinanceDepositDialog } from "@/components/RecordFinanceDepositDialog";
+import { BulkFinancePaymentDialog } from "@/components/BulkFinancePaymentDialog";
 import { GenerateFinanceLinkDialog } from "@/components/GenerateFinanceLinkDialog";
 import { AcceptFinanceRequestDialog } from "@/components/AcceptFinanceRequestDialog";
 import { FinanceConfirmationsTab } from "@/components/FinanceConfirmationsTab";
