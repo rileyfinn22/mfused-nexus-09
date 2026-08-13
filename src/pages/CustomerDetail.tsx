@@ -1552,7 +1552,7 @@ const CustomerDetail = () => {
                         )}
                       </div>
                       <div className="col-span-1 text-sm font-medium">
-                        {product.price ? `$${parseFloat(product.price).toFixed(3)}` : 'â€”'}
+                        {product.price ? `$${parseFloat(product.price).toFixed(3)}` : '—'}
                       </div>
                       <div className="col-span-1 flex items-center gap-1">
                         <AssignTemplateDropdown
