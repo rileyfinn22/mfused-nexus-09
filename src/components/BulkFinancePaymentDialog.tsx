@@ -252,6 +252,26 @@ export function BulkFinancePaymentDialog({ open, onOpenChange, onSuccess, invoic
             </span>
           </div>
 
+          {overage > 0 && (
+            <div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 p-3 text-sm">
+              <Checkbox id="overage-dep" checked={overageToDeposit} onCheckedChange={(c) => setOverageToDeposit(!!c)} />
+              <Label htmlFor="overage-dep" className="font-normal leading-snug">
+                Add the unallocated <span className="font-semibold">{formatUSD(overage)}</span> to the deposit balance as an overage credit.
+              </Label>
+            </div>
+          )}
+
+          {shortfall > 0 && (
+            <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+              <Checkbox id="short-dep" checked={shortfallFromDeposit} onCheckedChange={(c) => setShortfallFromDeposit(!!c)} />
+              <Label htmlFor="short-dep" className="font-normal leading-snug">
+                Cover the <span className="font-semibold">{formatUSD(shortfall)}</span> shortfall by pulling from the deposit balance.
+              </Label>
+            </div>
+          )}
+
+
+
           <div>
             <Label>Notes</Label>
             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
