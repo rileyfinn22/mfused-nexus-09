@@ -822,27 +822,25 @@ const Invoices = () => {
                       {invoice.invoice_type === 'full' || !invoice.invoice_type ? 'Blanket' : invoice.invoice_type === 'partial' ? 'Shipped' : (invoice.invoice_type.charAt(0).toUpperCase() + invoice.invoice_type.slice(1))}
                     </Badge>
                   </div>
-                  <div className="col-span-2 flex flex-wrap gap-1 items-center justify-end">
-                    {isVibeAdmin && ((invoice as any).customer_po_number || invoice.orders?.po_number) && (
-                      <span
-                        className="w-full text-left text-xs font-mono font-medium text-foreground truncate"
-                        title={`Customer PO: ${(invoice as any).customer_po_number || invoice.orders?.po_number}`}
-                      >
-                        CPO#: {(invoice as any).customer_po_number || invoice.orders?.po_number}
-                      </span>
-                    )}
-
-
-                    <ExpandToggleButton
-                      expanded={detailExpanded}
-                      onToggle={() => toggleDetailRow(invoice.id)}
-                    />
-                    {isVibeAdmin && (
-                      <>
+                  {isVibeAdmin && (
+                    <div className="col-span-2 flex flex-col gap-1 justify-center">
+                      {((invoice as any).customer_po_number || invoice.orders?.po_number) && (
+                        <div
+                          className="text-left text-xs font-mono font-medium text-foreground"
+                          title={`Customer PO: ${(invoice as any).customer_po_number || invoice.orders?.po_number}`}
+                        >
+                          CPO#: {(invoice as any).customer_po_number || invoice.orders?.po_number}
+                        </div>
+                      )}
+                      <div className="flex flex-wrap gap-1 justify-end">
+                        <ExpandToggleButton
+                          expanded={detailExpanded}
+                          onToggle={() => toggleDetailRow(invoice.id)}
+                        />
                         <Button
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-destructive/10" 
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                           title="Delete Invoice"
                           onClick={async (e) => {
                             e.stopPropagation();
@@ -955,62 +953,62 @@ const Invoices = () => {
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
-                      </>
-                    )}
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="h-6 w-6 p-0" 
-                      title="Download Invoice"
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        try {
-                          // Fetch order data
-                          const { data: orderData } = await supabase
-                            .from('orders')
-                            .select(`
-                              *,
-                              order_items (*)
-                            `)
-                            .eq('id', invoice.order_id)
-                            .single();
-                          
-                          if (!orderData) return;
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0"
+                          title="Download Invoice"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              // Fetch order data
+                              const { data: orderData } = await supabase
+                                .from('orders')
+                                .select(`
+                                  *,
+                                  order_items (*)
+                                `)
+                                .eq('id', invoice.order_id)
+                                .single();
+                              
+                              if (!orderData) return;
 
-                          // Children bill from their OWN allocation lines and get a prorated
-                          // blanket-payment credit; blankets use the order items as-is.
-                          // All of that math lives in src/lib/invoiceBalance.ts so this PDF
-                          // matches the detail page, emailed PDFs, and QuickBooks.
-                          const { itemsOverride, credit } = await fetchChildPdfInputs(supabase, invoice as any);
+                              // Children bill from their OWN allocation lines and get a prorated
+                              // blanket-payment credit; blankets use the order items as-is.
+                              // All of that math lives in src/lib/invoiceBalance.ts so this PDF
+                              // matches the detail page, emailed PDFs, and QuickBooks.
+                              const { itemsOverride, credit } = await fetchChildPdfInputs(supabase, invoice as any);
 
-                          const orderForPdf = {
-                            ...orderData,
-                            order_items: itemsOverride || orderData.order_items || []
-                          };
+                              const orderForPdf = {
+                                ...orderData,
+                                order_items: itemsOverride || orderData.order_items || []
+                              };
 
-                          const invoiceForPdf: any = credit.amount > 0
-                            ? { ...invoice, deposit_credit: credit.amount, deposit_credit_label: credit.label }
-                            : invoice;
+                              const invoiceForPdf: any = credit.amount > 0
+                                ? { ...invoice, deposit_credit: credit.amount, deposit_credit_label: credit.label }
+                                : invoice;
 
-                          await generateInvoicePDF(invoiceForPdf, orderForPdf);
+                              await generateInvoicePDF(invoiceForPdf, orderForPdf);
 
-                          toast({
-                            title: "Success",
-                            description: "Invoice PDF downloaded"
-                          });
-                        } catch (error) {
-                          console.error('Download error:', error);
-                          toast({
-                            title: "Error",
-                            description: "Failed to download invoice",
-                            variant: "destructive"
-                          });
-                        }
-                      }}
-                    >
-                      <Download className="h-3 w-3" />
-                    </Button>
-                  </div>
+                              toast({
+                                title: "Success",
+                                description: "Invoice PDF downloaded"
+                              });
+                            } catch (error) {
+                              console.error('Download error:', error);
+                              toast({
+                                title: "Error",
+                                description: "Failed to download invoice",
+                                variant: "destructive"
+                              });
+                            }
+                          }}
+                        >
+                          <Download className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 {detailExpanded && <InvoiceRowExpanded invoice={invoice} />}
                 </div>
