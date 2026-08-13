@@ -312,7 +312,7 @@ export default function Financing() {
         <td className="px-2 py-1.5 text-right whitespace-nowrap">{renderDualAmount(inv.financed_amount, rate)}</td>
         <td className="px-2 py-1.5 whitespace-nowrap">{new Date(String(inv.financed_date).split("T")[0] + "T00:00:00").toLocaleDateString()}</td>
         <td className="px-2 py-1.5 text-center"><Badge variant={getAgingBadgeVariant(fee.daysAging)} className="text-[10px] px-1.5 py-0">{fee.daysAging}{t("days")}</Badge></td>
-        <td className={`px-2 py-1.5 text-right whitespace-nowrap font-medium ${fee.daysAging <= 60 ? "text-yellow-500" : "text-orange-600"}`}>
+        <td className={`px-2 py-1.5 text-right whitespace-nowrap font-medium ${getAgingColor(fee.daysAging)}`}>
           {renderDualAmount(fee.feeAmount, rate)} <span className="text-[10px] opacity-75">(5%)</span>
         </td>
         <td className="px-2 py-1.5 text-right whitespace-nowrap">{renderDualAmount(inv.paid_back_amount, rate)}</td>
