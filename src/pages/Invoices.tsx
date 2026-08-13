@@ -823,13 +823,16 @@ const Invoices = () => {
                     </Badge>
                   </div>
                   {isVibeAdmin && (
-                    <div className="col-span-2 flex flex-col gap-1 justify-center min-w-0">
+                    <div className="col-span-2 flex min-w-0 flex-col justify-center gap-2 overflow-hidden">
                       {((invoice as any).customer_po_number || invoice.orders?.po_number) && (
                         <div
-                          className="text-left text-xs font-mono font-medium text-foreground whitespace-normal break-words min-w-0"
+                          className="min-w-0 max-w-full text-left text-xs font-medium text-foreground"
                           title={`Customer PO: ${(invoice as any).customer_po_number || invoice.orders?.po_number}`}
                         >
-                          CPO#: {(invoice as any).customer_po_number || invoice.orders?.po_number}
+                          <span className="block text-muted-foreground">CPO#:</span>
+                          <span className="block max-w-full break-all font-mono leading-5">
+                            {(invoice as any).customer_po_number || invoice.orders?.po_number}
+                          </span>
                         </div>
                       )}
                       <div className="flex flex-wrap gap-1 justify-end">
