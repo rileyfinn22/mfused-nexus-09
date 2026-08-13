@@ -591,7 +591,7 @@ export const InvoicePackingListSection = ({
       .from('inventory_allocations')
       .select(`
         quantity_allocated,
-        order_items(item_id, sku, name, id)
+        order_items(item_id, sku, name, description, id)
       `)
       .eq('invoice_id', invoiceId)
       .gt('quantity_allocated', 0);
