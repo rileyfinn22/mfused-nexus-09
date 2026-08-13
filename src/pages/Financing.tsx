@@ -14,6 +14,7 @@ import { calculateFinanceFee, getAgingBadgeVariant, formatUSD, formatRMB } from 
 import { AddFinancedInvoiceDialog } from "@/components/AddFinancedInvoiceDialog";
 import { RecordFinanceRepaymentDialog } from "@/components/RecordFinanceRepaymentDialog";
 import { RecordFinanceDepositDialog } from "@/components/RecordFinanceDepositDialog";
+import { BulkFinancePaymentDialog } from "@/components/BulkFinancePaymentDialog";
 import { GenerateFinanceLinkDialog } from "@/components/GenerateFinanceLinkDialog";
 import { AcceptFinanceRequestDialog } from "@/components/AcceptFinanceRequestDialog";
 import { FinanceConfirmationsTab } from "@/components/FinanceConfirmationsTab";
@@ -100,6 +101,7 @@ export default function Financing() {
   
   const [repayOpen, setRepayOpen] = useState(false);
   const [depositOpen, setDepositOpen] = useState(false);
+  const [bulkPayOpen, setBulkPayOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const [acceptOpen, setAcceptOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
@@ -431,6 +433,9 @@ export default function Financing() {
               <Button variant="outline" size="sm" onClick={() => setLinkOpen(true)}>
                 <Link2 className="mr-2 h-4 w-4" /> {t("shareLink")}
               </Button>
+              <Button variant="outline" size="sm" onClick={() => setBulkPayOpen(true)}>
+                <Banknote className="mr-2 h-4 w-4" /> Bulk Payment
+              </Button>
               <Button variant="outline" size="sm" onClick={() => setDepositOpen(true)}>
                 <Banknote className="mr-2 h-4 w-4" /> {t("recordDeposit")}
               </Button>
@@ -645,6 +650,7 @@ export default function Financing() {
         <>
           <AddFinancedInvoiceDialog open={addOpen} onOpenChange={(open) => { setAddOpen(open); if (!open) setPreselectedVendorPO(null); }} onSuccess={fetchData} preselectedVendorPO={preselectedVendorPO} mode="admin" />
           <RecordFinanceRepaymentDialog open={repayOpen} onOpenChange={setRepayOpen} onSuccess={fetchData} invoice={selectedInvoice} />
+          <BulkFinancePaymentDialog open={bulkPayOpen} onOpenChange={setBulkPayOpen} onSuccess={fetchData} invoices={allActive} />
           <RecordFinanceDepositDialog open={depositOpen} onOpenChange={setDepositOpen} onSuccess={fetchData} />
           <GenerateFinanceLinkDialog open={linkOpen} onOpenChange={setLinkOpen} />
         </>
