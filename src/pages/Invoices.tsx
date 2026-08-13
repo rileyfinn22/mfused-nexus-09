@@ -774,7 +774,7 @@ const Invoices = () => {
                   </div>
 
 
-                  <div className="col-span-2">
+                  <div className={isVibeAdmin ? 'col-span-2' : 'col-span-3'}>
                     {isVibeAdmin ? (
                       <div className="space-y-2">
                         <EditableDescription
