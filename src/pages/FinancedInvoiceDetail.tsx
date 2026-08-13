@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
 import { ArrowLeft, Save, Upload, Trash2, ExternalLink, FileText, Pencil, X, History, CheckCircle2, AlertTriangle, Clock, Link2, Search } from "lucide-react";
-import { calculateFinanceFee, formatUSD } from "@/lib/financeUtils";
+import { calculateFinanceFee, getAgingColor, formatUSD } from "@/lib/financeUtils";
 import { AcceptFinanceRequestDialog } from "@/components/AcceptFinanceRequestDialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -511,7 +511,7 @@ export default function FinancedInvoiceDetail() {
               <Label className="text-xs">Aging / Fee / Balance</Label>
               <div className="h-8 flex items-center text-sm gap-2">
                 <span className="font-medium">{fee.daysAging}d</span>
-                <span className={`font-bold ${fee.daysAging <= 60 ? "text-yellow-500" : "text-orange-600"}`}>{formatUSD(fee.feeAmount)}</span>
+                <span className={`font-bold ${getAgingColor(fee.daysAging)}`}>{formatUSD(fee.feeAmount)}</span>
                 <span className="font-bold">{formatUSD(balance)}</span>
               </div>
             </div>
