@@ -407,7 +407,7 @@ export default function Financing() {
           />
         </td>
         <td className="px-2 py-1.5 text-right whitespace-nowrap">{renderDualAmount(inv.financed_amount, rate)}</td>
-        <td className="px-2 py-1.5 text-right whitespace-nowrap text-yellow-600">
+        <td className={`px-2 py-1.5 text-right whitespace-nowrap ${getAgingColor(fee.daysAging)}`}>
           {feeAmount > 0.01 ? <>+{renderDualAmount(feeAmount, rate)} <span className="text-[10px] opacity-75">(5%)</span></> : <span className="text-muted-foreground">—</span>}
         </td>
         <td className="px-2 py-1.5 whitespace-nowrap">{new Date(String(inv.financed_date).split("T")[0] + "T00:00:00").toLocaleDateString()}</td>
