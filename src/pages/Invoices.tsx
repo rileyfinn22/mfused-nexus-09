@@ -822,13 +822,13 @@ const Invoices = () => {
                       {invoice.invoice_type === 'full' || !invoice.invoice_type ? 'Blanket' : invoice.invoice_type === 'partial' ? 'Shipped' : (invoice.invoice_type.charAt(0).toUpperCase() + invoice.invoice_type.slice(1))}
                     </Badge>
                   </div>
-                  <div className="col-span-2 flex gap-1 items-center justify-end">
+                  <div className="col-span-2 flex flex-wrap gap-1 items-center justify-end">
                     {isVibeAdmin && ((invoice as any).customer_po_number || invoice.orders?.po_number) && (
                       <span
-                        className="mr-auto text-xs font-mono text-muted-foreground truncate max-w-[110px]"
+                        className="w-full text-left text-xs font-mono font-medium text-foreground truncate"
                         title={`Customer PO: ${(invoice as any).customer_po_number || invoice.orders?.po_number}`}
                       >
-                        PO: {(invoice as any).customer_po_number || invoice.orders?.po_number}
+                        CPO#: {(invoice as any).customer_po_number || invoice.orders?.po_number}
                       </span>
                     )}
 
