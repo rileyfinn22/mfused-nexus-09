@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import SignedImage from "@/components/SignedImage";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -776,8 +777,8 @@ export function CompanyProductTemplates({
                       className="w-full h-full object-cover"
                     />
                   ) : product.image_url ? (
-                    <img 
-                      src={product.image_url} 
+                    <SignedImage
+                      src={product.image_url}
                       alt={product.name}
                       className="w-full h-full object-cover"
                     />
@@ -863,8 +864,8 @@ export function CompanyProductTemplates({
                         className="w-full h-full object-cover rounded"
                       />
                     ) : product.image_url ? (
-                      <img 
-                        src={product.image_url} 
+                      <SignedImage
+                        src={product.image_url}
                         alt={product.name}
                         className="w-full h-full object-cover rounded"
                       />

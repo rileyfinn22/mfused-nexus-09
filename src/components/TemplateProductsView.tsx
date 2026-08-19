@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
+import SignedImage from "@/components/SignedImage";
 import {
   Dialog,
   DialogContent,
@@ -529,8 +530,8 @@ export function TemplateProductsView({
                     className="w-full h-full object-cover"
                   />
                 ) : product.image_url ? (
-                  <img 
-                    src={product.image_url} 
+                  <SignedImage
+                    src={product.image_url}
                     alt={product.name}
                     className="w-full h-full object-cover"
                   />

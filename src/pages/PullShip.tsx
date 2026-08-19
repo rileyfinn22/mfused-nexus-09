@@ -545,14 +545,9 @@ const PullShip = () => {
         .from('po-documents')
         .getPublicUrl(fileName);
 
-      // Get user's company
-      const { data: userRole } = await supabase
-        .from('user_roles')
-        .select('company_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!userRole?.company_id) {
+      // Submit against whichever company the switcher is on — reading user_roles
+      // directly threw for anyone in more than one company.
+      if (!activeCompanyId) {
         throw new Error('User not associated with a company');
       }
 
@@ -564,7 +559,7 @@ const PullShip = () => {
           original_filename: selectedPOFile.name,
           customer_id: user.id,
           status: 'pending_analysis',
-          company_id: userRole.company_id
+          company_id: activeCompanyId
         })
         .select()
         .single();
@@ -579,7 +574,7 @@ const PullShip = () => {
       const { data: analysisData, error: analysisError } = await supabase.functions.invoke('analyze-po', {
         body: { 
           pdfPath: fileName,
-          companyId: userRole.company_id,
+          companyId: activeCompanyId,
           filename: selectedPOFile.name
         }
       });

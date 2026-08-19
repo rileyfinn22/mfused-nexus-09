@@ -321,19 +321,10 @@ const Inventory = () => {
       let targetCompanyId = companyId || (companyFilter !== 'all' ? companyFilter : null);
       
       if (!isVibeAdmin) {
-        // For non-vibe admins, get their company
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        const { data: userRole } = await supabase
-          .from('user_roles')
-          .select('company_id')
-          .eq('user_id', user.id)
-          .single();
-
-        if (userRole) {
-          targetCompanyId = userRole.company_id;
-        }
+        // Non-admins are scoped to whichever company the switcher is on. Reading
+        // user_roles directly breaks for anyone in more than one company.
+        if (!activeCompanyId) return;
+        targetCompanyId = activeCompanyId;
       }
 
       let query = supabase
