@@ -2685,7 +2685,9 @@ const OrderDetail = () => {
                           `$${item.unit_price?.toFixed(3)}`
                         )}
                       </TableCell>
-                      <TableCell className="text-right font-medium">${item.total?.toFixed(2)}</TableCell>
+                      <TableCell className="text-right font-medium">
+                        ${(Number(item.quantity || 0) * Number(item.unit_price || 0)).toFixed(2)}
+                      </TableCell>
                       {isEditMode && (
                         <TableCell>
                           <Button
