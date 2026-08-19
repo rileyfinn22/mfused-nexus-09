@@ -6,6 +6,16 @@ import jsPDF from "jspdf";
 import { pdfItemDescription } from "@/lib/pdfItemText";
 import autoTable from "jspdf-autotable";
 
+// The PO document is what we ordered, so every figure on it is quantity x unit_cost.
+// The stored line `total` column is a stale cache that no money math reads, and reading
+// it here made the vendor's own download disagree with the admin PDF of the same PO.
+// Mirrors orderedLineAmount / splitPOTotals in VendorPODetail.tsx and public.vendor_po_recalc.
+const isShippingItem = (item: any) =>
+  item?.sku === 'SHIPPING' || item?.item_type === 'shipping';
+
+const orderedLineAmount = (item: any) =>
+  Number(item?.quantity || 0) * Number(item?.unit_cost || 0);
+
 export interface PoPdfStickerRow {
   orderNumber?: string;
   invoiceNumber?: string;
@@ -206,12 +216,13 @@ export async function downloadVendorPoPdf(data: PoPdfData) {
   yPos = drawCaseStickerCallout(doc, yPos, pageWidth, data.stickerInfo);
 
   // ============ ITEMS ============
-  const tableData = data.items.map((item) => [
+  // Shipping is summarised in the totals section below, so it must not also appear as a line.
+  const tableData = data.items.filter((item) => !isShippingItem(item)).map((item) => [
     item.sku || "",
     pdfItemDescription(item),
     Number(item.quantity).toLocaleString(),
     `$${Number(item.unit_cost).toFixed(3)}`,
-    `$${Number(item.total).toFixed(2)}`,
+    `$${orderedLineAmount(item).toFixed(2)}`,
   ]);
 
   autoTable(doc, {
@@ -243,9 +254,14 @@ export async function downloadVendorPoPdf(data: PoPdfData) {
 
   // ============ TOTALS ============
   const finalY = (doc as any).lastAutoTable.finalY + 10;
-  const itemsTotal = data.items.reduce((sum, item) => sum + Number(item.total), 0);
-  const shippingCost = Number(data.shippingCost || 0);
-  const totalAmount = itemsTotal + shippingCost;
+  const itemsTotal = data.items
+    .filter((item) => !isShippingItem(item))
+    .reduce((sum, item) => sum + orderedLineAmount(item), 0);
+  const shippingLineSum = data.items
+    .filter(isShippingItem)
+    .reduce((sum, item) => sum + orderedLineAmount(item), 0);
+  const shippingCost = shippingLineSum !== 0 ? shippingLineSum : Number(data.shippingCost || 0);
+  const totalAmount = Math.round((itemsTotal + shippingCost) * 100) / 100;
 
   const totalsWidth = 80;
   const totalsX = pageWidth - totalsWidth - 14;

@@ -110,7 +110,7 @@ export default function VendorPortalPODetail() {
 
       const { data: itemData } = await (supabase as any)
         .from("vendor_po_items")
-        .select("id, sku, name, description, quantity, shipped_quantity, unit_cost, total")
+        .select("id, sku, name, description, quantity, shipped_quantity, unit_cost, total, item_type")
         .eq("vendor_po_id", id);
 
       setItems((itemData || []) as PoItem[]);
