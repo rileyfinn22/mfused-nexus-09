@@ -47,6 +47,6 @@ END;
 $function$;
 
 COMMENT ON FUNCTION public.vendor_po_recalc(uuid) IS
-'Owns both money columns on a vendor PO. total is always the order we placed: quantity x unit_cost, with freight taken from a SHIPPING line when there is one and the shipping_cost column otherwise. final_total is what the vendor actually billed and is derived from attached vendor_bills ONLY - it is NULL until a bill exists, so every final_total ?? total read site falls back to the ordered PO. Final and shipped quantities recorded on the PO lines are kept as history but no longer produce a billed figure: a PO stands as a PO until a bill is attached.';
+'Owns both money columns on a vendor PO. total is always the order we placed: quantity x unit_cost, with freight taken from a SHIPPING line when there is one and the shipping_cost column otherwise. final_total is what the vendor actually billed and is derived from attached vendor_bills ONLY - it is NULL until a bill exists, so every final_total ?? total read site falls back to the ordered PO. Final and shipped quantities recorded on the PO lines are kept as history but no longer produce a billed figure: a PO stands as a PO until a bill is attached. Payment is NOT a condition of a bill existing - an unpaid bill is a payable and is how we know what we still owe a vendor. Accounts payable is SUM(vendor_bills.total) - SUM(vendor_po_payments.amount).';
 
 SELECT public.vendor_po_recalc(id) FROM public.vendor_pos;
