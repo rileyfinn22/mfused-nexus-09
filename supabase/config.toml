@@ -95,3 +95,6 @@ verify_jwt = true
 
 [functions.parse-vendor-bill]
 verify_jwt = true
+
+[functions.draft-vendor-bill-from-upload]
+verify_jwt = true

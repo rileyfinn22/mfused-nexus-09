@@ -66,7 +66,41 @@ export function VendorBillsSection({ vendorPO, onChanged }: VendorBillsSectionPr
     onChanged();
   };
 
-  const billedTotal = bills.reduce((sum, b) => sum + Number(b.total || 0), 0);
+  // A draft is an unconfirmed read of a vendor upload. vendor_po_recalc ignores it, so the
+  // figures here must ignore it too or the card would disagree with the PO.
+  const drafts = bills.filter((b) => b.status === 'draft');
+  const finalBills = bills.filter((b) => b.status !== 'draft');
+
+  // Confirming the vendor's real invoice retires the bill we migrated off the PO - bills on a
+  // PO are summed, so leaving both would double what we owe.
+  const confirmDraft = async (draft: any) => {
+    const superseded = finalBills.filter((b) => b.source === 'reconstructed').map((b) => b.id);
+    if (superseded.length) {
+      const { error } = await supabase.from('vendor_bills' as any).delete().in('id', superseded);
+      if (error) {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+        return;
+      }
+    }
+    const { error } = await supabase
+      .from('vendor_bills' as any)
+      .update({ status: 'final' })
+      .eq('id', draft.id);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({
+      title: "Bill confirmed",
+      description: superseded.length
+        ? "It replaced the bill migrated from the PO."
+        : undefined,
+    });
+    fetchBills();
+    onChanged();
+  };
+
+  const billedTotal = finalBills.reduce((sum, b) => sum + Number(b.total || 0), 0);
   const orderedTotal = Number(vendorPO?.total || 0);
   const variance = Math.round((billedTotal - orderedTotal) * 100) / 100;
   const paid = Number(vendorPO?.total_paid || 0);
@@ -99,6 +133,15 @@ export function VendorBillsSection({ vendorPO, onChanged }: VendorBillsSectionPr
             </div>
           ) : (
             <>
+              {drafts.length > 0 && (
+                <p className="mb-3 rounded-md border border-amber-500/40 bg-amber-50/60 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950/20 dark:text-amber-200">
+                  {drafts.length === 1 ? 'A bill was' : `${drafts.length} bills were`} read automatically from
+                  what the vendor uploaded. Nothing is costed at {drafts.length === 1 ? 'it' : 'them'} until you
+                  confirm — check the figures against the document first, and edit if the read is off.
+                  {finalBills.some((b) => b.source === 'reconstructed') &&
+                    ' Confirming replaces the bill migrated from this PO.'}
+                </p>
+              )}
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -113,9 +156,16 @@ export function VendorBillsSection({ vendorPO, onChanged }: VendorBillsSectionPr
                 </TableHeader>
                 <TableBody>
                   {bills.map((bill) => (
-                    <TableRow key={bill.id}>
+                    <TableRow key={bill.id} className={bill.status === 'draft' ? 'bg-amber-50/60 dark:bg-amber-950/20' : undefined}>
                       <TableCell className="font-medium">
-                        {bill.invoice_number || <span className="text-muted-foreground">—</span>}
+                        <div className="flex items-center gap-2">
+                          {bill.invoice_number || <span className="text-muted-foreground">—</span>}
+                          {bill.status === 'draft' && (
+                            <Badge variant="outline" className="border-amber-500 text-amber-700 dark:text-amber-400">
+                              Draft{bill.parse_confidence != null && Number(bill.parse_confidence) < 0.7 ? ' · check' : ''}
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>{bill.bill_date ? new Date(bill.bill_date).toLocaleDateString() : '—'}</TableCell>
                       <TableCell>{bill.due_date ? new Date(bill.due_date).toLocaleDateString() : '—'}</TableCell>
@@ -124,6 +174,15 @@ export function VendorBillsSection({ vendorPO, onChanged }: VendorBillsSectionPr
                       <TableCell className="text-right font-semibold">{formatCurrency(Number(bill.total || 0))}</TableCell>
                       <TableCell>
                         <div className="flex items-center justify-end gap-1">
+                          {bill.status === 'draft' && (
+                            <Button
+                              size="sm"
+                              className="h-8"
+                              onClick={() => confirmDraft(bill)}
+                            >
+                              Confirm
+                            </Button>
+                          )}
                           {bill.document_path && (
                             <Button
                               variant="ghost"
