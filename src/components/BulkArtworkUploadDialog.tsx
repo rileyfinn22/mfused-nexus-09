@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { createFlatArtworkPreviewFromArtwork } from "@/lib/artworkPreview";
 import { toast } from "sonner";
 
@@ -74,8 +75,7 @@ const BulkArtworkUploadDialog = ({
   const [companies, setCompanies] = useState<Company[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [isVibeAdmin, setIsVibeAdmin] = useState(false);
-  const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
+  const { activeCompanyId, isVibeAdmin } = useActiveCompany();
   const [companyId, setCompanyId] = useState(restrictToCompany || '');
   const [templateId, setTemplateId] = useState('');
   
@@ -90,7 +90,6 @@ const BulkArtworkUploadDialog = ({
 
   useEffect(() => {
     if (open) {
-      checkRole();
       fetchCompanies();
       setStep('upload');
       setZipFile(null);
@@ -116,23 +115,13 @@ const BulkArtworkUploadDialog = ({
     }
   }, [templateId]);
 
-  const checkRole = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { data: userRole } = await supabase
-      .from('user_roles')
-      .select('role, company_id')
-      .eq('user_id', user.id)
-      .single();
-
-    setIsVibeAdmin(userRole?.role === 'vibe_admin');
-    setUserCompanyId(userRole?.company_id || null);
-
-    if (userRole?.role !== 'vibe_admin' && userRole?.company_id) {
-      setCompanyId(userRole.company_id);
+  // Non-admins upload against whichever company the switcher is on. Reading
+  // user_roles directly left multi-company customers with no company at all.
+  useEffect(() => {
+    if (!isVibeAdmin && activeCompanyId && !restrictToCompany) {
+      setCompanyId((prev) => prev || activeCompanyId);
     }
-  };
+  }, [isVibeAdmin, activeCompanyId, restrictToCompany]);
 
   const fetchCompanies = async () => {
     const { data } = await supabase

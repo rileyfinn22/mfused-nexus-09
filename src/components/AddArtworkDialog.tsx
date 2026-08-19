@@ -10,6 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Check, ChevronsUpDown, Plus, FileImage, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { buildManualArtworkPreviewPath, createFlatArtworkPreviewFromFile } from "@/lib/artworkPreview";
 import { toast } from "sonner";
 
@@ -52,8 +53,8 @@ const AddArtworkDialog = ({
   const [companies, setCompanies] = useState<Company[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
-  const [isVibeAdmin, setIsVibeAdmin] = useState(false);
-  const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
+  const { activeCompanyId, isVibeAdmin } = useActiveCompany();
+  const userCompanyId = isVibeAdmin ? null : activeCompanyId;
   const [uploading, setUploading] = useState(false);
   const [productComboOpen, setProductComboOpen] = useState(false);
   const [resolvedArtworkType, setResolvedArtworkType] = useState<'customer' | 'vibe_proof'>(defaultArtworkType || 'customer');
@@ -70,7 +71,6 @@ const AddArtworkDialog = ({
 
   useEffect(() => {
     if (open) {
-      checkRole();
       fetchCompanies();
       fetchProducts();
     }
@@ -103,24 +103,13 @@ const AddArtworkDialog = ({
     }
   }, [formData.companyId, products]);
 
-  const checkRole = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { data: userRole } = await supabase
-      .from('user_roles')
-      .select('role, company_id')
-      .eq('user_id', user.id)
-      .single();
-
-    setIsVibeAdmin(userRole?.role === 'vibe_admin');
-    setUserCompanyId(userRole?.company_id || null);
-
-    // If not admin and no company specified, use user's company
-    if (userRole?.role !== 'vibe_admin' && userRole?.company_id) {
-      setFormData(prev => ({ ...prev, companyId: userRole.company_id }));
+  // Non-admins upload against whichever company the switcher is on. Reading
+  // user_roles directly left multi-company customers with no company at all.
+  useEffect(() => {
+    if (open && !isVibeAdmin && activeCompanyId) {
+      setFormData(prev => (prev.companyId ? prev : { ...prev, companyId: activeCompanyId }));
     }
-  };
+  }, [open, isVibeAdmin, activeCompanyId]);
 
   const fetchCompanies = async () => {
     const { data } = await supabase
