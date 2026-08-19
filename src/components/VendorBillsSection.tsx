@@ -11,17 +11,19 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { AddVendorBillDialog } from "@/components/AddVendorBillDialog";
 import { openStorageObjectInNewTab } from "@/lib/storageUrl";
-import { Plus, FileText, Receipt, Pencil, Trash2, Download } from "lucide-react";
+import { downloadVendorBillPdf } from "@/lib/vendorBillPdf";
+import { Plus, FileText, Receipt, Pencil, Trash2, Download, FileDown } from "lucide-react";
 
 interface VendorBillsSectionProps {
   vendorPO: any;
+  vendorName?: string | null;
   onChanged: () => void;
 }
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
 
-export function VendorBillsSection({ vendorPO, onChanged }: VendorBillsSectionProps) {
+export function VendorBillsSection({ vendorPO, vendorName, onChanged }: VendorBillsSectionProps) {
   const [bills, setBills] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -45,6 +47,53 @@ export function VendorBillsSection({ vendorPO, onChanged }: VendorBillsSectionPr
   }, [vendorPO?.id]);
 
   useEffect(() => { fetchBills(); }, [fetchBills]);
+
+  // The references that let someone match a bill up: the Vibe invoice(s) the PO was raised
+  // against, and the customer's own PO number.
+  const [refs, setRefs] = useState<{ invoiceNumbers: string[]; customerPO: string | null }>({
+    invoiceNumbers: [], customerPO: null,
+  });
+
+  useEffect(() => {
+    if (!vendorPO?.order_id) { setRefs({ invoiceNumbers: [], customerPO: null }); return; }
+    let cancelled = false;
+    (async () => {
+      const [{ data: invoices }, { data: order }] = await Promise.all([
+        supabase.from('invoices').select('invoice_number, customer_po_number')
+          .eq('order_id', vendorPO.order_id).is('deleted_at', null)
+          .order('invoice_number', { ascending: true }),
+        supabase.from('orders').select('po_number').eq('id', vendorPO.order_id).maybeSingle(),
+      ]);
+      if (cancelled) return;
+      setRefs({
+        invoiceNumbers: (invoices || []).map((i: any) => i.invoice_number).filter(Boolean),
+        customerPO: order?.po_number
+          || (invoices || []).map((i: any) => i.customer_po_number).find(Boolean)
+          || null,
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [vendorPO?.order_id]);
+
+  const downloadBill = (bill: any) => {
+    downloadVendorBillPdf({
+      poNumber: vendorPO?.po_number,
+      vendorName: vendorName ?? null,
+      invoiceNumber: bill.invoice_number,
+      billDate: bill.bill_date,
+      dueDate: bill.due_date,
+      subtotal: Number(bill.subtotal || 0),
+      freight: Number(bill.freight || 0),
+      total: Number(bill.total || 0),
+      currency: bill.currency,
+      status: bill.status,
+      source: bill.source,
+      vibeInvoiceNumbers: refs.invoiceNumbers,
+      customerPO: refs.customerPO,
+      documentName: bill.document_name,
+      notes: bill.notes,
+    });
+  };
 
   const handleSaved = () => {
     setEditing(null);
@@ -183,12 +232,21 @@ export function VendorBillsSection({ vendorPO, onChanged }: VendorBillsSectionPr
                               Confirm
                             </Button>
                           )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            title="Download this bill as a PDF"
+                            onClick={() => downloadBill(bill)}
+                          >
+                            <FileDown className="h-4 w-4" />
+                          </Button>
                           {bill.document_path && (
                             <Button
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8"
-                              title={bill.document_name || 'View document'}
+                              title={bill.document_name || "Open the vendor's own document"}
                               onClick={() => openStorageObjectInNewTab('po-documents', bill.document_path)}
                             >
                               <Download className="h-4 w-4" />

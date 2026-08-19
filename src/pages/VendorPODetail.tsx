@@ -47,6 +47,17 @@ const splitPOTotals = (items: any[], shippingCost: any) => {
   return { itemsTotal, shipping, totalAmount: Math.round((itemsTotal + shipping) * 100) / 100 };
 };
 
+// What actually shipped, valued at the PO's own prices. Shown next to the ordered total so you
+// can see over- and under-shipping at a glance. Deliberately NOT a billed figure: what the vendor
+// charged comes from vendor_bills and nothing else, so this never reaches final_total or P/L.
+const shippedLineAmount = (item: any) =>
+  Number(item?.shipped_quantity || 0) * Number(item?.unit_cost || 0);
+
+const shippedPOValue = (items: any[]) =>
+  Math.round(
+    items.filter(item => !isShippingItem(item)).reduce((sum, item) => sum + shippedLineAmount(item), 0) * 100
+  ) / 100;
+
 const VendorPODetail = () => {
   const { poId } = useParams();
   const navigate = useNavigate();
@@ -990,8 +1001,7 @@ const VendorPODetail = () => {
         content: a.base64,
       }));
       
-      const itemsTotal = poItems.reduce((sum, item) => sum + Number(item.total), 0);
-      const totalAmount = itemsTotal + Number(po.shipping_cost || 0);
+      const { totalAmount } = splitPOTotals(poItems, po.shipping_cost);
 
       const caseStickerInfo = await fetchCaseStickerInfo();
       
@@ -1042,8 +1052,7 @@ const VendorPODetail = () => {
   };
 
   const getDefaultEmailMessage = () => {
-    const itemsTotal = poItems.reduce((sum, item) => sum + Number(item.total), 0);
-    const totalAmount = itemsTotal + Number(po.shipping_cost || 0);
+    const { totalAmount } = splitPOTotals(poItems, po.shipping_cost);
     return `Dear ${vendor.contact_name || vendor.name},
 
 Please find attached the purchase order from ${VIBE_COMPANY.name}.
@@ -1140,6 +1149,11 @@ Thank you for your business.`;
     ? shippingItems.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_cost || 0), 0)
     : Number(po.shipping_cost || 0);
   const orderedGrandTotal = Math.round((orderedItemsTotal + orderedShipping) * 100) / 100;
+
+  // What shipped, at the PO's own prices. Visual only -- it is here to show over- and
+  // under-shipping against the order, and never feeds what we owe.
+  const shippedValue = shippedPOValue(poItems);
+  const shippedVariance = Math.round((shippedValue - orderedItemsTotal) * 100) / 100;
 
   // Payables figures. Not shown as part of the PO document -- only where money owed is the point.
   const effectiveBillTotal = po.final_total != null ? Number(po.final_total) : orderedGrandTotal;
@@ -1277,10 +1291,19 @@ Thank you for your business.`;
 
             {/* Payment Summary */}
             <div className="mt-6 bg-background/80 backdrop-blur rounded-lg p-4">
-              <div className="grid grid-cols-4 gap-4 text-center">
+              <div className="grid grid-cols-5 gap-4 text-center">
                 <div>
                   <p className="text-xs text-muted-foreground">Original PO</p>
                   <p className="text-lg font-bold">${orderedGrandTotal.toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Shipped Value</p>
+                  <p className="text-lg font-bold">${shippedValue.toFixed(2)}</p>
+                  {shippedVariance !== 0 && (
+                    <p className={`text-xs ${shippedVariance > 0 ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                      {shippedVariance > 0 ? '+' : ''}{shippedVariance.toFixed(2)} vs ordered
+                    </p>
+                  )}
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Total Paid</p>
@@ -1892,7 +1915,7 @@ Thank you for your business.`;
 
       {/* Vendor Bills -- their invoice is what we actually owe */}
       {po && isAdmin && (
-        <VendorBillsSection vendorPO={po} onChanged={fetchPODetails} />
+        <VendorBillsSection vendorPO={po} vendorName={vendor?.name} onChanged={fetchPODetails} />
       )}
 
       {/* Packing Lists Section */}
