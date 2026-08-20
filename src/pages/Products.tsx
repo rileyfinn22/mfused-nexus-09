@@ -195,26 +195,47 @@ const Products = () => {
 
       if (productsError) throw productsError;
 
-      // Batch fetch product_states + inventory in 2 queries (was N+1 per product)
+      // Batch fetch product_states + inventory. IDs are chunked because a single
+      // `in.(...)` filter with thousands of UUIDs overflows the request URL (HTTP 400).
       const productIds = (productsData || []).map((p: any) => p.id);
-      const [{ data: statesData }, { data: inventoryRows }] = productIds.length > 0
+      const chunk = <T,>(arr: T[], size = 150): T[][] => {
+        const out: T[][] = [];
+        for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+        return out;
+      };
+      const idChunks = chunk(productIds);
+
+      const fetchChunked = async (table: string, select: string, column: string) => {
+        const results = await Promise.all(
+          idChunks.map(async (ids) => {
+            const { data, error } = await (supabase as any)
+              .from(table)
+              .select(select)
+              .in(column, ids)
+              .limit(100000);
+            if (error) {
+              console.error(`Error fetching ${table}:`, error);
+              return [] as any[];
+            }
+            return data || [];
+          })
+        );
+        return results.flat();
+      };
+
+      const [statesData, inventoryRows, costRows] = productIds.length > 0
         ? await Promise.all([
-            supabase.from('product_states').select('*').in('product_id', productIds),
-            supabase.from('inventory').select('sku, product_id').in('product_id', productIds),
+            fetchChunked('product_states', '*', 'product_id'),
+            fetchChunked('inventory', 'sku, product_id', 'product_id'),
+            fetchChunked('product_costs', 'product_id, cost', 'product_id'),
           ])
-        : [{ data: [] as any[] }, { data: [] as any[] }];
+        : [[] as any[], [] as any[], [] as any[]];
 
       // Product cost moved to companion table product_costs
       const productCostMap: Record<string, number | null> = {};
-      if (productIds.length > 0) {
-        const { data: costRows } = await (supabase as any)
-          .from('product_costs')
-          .select('product_id, cost')
-          .in('product_id', productIds);
-        (costRows || []).forEach((row: any) => {
-          productCostMap[row.product_id] = row.cost;
-        });
-      }
+      (costRows || []).forEach((row: any) => {
+        productCostMap[row.product_id] = row.cost;
+      });
 
       const statesByProduct = new Map<string, any[]>();
       (statesData || []).forEach((s: any) => {
@@ -226,6 +247,7 @@ const Products = () => {
       (inventoryRows || []).forEach((row: any) => {
         if (!skuByProduct.has(row.product_id)) skuByProduct.set(row.product_id, row.sku);
       });
+
 
       const productsWithStates = (productsData || []).map((product: any) => ({
         id: product.id,
