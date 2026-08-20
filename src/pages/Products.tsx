@@ -1161,13 +1161,14 @@ const Products = () => {
                       </div>
                       <div className="col-span-1" onClick={(e) => e.stopPropagation()}>
                         {/* Priority: 1. Artwork thumbnail, 2. Product image_url, 3. Package icon */}
-                        {product.sku && artworkThumbnails[product.sku] ? (
+                        {(product.item_id && artworkThumbnails[product.item_id]) || (product.sku && artworkThumbnails[product.sku]) ? (
                           <SignedImage
-                            src={artworkThumbnails[product.sku]} 
+                            src={(product.item_id && artworkThumbnails[product.item_id]) || artworkThumbnails[product.sku!]}
                             alt={product.name}
                             className="w-10 h-10 object-cover rounded-md border border-border cursor-pointer hover:opacity-80 transition-opacity"
-                            onClick={() => navigate(`/artwork?search=${encodeURIComponent(product.sku)}`)}
+                            onClick={() => navigate(`/artwork?search=${encodeURIComponent(product.item_id || product.sku || '')}`)}
                           />
+
                         ) : product.image_url ? (
                           <SignedImage
                             src={product.image_url} 
