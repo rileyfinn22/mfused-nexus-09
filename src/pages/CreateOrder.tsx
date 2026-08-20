@@ -2074,7 +2074,7 @@ const CreateOrder = () => {
         }
       } else {
         // New order - insert all items
-        const orderItems = selectedItems.map(item => {
+        const orderItems = selectedItems.map((item, idx) => {
           const product = products.find(p => p.id === item.productId);
           const price = item.unit_price ?? 0;
           const itemTotal = price * item.quantity;
@@ -2090,6 +2090,7 @@ const CreateOrder = () => {
             shipped_quantity: null,
             unit_price: price,
             total: itemTotal,
+            line_number: idx + 1,
           };
         });
 
