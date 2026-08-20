@@ -1349,7 +1349,8 @@ const CreateOrder = () => {
         memo: order.memo || "",
       });
 
-      const items = order.order_items
+      const items = [...order.order_items]
+        .sort((a: any, b: any) => (a.line_number ?? 9999) - (b.line_number ?? 9999))
         .filter((item: any) => item.product_id !== null) // Only load items with matching products
         .map((item: any) => ({
           productId: item.product_id,
