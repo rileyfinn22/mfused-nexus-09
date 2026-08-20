@@ -245,6 +245,15 @@ serve(async (req) => {
       // ion_bag matches bag/pouch types
       if (type1 === 'ion_bag' && (type2 === 'bag' || type2 === 'pouch')) return true;
       if (type2 === 'ion_bag' && (type1 === 'bag' || type1 === 'pouch')) return true;
+
+      // Merch packs are frequently named with the bag family they contain
+      // ("Vape Bag Merch Pack", "Ion Merch Packs"), so treat them as compatible.
+      const merchCompatible = ['vape_bag', 'bag', 'ion_bag', 'pouch'];
+      if (type1 === 'merch_pack' && merchCompatible.includes(type2 as string)) return true;
+      if (type2 === 'merch_pack' && merchCompatible.includes(type1 as string)) return true;
+
+      return false;
+    };
       
       return false;
     };
