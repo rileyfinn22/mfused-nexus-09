@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Plus, Minus, X, Save, Send, Search, Upload, FileText, Loader2, Check, ChevronsUpDown, Sparkles, Paperclip, Clock, RefreshCw } from "lucide-react";
+import { ArrowLeft, Plus, Minus, X, Save, Send, Search, Upload, FileText, Loader2, Check, ChevronsUpDown, Sparkles, Paperclip, Clock, RefreshCw, GripVertical } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { z } from "zod";
@@ -211,6 +211,8 @@ const CreateOrder = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [allCompanies, setAllCompanies] = useState<Company[]>([]);
   const [selectedItems, setSelectedItems] = useState<OrderItem[]>([]);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [roleChecked, setRoleChecked] = useState(false);
