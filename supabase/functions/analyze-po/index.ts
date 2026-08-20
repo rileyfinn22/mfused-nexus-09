@@ -655,6 +655,16 @@ Return ONLY valid JSON:
         const productType = extractTypeFromAny(productTextForMatch);
         const productTokens = extractIdentifierTokens(productTextForMatch);
 
+        // HARD GUARD: a merch pack is a distinct product. A merch-pack PO line may
+        // only match a merch-pack product, and vice versa — regardless of type
+        // detection order or missing type on either side.
+        const poIsMerch = /\bmerch(?:andise)?\s*packs?\b/i.test(rawLine);
+        const productIsMerch = /\bmerch(?:andise)?\s*packs?\b/i.test(productTextForMatch);
+        if (poIsMerch !== productIsMerch) {
+          continue;
+        }
+
+
         // State matching (required if PO has state)
         if (poState) {
           if (productState?.toUpperCase() === poState.toUpperCase()) {
