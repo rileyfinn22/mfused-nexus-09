@@ -1013,8 +1013,9 @@ const Products = () => {
                 >
                   {/* Product Image/Icon Area */}
                   <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative overflow-hidden">
-                    {product.sku && artworkThumbnails[product.sku] ? (
-                      <SignedImage src={artworkThumbnails[product.sku]} alt={product.name} className="w-full h-full object-cover" />
+                    {(product.item_id && artworkThumbnails[product.item_id]) || (product.sku && artworkThumbnails[product.sku]) ? (
+                      <SignedImage src={(product.item_id && artworkThumbnails[product.item_id]) || artworkThumbnails[product.sku!]} alt={product.name} className="w-full h-full object-cover" />
+
                     ) : product.image_url ? (
                       <SignedImage src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
                     ) : (
