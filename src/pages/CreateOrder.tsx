@@ -654,7 +654,7 @@ const CreateOrder = () => {
           setExistingOrderNumber(newOrder.order_number);
           
           // Insert order items for the new draft
-          const orderItems = selectedItems.map(item => {
+          const orderItems = selectedItems.map((item, idx) => {
             const product = products.find(p => p.id === item.productId);
             const price = item.unit_price ?? 0;
             return {
@@ -668,6 +668,7 @@ const CreateOrder = () => {
               shipped_quantity: null,
               unit_price: price,
               total: price * item.quantity,
+              line_number: idx + 1,
             };
           });
 
