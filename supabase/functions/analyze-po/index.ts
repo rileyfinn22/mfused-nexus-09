@@ -625,11 +625,17 @@ Return ONLY valid JSON:
       // 1. PO-level state (from filename like "Purchase_Order_NY-...") - THIS IS THE PRIMARY SOURCE
       // 2. Hint-provided state (from user's analysis hint)
       // 3. State extracted from the item line itself (fallback)
-      const poState = poLevelState || hintCtx?.forcedState || extractStateFromAny(rawLine) || extractStateFromAny(poName);
+      // A line explicitly flagged NTL / National is a nationwide item: it must NOT
+      // inherit the PO-level state (e.g. a WA purchase order containing NTL merch packs).
+      const lineIsNational = /\b(ntl|national|nationwide)\b/i.test(rawLine) || /\b(ntl|national|nationwide)\b/i.test(poName);
+      const poState = lineIsNational
+        ? null
+        : (poLevelState || hintCtx?.forcedState || extractStateFromAny(rawLine) || extractStateFromAny(poName));
       const poType = hintCtx?.forcedType || extractTypeFromAny(rawLine) || extractTypeFromAny(poName);
       const poTokens = extractIdentifierTokens(rawLine);
 
-      console.log(`  PO-level state: ${poLevelState}, Hint state: ${hintCtx?.forcedState}, Final state: ${poState || 'none'}, Type: ${poType || 'none'}, Tokens: [${poTokens.join(', ')}]`);
+      console.log(`  PO-level state: ${poLevelState}, Hint state: ${hintCtx?.forcedState}, National line: ${lineIsNational}, Final state: ${poState || 'none'}, Type: ${poType || 'none'}, Tokens: [${poTokens.join(', ')}]`);
+
 
       if (!poState && !poType && poTokens.length === 0) {
         console.log(`  No state/type/tokens extracted, falling back to fuzzy match`);
@@ -665,14 +671,24 @@ Return ONLY valid JSON:
         }
 
 
-        // State matching (required if PO has state)
-        if (poState) {
-          if (productState?.toUpperCase() === poState.toUpperCase()) {
+        // "General"/"NTL" products are nationwide SKUs — they belong to no state and
+        // must never be filtered out by a state-specific PO (or vice versa).
+        const NATIONAL_STATES = new Set(['GENERAL', 'GEN', 'NTL', 'NATIONAL', 'NATIONWIDE', 'ALL']);
+        const productIsNational = !productState || NATIONAL_STATES.has(String(productState).toUpperCase());
+
+        if (lineIsNational) {
+          // NTL line -> only nationwide products are valid.
+          if (!productIsNational) continue;
+          score += 30;
+        } else if (poState) {
+          if (!productIsNational && productState?.toUpperCase() === poState.toUpperCase()) {
             score += 30; // Strong boost for state match
-          } else if (productState) {
+          } else if (!productIsNational) {
             continue; // Wrong state = skip this product entirely
           }
+          // National product on a state PO: allowed, no boost.
         }
+
 
         // Type matching - must be compatible types (using improved areTypesCompatible function)
         if (poType) {
