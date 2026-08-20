@@ -1965,7 +1965,7 @@ const CreateOrder = () => {
 
       if (effectiveOrderId && existingItemsMap) {
         // Update existing items and add new ones, preserving vendor assignments
-        for (const item of selectedItems) {
+        for (const [idx, item] of selectedItems.entries()) {
           const product = await resolveProduct(item.productId);
           const price = item.unit_price ?? 0;
           const itemTotal = price * item.quantity;
@@ -1980,6 +1980,7 @@ const CreateOrder = () => {
                 quantity: item.quantity,
                 unit_price: price,
                 total: itemTotal,
+                line_number: idx + 1,
                 sku: product?.item_id || existingItem.sku,
                 item_id: product?.item_id || existingItem.item_id,
                 name: product?.name || existingItem.name,
@@ -2004,6 +2005,7 @@ const CreateOrder = () => {
                 shipped_quantity: null,
                 unit_price: price,
                 total: itemTotal,
+                line_number: idx + 1,
               });
           }
         }
