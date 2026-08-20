@@ -671,14 +671,24 @@ Return ONLY valid JSON:
         }
 
 
-        // State matching (required if PO has state)
-        if (poState) {
-          if (productState?.toUpperCase() === poState.toUpperCase()) {
+        // "General"/"NTL" products are nationwide SKUs — they belong to no state and
+        // must never be filtered out by a state-specific PO (or vice versa).
+        const NATIONAL_STATES = new Set(['GENERAL', 'GEN', 'NTL', 'NATIONAL', 'NATIONWIDE', 'ALL']);
+        const productIsNational = !productState || NATIONAL_STATES.has(String(productState).toUpperCase());
+
+        if (lineIsNational) {
+          // NTL line -> only nationwide products are valid.
+          if (!productIsNational) continue;
+          score += 30;
+        } else if (poState) {
+          if (!productIsNational && productState?.toUpperCase() === poState.toUpperCase()) {
             score += 30; // Strong boost for state match
-          } else if (productState) {
+          } else if (!productIsNational) {
             continue; // Wrong state = skip this product entirely
           }
+          // National product on a state PO: allowed, no boost.
         }
+
 
         // Type matching - must be compatible types (using improved areTypesCompatible function)
         if (poType) {
