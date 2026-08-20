@@ -195,26 +195,47 @@ const Products = () => {
 
       if (productsError) throw productsError;
 
-      // Batch fetch product_states + inventory in 2 queries (was N+1 per product)
+      // Batch fetch product_states + inventory. IDs are chunked because a single
+      // `in.(...)` filter with thousands of UUIDs overflows the request URL (HTTP 400).
       const productIds = (productsData || []).map((p: any) => p.id);
-      const [{ data: statesData }, { data: inventoryRows }] = productIds.length > 0
+      const chunk = <T,>(arr: T[], size = 150): T[][] => {
+        const out: T[][] = [];
+        for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+        return out;
+      };
+      const idChunks = chunk(productIds);
+
+      const fetchChunked = async (table: string, select: string, column: string) => {
+        const results = await Promise.all(
+          idChunks.map(async (ids) => {
+            const { data, error } = await (supabase as any)
+              .from(table)
+              .select(select)
+              .in(column, ids)
+              .limit(100000);
+            if (error) {
+              console.error(`Error fetching ${table}:`, error);
+              return [] as any[];
+            }
+            return data || [];
+          })
+        );
+        return results.flat();
+      };
+
+      const [statesData, inventoryRows, costRows] = productIds.length > 0
         ? await Promise.all([
-            supabase.from('product_states').select('*').in('product_id', productIds),
-            supabase.from('inventory').select('sku, product_id').in('product_id', productIds),
+            fetchChunked('product_states', '*', 'product_id'),
+            fetchChunked('inventory', 'sku, product_id', 'product_id'),
+            fetchChunked('product_costs', 'product_id, cost', 'product_id'),
           ])
-        : [{ data: [] as any[] }, { data: [] as any[] }];
+        : [[] as any[], [] as any[], [] as any[]];
 
       // Product cost moved to companion table product_costs
       const productCostMap: Record<string, number | null> = {};
-      if (productIds.length > 0) {
-        const { data: costRows } = await (supabase as any)
-          .from('product_costs')
-          .select('product_id, cost')
-          .in('product_id', productIds);
-        (costRows || []).forEach((row: any) => {
-          productCostMap[row.product_id] = row.cost;
-        });
-      }
+      (costRows || []).forEach((row: any) => {
+        productCostMap[row.product_id] = row.cost;
+      });
 
       const statesByProduct = new Map<string, any[]>();
       (statesData || []).forEach((s: any) => {
@@ -226,6 +247,7 @@ const Products = () => {
       (inventoryRows || []).forEach((row: any) => {
         if (!skuByProduct.has(row.product_id)) skuByProduct.set(row.product_id, row.sku);
       });
+
 
       const productsWithStates = (productsData || []).map((product: any) => ({
         id: product.id,
@@ -269,37 +291,63 @@ const Products = () => {
 
       if (templatesError) throw templatesError;
 
-      // Batch product counts per template in ONE query (was N+1 per template)
+      // Product counts per template. Template IDs are chunked (long `in.(...)` filters
+      // 400 out) and an explicit high limit avoids the default 1000-row cap.
       const templateIds = (templatesData || []).map((t: any) => t.id);
+      const chunkIds = (arr: string[], size = 150): string[][] => {
+        const out: string[][] = [];
+        for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+        return out;
+      };
+      const templateIdChunks = chunkIds(templateIds);
 
       // Template cost moved to companion table product_template_costs
       const templateCostMap: Record<string, number | null> = {};
       if (templateIds.length > 0) {
-        const { data: tCostRows } = await (supabase as any)
-          .from('product_template_costs')
-          .select('template_id, cost')
-          .in('template_id', templateIds);
-        (tCostRows || []).forEach((row: any) => {
+        const costChunks = await Promise.all(
+          templateIdChunks.map(async (ids) => {
+            const { data } = await (supabase as any)
+              .from('product_template_costs')
+              .select('template_id, cost')
+              .in('template_id', ids)
+              .limit(100000);
+            return data || [];
+          })
+        );
+        costChunks.flat().forEach((row: any) => {
           templateCostMap[row.template_id] = row.cost;
         });
       }
 
       let countsByTemplate = new Map<string, number>();
       if (templateIds.length > 0) {
-        let countsQuery = supabase
-          .from('products')
-          .select('template_id')
-          .in('template_id', templateIds);
-        if (isVibeAdmin) {
-          if (companyFilter !== 'all') countsQuery = countsQuery.eq('company_id', companyFilter);
-        } else if (activeCompanyId) {
-          countsQuery = countsQuery.eq('company_id', activeCompanyId);
+        // Exact per-template counts via HEAD requests — a bulk select is capped by
+        // PostgREST's max-rows, which silently under-counts large templates.
+        const countOne = async (templateId: string) => {
+          let q = supabase
+            .from('products')
+            .select('id', { count: 'exact', head: true })
+            .eq('template_id', templateId);
+          if (isVibeAdmin) {
+            if (companyFilter !== 'all') q = q.eq('company_id', companyFilter);
+          } else if (activeCompanyId) {
+            q = q.eq('company_id', activeCompanyId);
+          }
+          const { count, error } = await q;
+          if (error) {
+            console.error('Error counting template products:', error);
+            return [templateId, 0] as const;
+          }
+          return [templateId, count || 0] as const;
+        };
+        // Limited concurrency to avoid hammering the API with hundreds of parallel requests.
+        for (const batch of chunkIds(templateIds, 12)) {
+          const results = await Promise.all(batch.map(countOne));
+          results.forEach(([id, count]) => countsByTemplate.set(id, count));
         }
-        const { data: countRows } = await countsQuery;
-        (countRows || []).forEach((row: any) => {
-          countsByTemplate.set(row.template_id, (countsByTemplate.get(row.template_id) || 0) + 1);
-        });
       }
+
+
 
       const templatesWithCounts = (templatesData || []).map((template: any) => ({
         ...template,
@@ -967,8 +1015,9 @@ const Products = () => {
                 >
                   {/* Product Image/Icon Area */}
                   <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative overflow-hidden">
-                    {product.sku && artworkThumbnails[product.sku] ? (
-                      <SignedImage src={artworkThumbnails[product.sku]} alt={product.name} className="w-full h-full object-cover" />
+                    {(product.item_id && artworkThumbnails[product.item_id]) || (product.sku && artworkThumbnails[product.sku]) ? (
+                      <SignedImage src={(product.item_id && artworkThumbnails[product.item_id]) || artworkThumbnails[product.sku!]} alt={product.name} className="w-full h-full object-cover" />
+
                     ) : product.image_url ? (
                       <SignedImage src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
                     ) : (
@@ -1114,13 +1163,14 @@ const Products = () => {
                       </div>
                       <div className="col-span-1" onClick={(e) => e.stopPropagation()}>
                         {/* Priority: 1. Artwork thumbnail, 2. Product image_url, 3. Package icon */}
-                        {product.sku && artworkThumbnails[product.sku] ? (
+                        {(product.item_id && artworkThumbnails[product.item_id]) || (product.sku && artworkThumbnails[product.sku]) ? (
                           <SignedImage
-                            src={artworkThumbnails[product.sku]} 
+                            src={(product.item_id && artworkThumbnails[product.item_id]) || artworkThumbnails[product.sku!]}
                             alt={product.name}
                             className="w-10 h-10 object-cover rounded-md border border-border cursor-pointer hover:opacity-80 transition-opacity"
-                            onClick={() => navigate(`/artwork?search=${encodeURIComponent(product.sku)}`)}
+                            onClick={() => navigate(`/artwork?search=${encodeURIComponent(product.item_id || product.sku || '')}`)}
                           />
+
                         ) : product.image_url ? (
                           <SignedImage
                             src={product.image_url} 
