@@ -947,6 +947,13 @@ export type Database = {
             foreignKeyName: "financed_invoices_invoice_id_fkey"
             columns: ["invoice_id"]
             isOneToOne: false
+            referencedRelation: "invoice_receivables"
+            referencedColumns: ["invoice_id"]
+          },
+          {
+            foreignKeyName: "financed_invoices_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
             referencedRelation: "invoice_subtotal_reconciliation"
             referencedColumns: ["invoice_id"]
           },
@@ -1085,6 +1092,13 @@ export type Database = {
             foreignKeyName: "inventory_allocations_invoice_id_fkey"
             columns: ["invoice_id"]
             isOneToOne: false
+            referencedRelation: "invoice_receivables"
+            referencedColumns: ["invoice_id"]
+          },
+          {
+            foreignKeyName: "inventory_allocations_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
             referencedRelation: "invoice_subtotal_reconciliation"
             referencedColumns: ["invoice_id"]
           },
@@ -1172,6 +1186,13 @@ export type Database = {
           source?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "invoice_packing_lists_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_receivables"
+            referencedColumns: ["invoice_id"]
+          },
           {
             foreignKeyName: "invoice_packing_lists_invoice_id_fkey"
             columns: ["invoice_id"]
@@ -1350,6 +1371,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "orders"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_parent_invoice_id_fkey"
+            columns: ["parent_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_receivables"
+            referencedColumns: ["invoice_id"]
           },
           {
             foreignKeyName: "invoices_parent_invoice_id_fkey"
@@ -1900,6 +1928,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "payments_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_receivables"
+            referencedColumns: ["invoice_id"]
+          },
           {
             foreignKeyName: "payments_invoice_id_fkey"
             columns: ["invoice_id"]
@@ -3364,6 +3399,10 @@ export type Database = {
           id: string
           invoice_number: string | null
           notes: string | null
+          parse_confidence: number | null
+          source: string
+          source_update_id: string | null
+          status: string
           subtotal: number
           total: number
           updated_at: string
@@ -3382,6 +3421,10 @@ export type Database = {
           id?: string
           invoice_number?: string | null
           notes?: string | null
+          parse_confidence?: number | null
+          source?: string
+          source_update_id?: string | null
+          status?: string
           subtotal?: number
           total?: number
           updated_at?: string
@@ -3400,6 +3443,10 @@ export type Database = {
           id?: string
           invoice_number?: string | null
           notes?: string | null
+          parse_confidence?: number | null
+          source?: string
+          source_update_id?: string | null
+          status?: string
           subtotal?: number
           total?: number
           updated_at?: string
@@ -4129,6 +4176,41 @@ export type Database = {
       }
     }
     Views: {
+      invoice_receivables: {
+        Row: {
+          billable: number | null
+          company_id: string | null
+          counts_toward_ar: boolean | null
+          due_date: string | null
+          invoice_date: string | null
+          invoice_id: string | null
+          invoice_number: string | null
+          is_placeholder: boolean | null
+          kind: string | null
+          order_id: string | null
+          outstanding: number | null
+          parent_credit: number | null
+          status: string | null
+          total: number | null
+          total_paid: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_subtotal_reconciliation: {
         Row: {
           company_id: string | null
