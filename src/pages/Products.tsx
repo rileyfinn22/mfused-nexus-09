@@ -321,30 +321,32 @@ const Products = () => {
 
       let countsByTemplate = new Map<string, number>();
       if (templateIds.length > 0) {
-        const countChunks = await Promise.all(
-          templateIdChunks.map(async (ids) => {
-            let countsQuery = supabase
-              .from('products')
-              .select('template_id')
-              .in('template_id', ids)
-              .limit(100000);
-            if (isVibeAdmin) {
-              if (companyFilter !== 'all') countsQuery = countsQuery.eq('company_id', companyFilter);
-            } else if (activeCompanyId) {
-              countsQuery = countsQuery.eq('company_id', activeCompanyId);
-            }
-            const { data, error } = await countsQuery;
-            if (error) {
-              console.error('Error counting template products:', error);
-              return [] as any[];
-            }
-            return data || [];
-          })
-        );
-        countChunks.flat().forEach((row: any) => {
-          countsByTemplate.set(row.template_id, (countsByTemplate.get(row.template_id) || 0) + 1);
-        });
+        // Exact per-template counts via HEAD requests — a bulk select is capped by
+        // PostgREST's max-rows, which silently under-counts large templates.
+        const countOne = async (templateId: string) => {
+          let q = supabase
+            .from('products')
+            .select('id', { count: 'exact', head: true })
+            .eq('template_id', templateId);
+          if (isVibeAdmin) {
+            if (companyFilter !== 'all') q = q.eq('company_id', companyFilter);
+          } else if (activeCompanyId) {
+            q = q.eq('company_id', activeCompanyId);
+          }
+          const { count, error } = await q;
+          if (error) {
+            console.error('Error counting template products:', error);
+            return [templateId, 0] as const;
+          }
+          return [templateId, count || 0] as const;
+        };
+        // Limited concurrency to avoid hammering the API with hundreds of parallel requests.
+        for (const batch of chunkIds(templateIds, 12)) {
+          const results = await Promise.all(batch.map(countOne));
+          results.forEach(([id, count]) => countsByTemplate.set(id, count));
+        }
       }
+
 
 
       const templatesWithCounts = (templatesData || []).map((template: any) => ({
