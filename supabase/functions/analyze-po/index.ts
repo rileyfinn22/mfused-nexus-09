@@ -254,9 +254,7 @@ serve(async (req) => {
 
       return false;
     };
-      
-      return false;
-    };
+
 
     const parseAnalysisHint = (hint: string | undefined | null): { forcedState: string | null; forcedType: ProductType } => {
       if (!hint) return { forcedState: null, forcedType: null };
