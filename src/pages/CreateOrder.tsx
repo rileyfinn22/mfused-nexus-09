@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Plus, Minus, X, Save, Send, Search, Upload, FileText, Loader2, Check, ChevronsUpDown, Sparkles, Paperclip, Clock, RefreshCw } from "lucide-react";
+import { ArrowLeft, Plus, Minus, X, Save, Send, Search, Upload, FileText, Loader2, Check, ChevronsUpDown, Sparkles, Paperclip, Clock, RefreshCw, GripVertical } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { z } from "zod";
@@ -211,6 +211,8 @@ const CreateOrder = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [allCompanies, setAllCompanies] = useState<Company[]>([]);
   const [selectedItems, setSelectedItems] = useState<OrderItem[]>([]);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [roleChecked, setRoleChecked] = useState(false);
@@ -652,7 +654,7 @@ const CreateOrder = () => {
           setExistingOrderNumber(newOrder.order_number);
           
           // Insert order items for the new draft
-          const orderItems = selectedItems.map(item => {
+          const orderItems = selectedItems.map((item, idx) => {
             const product = products.find(p => p.id === item.productId);
             const price = item.unit_price ?? 0;
             return {
@@ -666,6 +668,7 @@ const CreateOrder = () => {
               shipped_quantity: null,
               unit_price: price,
               total: price * item.quantity,
+              line_number: idx + 1,
             };
           });
 
@@ -1346,7 +1349,8 @@ const CreateOrder = () => {
         memo: order.memo || "",
       });
 
-      const items = order.order_items
+      const items = [...order.order_items]
+        .sort((a: any, b: any) => (a.line_number ?? 9999) - (b.line_number ?? 9999))
         .filter((item: any) => item.product_id !== null) // Only load items with matching products
         .map((item: any) => ({
           productId: item.product_id,
@@ -1641,6 +1645,25 @@ const CreateOrder = () => {
 
   // Generate unique key for each item (productId + price combo)
   const getItemKey = (item: OrderItem) => `${item.productId}::${item.unit_price ?? 'default'}`;
+
+  // Drag-and-drop reordering of line items
+  const moveItem = (from: number, to: number) => {
+    if (from === to || from < 0 || to < 0) return;
+    setSelectedItems(prev => {
+      if (from >= prev.length || to >= prev.length) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  };
+
+  const handleRowDrop = (targetIndex: number) => {
+    if (dragIndex !== null) moveItem(dragIndex, targetIndex);
+    setDragIndex(null);
+    setDragOverIndex(null);
+  };
+
 
   const handleQuantityChange = (itemKey: string, change: number) => {
     setSelectedItems(selectedItems.map(item => {
@@ -1944,7 +1967,7 @@ const CreateOrder = () => {
 
       if (effectiveOrderId && existingItemsMap) {
         // Update existing items and add new ones, preserving vendor assignments
-        for (const item of selectedItems) {
+        for (const [idx, item] of selectedItems.entries()) {
           const product = await resolveProduct(item.productId);
           const price = item.unit_price ?? 0;
           const itemTotal = price * item.quantity;
@@ -1959,6 +1982,7 @@ const CreateOrder = () => {
                 quantity: item.quantity,
                 unit_price: price,
                 total: itemTotal,
+                line_number: idx + 1,
                 sku: product?.item_id || existingItem.sku,
                 item_id: product?.item_id || existingItem.item_id,
                 name: product?.name || existingItem.name,
@@ -1983,6 +2007,7 @@ const CreateOrder = () => {
                 shipped_quantity: null,
                 unit_price: price,
                 total: itemTotal,
+                line_number: idx + 1,
               });
           }
         }
@@ -2050,7 +2075,7 @@ const CreateOrder = () => {
         }
       } else {
         // New order - insert all items
-        const orderItems = selectedItems.map(item => {
+        const orderItems = selectedItems.map((item, idx) => {
           const product = products.find(p => p.id === item.productId);
           const price = item.unit_price ?? 0;
           const itemTotal = price * item.quantity;
@@ -2066,6 +2091,7 @@ const CreateOrder = () => {
             shipped_quantity: null,
             unit_price: price,
             total: itemTotal,
+            line_number: idx + 1,
           };
         });
 
@@ -2899,6 +2925,8 @@ const CreateOrder = () => {
             <Table>
               <TableHeader>
                 <TableRow className="bg-table-header">
+                  <TableHead className="w-8"></TableHead>
+                  <TableHead className="w-10 text-center">#</TableHead>
                   <TableHead className="w-12"></TableHead>
                   <TableHead>Item ID</TableHead>
                   <TableHead>Product/Service</TableHead>
@@ -2909,7 +2937,7 @@ const CreateOrder = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {selectedItems.map((item) => {
+                {selectedItems.map((item, index) => {
                   const product = products.find(p => p.id === item.productId);
                   // IMPORTANT: the total uses ALL selectedItems, so we must render rows even if the
                   // product isn't currently in the loaded product list (e.g. query limit).
@@ -2924,7 +2952,41 @@ const CreateOrder = () => {
                   const displayDescription = product?.description ?? item.description ?? null;
                   
                   return (
-                    <TableRow key={itemKey}>
+                    <TableRow
+                      key={itemKey}
+                      onDragOver={(e) => {
+                        if (dragIndex === null) return;
+                        e.preventDefault();
+                        setDragOverIndex(index);
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        handleRowDrop(index);
+                      }}
+                      className={cn(
+                        dragIndex === index && "opacity-50",
+                        dragOverIndex === index && dragIndex !== index && "border-t-2 border-primary"
+                      )}
+                    >
+                      <TableCell className="w-8 px-1">
+                        <span
+                          draggable
+                          onDragStart={(e) => {
+                            e.dataTransfer.effectAllowed = "move";
+                            setDragIndex(index);
+                          }}
+                          onDragEnd={() => {
+                            setDragIndex(null);
+                            setDragOverIndex(null);
+                          }}
+                          className="inline-flex cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
+                          title="Drag to reorder"
+                          aria-label="Drag to reorder line item"
+                        >
+                          <GripVertical className="h-4 w-4" />
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-center text-xs text-muted-foreground">{index + 1}</TableCell>
                       <TableCell>
                         <Button
                           type="button"
