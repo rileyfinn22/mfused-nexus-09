@@ -170,6 +170,9 @@ serve(async (req) => {
     // "ion_bag" must come before "bag" since Ion Bags are a distinct product family
     type ProductType = 'sleeve' | 'ion_bag' | 'bag' | 'pouch' | 'box' | 'tin' | 'merch_pack' | 'fatty' | 'fatty_bag_5pk' | 'fatty_bag_2pk' | 'vape_bag' | 'live_line_bag' | 'pen_pouch' | '7g_pouch' | '14g_pouch' | 'label' | 'jar' | null;
     const PRODUCT_TYPE_PATTERNS: { type: ProductType; patterns: RegExp[] }[] = [
+      // Merch packs are the most specific family: they often ALSO mention "vape bag",
+      // "bag" or "ion" in the same string, so they must be detected first.
+      { type: 'merch_pack', patterns: [/\bmerch\s*packs?\b/i, /\bmerchandise\s*packs?\b/i, /\bmp\s*-\s*/i] },
       // Combined product families (most specific first)
       { type: 'ion_bag', patterns: [/\bion\s*bags?\b/i, /\bbag\s*-?\s*ion\b/i, /\bion\b.*\bbag\b/i, /\bbag\b.*\bion\b/i] },
       { type: 'fatty_bag_5pk', patterns: [/\bfatty.*5\s*(?:pk|pack)\b/i, /\b5\s*(?:pk|pack).*fatty\b/i, /\bfatty.*\(5\s*x/i] },
@@ -179,7 +182,7 @@ serve(async (req) => {
       // Specific pouch types (must come before generic pouch)
       { type: 'pen_pouch', patterns: [/\bpen\s*pouch\b/i, /\bpouch\b.*\bpen\b/i] },
       { type: '7g_pouch', patterns: [/\b7g?\s*pouch\b/i, /\bpouch\b.*\b7g?\b/i, /\b7\s*g\s*pouch\b/i] },
-      { type: '14g_pouch', patterns: [/\b14g?\s*pouch\b/i, /\bpouch\b.*\b14g?\b/i, /\b14\s*g\s*pouch\b/i, /\bflower.*label.*pouch\b/i] },
+      { type: '14g_pouch', patterns: [/\b14g?\s*pouch\b/i, /\bpouch\b.*\b14g?\b/i, /\bflower.*label.*pouch\b/i] },
       // Base types
       { type: 'sleeve', patterns: [/\bsleeves?\b/i] },
       { type: 'pouch', patterns: [/\bpouch(?:es)?\b/i] },
@@ -188,9 +191,9 @@ serve(async (req) => {
       { type: 'tin', patterns: [/\btins?\b/i] },
       { type: 'jar', patterns: [/\bjars?\b/i] },
       { type: 'label', patterns: [/\blabels?\b/i] },
-      { type: 'merch_pack', patterns: [/\bmerch\s*packs?\b/i, /\bmerchandise\s*packs?\b/i, /\bion\s*merch\b/i] },
       { type: 'fatty', patterns: [/\bfatty\b/i, /\bfattys\b/i, /\bfatties\b/i] },
     ];
+
 
     const detectProductType = (str: string): ProductType => {
       if (!str) return null;
@@ -242,9 +245,16 @@ serve(async (req) => {
       // ion_bag matches bag/pouch types
       if (type1 === 'ion_bag' && (type2 === 'bag' || type2 === 'pouch')) return true;
       if (type2 === 'ion_bag' && (type1 === 'bag' || type1 === 'pouch')) return true;
-      
+
+      // Merch packs are frequently named with the bag family they contain
+      // ("Vape Bag Merch Pack", "Ion Merch Packs"), so treat them as compatible.
+      const merchCompatible = ['vape_bag', 'bag', 'ion_bag', 'pouch'];
+      if (type1 === 'merch_pack' && merchCompatible.includes(type2 as string)) return true;
+      if (type2 === 'merch_pack' && merchCompatible.includes(type1 as string)) return true;
+
       return false;
     };
+
 
     const parseAnalysisHint = (hint: string | undefined | null): { forcedState: string | null; forcedType: ProductType } => {
       if (!hint) return { forcedState: null, forcedType: null };
@@ -638,7 +648,11 @@ Return ONLY valid JSON:
         const templateName = p?.product_templates?.name || '';
         const productTextForMatch = `${p.name || ''} ${templateName}`.trim();
 
-        const productState = p.state?.toUpperCase() || extractStateFromAny(productTextForMatch);
+        // The state written into the product/template NAME is authoritative — the
+        // products.state column can be stale (e.g. cloned templates keeping "MD"
+        // on products named "WA Ion Bags - ...").
+        const nameState = extractStateFromAny(productTextForMatch);
+        const productState = nameState || p.state?.toUpperCase() || null;
         const productType = extractTypeFromAny(productTextForMatch);
         const productTokens = extractIdentifierTokens(productTextForMatch);
 
