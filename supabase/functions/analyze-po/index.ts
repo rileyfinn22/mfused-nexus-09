@@ -625,11 +625,17 @@ Return ONLY valid JSON:
       // 1. PO-level state (from filename like "Purchase_Order_NY-...") - THIS IS THE PRIMARY SOURCE
       // 2. Hint-provided state (from user's analysis hint)
       // 3. State extracted from the item line itself (fallback)
-      const poState = poLevelState || hintCtx?.forcedState || extractStateFromAny(rawLine) || extractStateFromAny(poName);
+      // A line explicitly flagged NTL / National is a nationwide item: it must NOT
+      // inherit the PO-level state (e.g. a WA purchase order containing NTL merch packs).
+      const lineIsNational = /\b(ntl|national|nationwide)\b/i.test(rawLine) || /\b(ntl|national|nationwide)\b/i.test(poName);
+      const poState = lineIsNational
+        ? null
+        : (poLevelState || hintCtx?.forcedState || extractStateFromAny(rawLine) || extractStateFromAny(poName));
       const poType = hintCtx?.forcedType || extractTypeFromAny(rawLine) || extractTypeFromAny(poName);
       const poTokens = extractIdentifierTokens(rawLine);
 
-      console.log(`  PO-level state: ${poLevelState}, Hint state: ${hintCtx?.forcedState}, Final state: ${poState || 'none'}, Type: ${poType || 'none'}, Tokens: [${poTokens.join(', ')}]`);
+      console.log(`  PO-level state: ${poLevelState}, Hint state: ${hintCtx?.forcedState}, National line: ${lineIsNational}, Final state: ${poState || 'none'}, Type: ${poType || 'none'}, Tokens: [${poTokens.join(', ')}]`);
+
 
       if (!poState && !poType && poTokens.length === 0) {
         console.log(`  No state/type/tokens extracted, falling back to fuzzy match`);
