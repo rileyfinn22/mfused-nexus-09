@@ -648,7 +648,11 @@ Return ONLY valid JSON:
         const templateName = p?.product_templates?.name || '';
         const productTextForMatch = `${p.name || ''} ${templateName}`.trim();
 
-        const productState = p.state?.toUpperCase() || extractStateFromAny(productTextForMatch);
+        // The state written into the product/template NAME is authoritative — the
+        // products.state column can be stale (e.g. cloned templates keeping "MD"
+        // on products named "WA Ion Bags - ...").
+        const nameState = extractStateFromAny(productTextForMatch);
+        const productState = nameState || p.state?.toUpperCase() || null;
         const productType = extractTypeFromAny(productTextForMatch);
         const productTokens = extractIdentifierTokens(productTextForMatch);
 
