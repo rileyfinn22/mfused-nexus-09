@@ -1644,6 +1644,25 @@ const CreateOrder = () => {
   // Generate unique key for each item (productId + price combo)
   const getItemKey = (item: OrderItem) => `${item.productId}::${item.unit_price ?? 'default'}`;
 
+  // Drag-and-drop reordering of line items
+  const moveItem = (from: number, to: number) => {
+    if (from === to || from < 0 || to < 0) return;
+    setSelectedItems(prev => {
+      if (from >= prev.length || to >= prev.length) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  };
+
+  const handleRowDrop = (targetIndex: number) => {
+    if (dragIndex !== null) moveItem(dragIndex, targetIndex);
+    setDragIndex(null);
+    setDragOverIndex(null);
+  };
+
+
   const handleQuantityChange = (itemKey: string, change: number) => {
     setSelectedItems(selectedItems.map(item => {
       if (getItemKey(item) === itemKey) {
