@@ -2920,6 +2920,8 @@ const CreateOrder = () => {
             <Table>
               <TableHeader>
                 <TableRow className="bg-table-header">
+                  <TableHead className="w-8"></TableHead>
+                  <TableHead className="w-10 text-center">#</TableHead>
                   <TableHead className="w-12"></TableHead>
                   <TableHead>Item ID</TableHead>
                   <TableHead>Product/Service</TableHead>
@@ -2930,7 +2932,7 @@ const CreateOrder = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {selectedItems.map((item) => {
+                {selectedItems.map((item, index) => {
                   const product = products.find(p => p.id === item.productId);
                   // IMPORTANT: the total uses ALL selectedItems, so we must render rows even if the
                   // product isn't currently in the loaded product list (e.g. query limit).
@@ -2945,7 +2947,41 @@ const CreateOrder = () => {
                   const displayDescription = product?.description ?? item.description ?? null;
                   
                   return (
-                    <TableRow key={itemKey}>
+                    <TableRow
+                      key={itemKey}
+                      onDragOver={(e) => {
+                        if (dragIndex === null) return;
+                        e.preventDefault();
+                        setDragOverIndex(index);
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        handleRowDrop(index);
+                      }}
+                      className={cn(
+                        dragIndex === index && "opacity-50",
+                        dragOverIndex === index && dragIndex !== index && "border-t-2 border-primary"
+                      )}
+                    >
+                      <TableCell className="w-8 px-1">
+                        <span
+                          draggable
+                          onDragStart={(e) => {
+                            e.dataTransfer.effectAllowed = "move";
+                            setDragIndex(index);
+                          }}
+                          onDragEnd={() => {
+                            setDragIndex(null);
+                            setDragOverIndex(null);
+                          }}
+                          className="inline-flex cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
+                          title="Drag to reorder"
+                          aria-label="Drag to reorder line item"
+                        >
+                          <GripVertical className="h-4 w-4" />
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-center text-xs text-muted-foreground">{index + 1}</TableCell>
                       <TableCell>
                         <Button
                           type="button"
