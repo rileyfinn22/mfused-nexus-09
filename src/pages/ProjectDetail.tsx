@@ -25,7 +25,7 @@ import {
   File
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { downloadStorageObject, getStoragePreviewUrl, normalizeStorageObjectPath } from "@/lib/storageUrl";
+import { downloadStorageObject, getStoragePreviewUrl, normalizeStorageObjectPath, sanitizeStorageFileName } from "@/lib/storageUrl";
 
 const ProjectDetail = () => {
   const { projectId } = useParams();
@@ -182,7 +182,10 @@ const ProjectDetail = () => {
       if (!user) throw new Error('Not authenticated');
 
       for (const file of Array.from(files)) {
-        const filePath = `${projectId}/${Date.now()}-${file.name}`;
+        // Strip URL-breaking characters from the stored path. A '#' in the object
+        // key truncates the signed URL at the fragment, so the download 400s and
+        // the file lands with no extension. file_name below keeps the real name.
+        const filePath = `${projectId}/${Date.now()}-${sanitizeStorageFileName(file.name)}`;
         const { error: uploadError } = await supabase.storage
           .from('project-documents')
           .upload(filePath, file);

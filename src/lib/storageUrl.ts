@@ -133,9 +133,18 @@ export const getStoragePreviewUrl = async (bucketName: string, filePath: string)
   return createSignedStorageUrl(bucketName, filePath);
 };
 
+/** The name is appended to the signed URL as `?download=…`, and supabase-js runs
+ *  the whole URL through encodeURI, which leaves '#', '?' and '&' untouched. A
+ *  '#' therefore starts a fragment and the server only ever sees the part before
+ *  it — Content-Disposition comes back as `filename=PACKING%20LIST-`, so the file
+ *  saves with no extension and the OS can't open it. Neutralise those three
+ *  characters; everything else (spaces, case, dots) is preserved. */
+const toDownloadParamName = (name: string) => name.replace(/[#?&]/g, "-");
+
 export const downloadStorageObject = async (bucketName: string, filePath: string, fileName: string) => {
-  const signedUrl = await createSignedStorageUrl(bucketName, filePath, { download: fileName });
-  await triggerSignedFileDownload(signedUrl, fileName);
+  const downloadName = toDownloadParamName(fileName);
+  const signedUrl = await createSignedStorageUrl(bucketName, filePath, { download: downloadName });
+  await triggerSignedFileDownload(signedUrl, downloadName);
 };
 
 export const openStorageObjectInNewTab = async (bucketName: string, filePath: string) => {
