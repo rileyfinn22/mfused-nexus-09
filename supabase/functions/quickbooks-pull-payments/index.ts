@@ -138,23 +138,30 @@ async function recordQboPayment(
   }
 
   // 3. Genuinely new payment from QBO.
+  // NOTE: plain insert, not upsert. The (quickbooks_id, invoice_id) unique index is PARTIAL
+  // (WHERE quickbooks_id IS NOT NULL), and PostgREST's on_conflict cannot target a partial
+  // index — it fails with 42P10. Step 1 above already de-duplicates by QBO id.
   const { error: insertError } = await supabase
     .from('payments')
-    .upsert(
-      {
-        company_id: companyId,
-        invoice_id: invoiceId,
-        amount,
-        payment_date: txnDate,
-        payment_method: method,
-        reference_number: refNum,
-        notes: 'Imported from QuickBooks',
-        quickbooks_id: qbPaymentId,
-        quickbooks_sync_status: 'synced',
-        quickbooks_synced_at: new Date().toISOString(),
-      },
-      { onConflict: 'quickbooks_id,invoice_id', ignoreDuplicates: true }
-    );
+    .insert({
+      company_id: companyId,
+      invoice_id: invoiceId,
+      amount,
+      payment_date: txnDate,
+      payment_method: method,
+      reference_number: refNum,
+      notes: 'Imported from QuickBooks',
+      quickbooks_id: qbPaymentId,
+      quickbooks_sync_status: 'synced',
+      quickbooks_synced_at: new Date().toISOString(),
+    });
+
+  // Duplicate hit on the partial unique index: another run already imported it.
+  if (insertError && (insertError as any).code === '23505') {
+    console.log(`Payment ${qbPaymentId} already imported, skipping`);
+    return 'skipped';
+  }
+
 
   if (insertError) {
     console.error('Error inserting payment:', insertError);
