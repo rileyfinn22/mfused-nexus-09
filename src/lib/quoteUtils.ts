@@ -60,7 +60,13 @@ const COLORS = {
   rowAlt: [250, 251, 252] as [number, number, number],    // subtle zebra
   productBand: [35, 41, 49] as [number, number, number],  // dark product header
   optionBand: [240, 242, 245] as [number, number, number],
+  onInkMuted: [168, 176, 187] as [number, number, number], // secondary text on charcoal
 };
+
+// Charcoal masthead the wordmark sits in, and the mark's true w/h after the
+// slate plate is keyed out and trimmed (689x507).
+const MASTHEAD_H = 30;
+const LOGO_ASPECT = 1.359;
 
 export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promise<void> {
   const doc = new jsPDF();
@@ -70,40 +76,42 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
   const FOOTER_RESERVE = 36;
 
   // ============ HEADER ============
-  let yPos = 18;
+  // The wordmark is white script with a green shadow — it is drawn for dark
+  // grounds, so on a white page it arrived as a black plate that read as pasted
+  // on. Give it a charcoal masthead instead: the logo's own ground is keyed out
+  // in vibe-logo-print.png, so it sits seamlessly on COLORS.ink, which is the
+  // same charcoal the product bands below already use.
+  doc.setFillColor(...COLORS.ink);
+  doc.rect(0, 0, pageWidth, MASTHEAD_H, 'F');
 
-  doc.setFontSize(14);
+  doc.setFontSize(13);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...COLORS.ink);
-  doc.text('ArmorPak Inc. DBA Vibe Packaging', MARGIN, yPos);
+  doc.setTextColor(255, 255, 255);
+  doc.text('ArmorPak Inc. DBA Vibe Packaging', MARGIN, 14);
 
   doc.setFontSize(8.5);
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(...COLORS.muted);
-  doc.text('1415 S 700 W  ·  Salt Lake City, UT 84104  ·  www.vibepkg.com', MARGIN, yPos + 6);
+  doc.setTextColor(...COLORS.onInkMuted);
+  doc.text('1415 S 700 W  ·  Salt Lake City, UT 84104  ·  www.vibepkg.com', MARGIN, 21);
 
-  // Logo right
   try {
-    const logoResponse = await fetch('/images/vibe-logo.png');
+    const logoResponse = await fetch('/images/vibe-logo-print.png');
     const logoBlob = await logoResponse.blob();
     const logoBase64 = await new Promise<string>((resolve) => {
       const reader = new FileReader();
       reader.onloadend = () => resolve(reader.result as string);
       reader.readAsDataURL(logoBlob);
     });
-    doc.addImage(logoBase64, 'PNG', pageWidth - MARGIN - 36, yPos - 8, 36, 22);
+    // Height-driven so the mark keeps its true proportions; the old call passed
+    // 36x22 against a 1.249 source and stretched it ~31% wide.
+    const logoH = 15;
+    const logoW = logoH * LOGO_ASPECT;
+    doc.addImage(logoBase64, 'PNG', pageWidth - MARGIN - logoW, (MASTHEAD_H - logoH) / 2, logoW, logoH);
   } catch {
-    // Silent fallback — no colored mark
+    // Silent fallback — the masthead still reads without the mark.
   }
 
-  yPos += 16;
-
-  // Subtle neutral divider (no lime green)
-  doc.setDrawColor(...COLORS.rule);
-  doc.setLineWidth(0.3);
-  doc.line(MARGIN, yPos, pageWidth - MARGIN, yPos);
-
-  yPos += 14;
+  let yPos = MASTHEAD_H + 16;
 
   // ============ QUOTE TITLE ============
   doc.setFontSize(11);
