@@ -78,7 +78,7 @@ async function recordQboPayment(
     method: string;
     refNum: string | null;
   }
-): Promise<'updated' | 'adopted' | 'inserted' | 'error'> {
+): Promise<'updated' | 'adopted' | 'inserted' | 'skipped' | 'error'> {
   const { companyId, invoiceId, qbPaymentId, amount, txnDate, method, refNum } = args;
 
   // 1. Already imported for this invoice -> reconcile the amount only.
