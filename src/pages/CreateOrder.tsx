@@ -534,7 +534,12 @@ const CreateOrder = () => {
   const performAutoSave = useCallback(async () => {
     // Skip auto-save if editing an existing order (orderId is set from URL params)
     if (orderId) return;
-    
+
+    // Buyers have no INSERT/UPDATE rights on orders — they submit through the
+    // submit_customer_order RPC instead. Auto-saving would just throw RLS errors
+    // at them while they type.
+    if (!isVibeAdmin) return;
+
     // Only auto-save if there's meaningful data
     const hasItems = selectedItems.length > 0 || unmatchedPoItems.length > 0;
     const hasAddress = formData.shippingStreet.trim() !== '';
@@ -1823,6 +1828,53 @@ const CreateOrder = () => {
       const subtotal = matchedSubtotal + unmatchedSubtotalSave;
       const total = subtotal;
 
+      // Buyers can't write orders directly — RLS gives them no INSERT on
+      // orders/order_items. Everything goes through the RPC, which assigns the
+      // order number, stamps company/creator, checks every product belongs to
+      // them, and files it as pending for review.
+      if (!isVibeAdmin) {
+        const { data: newOrderId, error: rpcError } = await supabase.rpc(
+          "submit_customer_order",
+          {
+            p_company_id: companyId,
+            p_items: selectedItems.map((item) => ({
+              product_id: item.productId,
+              quantity: item.quantity,
+              unit_price: item.unit_price ?? 0,
+            })),
+            p_shipping_name: formData.shippingName,
+            p_shipping_street: formData.shippingStreet,
+            p_shipping_city: formData.shippingCity,
+            p_shipping_state: formData.shippingState,
+            p_shipping_zip: formData.shippingZip,
+            p_po_number: formData.poNumber || null,
+            p_customer_name: formData.customerName || null,
+            p_customer_email: formData.customerEmail || null,
+            p_customer_phone: formData.customerPhone || null,
+            p_due_date: formData.dueDate ? new Date(formData.dueDate).toISOString() : null,
+            p_billing_name: sameAsBilling ? formData.shippingName : formData.billingName || null,
+            p_billing_street: sameAsBilling ? formData.shippingStreet : formData.billingStreet || null,
+            p_billing_city: sameAsBilling ? formData.shippingCity : formData.billingCity || null,
+            p_billing_state: sameAsBilling ? formData.shippingState : formData.billingState || null,
+            p_billing_zip: sameAsBilling ? formData.shippingZip : formData.billingZip || null,
+            p_memo: formData.memo || null,
+          }
+        );
+
+        if (rpcError) throw rpcError;
+
+        if (selectedFiles.length > 0) {
+          await uploadCustomerPoAttachment(newOrderId as string);
+        }
+
+        toast({
+          title: "Order Submitted",
+          description: "It's pending review — VibePKG will confirm pricing and timing.",
+        });
+        navigate(`/orders/${newOrderId}`);
+        return;
+      }
+
       let order;
       let orderNumber = existingOrderNumber;
       let existingItemsMap: Map<string, any> | null = null;
@@ -2199,13 +2251,19 @@ const CreateOrder = () => {
                 Sync Specs
               </Button>
             )}
-            <Button variant="outline" onClick={() => saveOrder(true)} disabled={loading}>
-              <Save className="h-4 w-4 mr-2" />
-              {orderId ? "Update Draft" : "Save Draft"}
-            </Button>
+            {/* Drafts are staff-only: buyers have no UPDATE rights on orders, so
+                a saved draft would be one they could never reopen or submit. */}
+            {isVibeAdmin && (
+              <Button variant="outline" onClick={() => saveOrder(true)} disabled={loading}>
+                <Save className="h-4 w-4 mr-2" />
+                {orderId ? "Update Draft" : "Save Draft"}
+              </Button>
+            )}
             <Button onClick={() => saveOrder(false)} disabled={loading}>
               <Send className="h-4 w-4 mr-2" />
-              {loading ? (orderId ? "Updating..." : "Placing...") : (orderId ? "Update Order" : "Place Order")}
+              {loading
+                ? (orderId ? "Updating..." : (isVibeAdmin ? "Placing..." : "Submitting..."))
+                : (orderId ? "Update Order" : (isVibeAdmin ? "Place Order" : "Submit Order"))}
             </Button>
           </div>
         </div>
@@ -2241,7 +2299,10 @@ const CreateOrder = () => {
           </div>
         )}
 
-        {/* AI Order Entry / Re-upload PO */}
+        {/* AI Order Entry / Re-upload PO — staff only. It calls analyze-po, which
+            creates orders with service-role rights and matches against vendor
+            preferences, so it stays off the buyer's screen. */}
+        {isVibeAdmin && (
         <div className="bg-muted/30 backdrop-blur rounded-lg p-4 border border-table-border">
           <div className="flex items-center justify-between mb-3">
             <div>
@@ -2424,6 +2485,7 @@ const CreateOrder = () => {
               </div>
             )}
         </div>
+        )}
 
         {/* Customer & Address Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-muted/30 backdrop-blur rounded-lg p-6 border border-table-border">
