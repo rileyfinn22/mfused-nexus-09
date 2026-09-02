@@ -1707,6 +1707,7 @@ export type Database = {
           shipping_street: string
           shipping_zip: string
           status: string
+          submitted_by_customer: boolean
           subtotal: number
           tax: number
           terms: string | null
@@ -1715,7 +1716,6 @@ export type Database = {
           tracking_number: string | null
           tracking_url: string | null
           updated_at: string
-          submitted_by_customer: boolean
           vibe_approved: boolean
           vibe_approved_at: string | null
           vibe_approved_by: string | null
@@ -1770,6 +1770,7 @@ export type Database = {
           shipping_street: string
           shipping_zip: string
           status?: string
+          submitted_by_customer?: boolean
           subtotal?: number
           tax?: number
           terms?: string | null
@@ -1778,7 +1779,6 @@ export type Database = {
           tracking_number?: string | null
           tracking_url?: string | null
           updated_at?: string
-          submitted_by_customer?: boolean
           vibe_approved?: boolean
           vibe_approved_at?: string | null
           vibe_approved_by?: string | null
@@ -1833,6 +1833,7 @@ export type Database = {
           shipping_street?: string
           shipping_zip?: string
           status?: string
+          submitted_by_customer?: boolean
           subtotal?: number
           tax?: number
           terms?: string | null
@@ -1841,7 +1842,6 @@ export type Database = {
           tracking_number?: string | null
           tracking_url?: string | null
           updated_at?: string
-          submitted_by_customer?: boolean
           vibe_approved?: boolean
           vibe_approved_at?: string | null
           vibe_approved_by?: string | null
@@ -2018,6 +2018,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      portal_observer_accounts: {
+        Row: {
+          created_at: string
+          note: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          note?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          note?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       print_orders: {
         Row: {
@@ -4291,6 +4309,30 @@ export type Database = {
         Args: { _order_id: string; _user_id: string }
         Returns: boolean
       }
+      company_pending_invitations: {
+        Args: { p_company_id: string }
+        Returns: {
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          is_expired: boolean
+          role: Database["public"]["Enums"]["app_role"]
+          status: string
+        }[]
+      }
+      company_team_members: {
+        Args: { p_company_id: string }
+        Returns: {
+          email: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }[]
+      }
+      create_company_invitation: {
+        Args: { p_company_id: string; p_email: string }
+        Returns: Json
+      }
       customer_po_production_detail: {
         Args: { p_po_id: string }
         Returns: Json
@@ -4421,6 +4463,29 @@ export type Database = {
         }
         Returns: string
       }
+      submit_customer_order: {
+        Args: {
+          p_billing_city?: string
+          p_billing_name?: string
+          p_billing_state?: string
+          p_billing_street?: string
+          p_billing_zip?: string
+          p_company_id: string
+          p_customer_email?: string
+          p_customer_name?: string
+          p_customer_phone?: string
+          p_due_date?: string
+          p_items: Json
+          p_memo?: string
+          p_po_number?: string
+          p_shipping_city: string
+          p_shipping_name: string
+          p_shipping_state: string
+          p_shipping_street: string
+          p_shipping_zip: string
+        }
+        Returns: string
+      }
       update_shipment_leg_public:
         | {
             Args: {
@@ -4448,29 +4513,6 @@ export type Database = {
             }
             Returns: Json
           }
-      submit_customer_order: {
-        Args: {
-          p_billing_city?: string
-          p_billing_name?: string
-          p_billing_state?: string
-          p_billing_street?: string
-          p_billing_zip?: string
-          p_company_id: string
-          p_customer_email?: string
-          p_customer_name?: string
-          p_customer_phone?: string
-          p_due_date?: string
-          p_items: Json
-          p_memo?: string
-          p_po_number?: string
-          p_shipping_city: string
-          p_shipping_name: string
-          p_shipping_state: string
-          p_shipping_street: string
-          p_shipping_zip: string
-        }
-        Returns: string
-      }
       user_has_company_access: {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
@@ -4569,12 +4611,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4598,11 +4640,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4623,11 +4665,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4648,11 +4690,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4665,11 +4707,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
