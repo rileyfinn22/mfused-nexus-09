@@ -14,6 +14,7 @@ import Inventory from "./pages/Inventory";
 import Orders from "./pages/Orders";
 import OrderDetail from "./pages/OrderDetail";
 import CreateOrder from "./pages/CreateOrder";
+import NewOrder from "./pages/NewOrder";
 import Invoices from "./pages/Invoices";
 import InvoiceDetail from "./pages/InvoiceDetail";
 import InvoiceShippedEdit from "./pages/InvoiceShippedEdit";
@@ -86,7 +87,7 @@ const App = () => (
           <Route path="/products/edit/:id" element={<DashboardLayout><EditProduct /></DashboardLayout>} />
           <Route path="/inventory" element={<DashboardLayout><Inventory /></DashboardLayout>} />
           <Route path="/orders" element={<DashboardLayout><Orders /></DashboardLayout>} />
-          <Route path="/orders/create" element={<DashboardLayout><CreateOrder /></DashboardLayout>} />
+          <Route path="/orders/create" element={<DashboardLayout><NewOrder /></DashboardLayout>} />
           <Route path="/orders/edit/:orderId" element={<DashboardLayout><CreateOrder /></DashboardLayout>} />
           <Route path="/orders/:orderId" element={<DashboardLayout><OrderDetail /></DashboardLayout>} />
           <Route path="/invoices" element={<DashboardLayout><Invoices /></DashboardLayout>} />

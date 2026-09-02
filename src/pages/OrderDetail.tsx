@@ -2863,15 +2863,16 @@ const OrderDetail = () => {
             </div>
           </div>
 
-          {/* Vibe Notes Section */}
-          <div className="border-t border-table-border bg-muted/30 p-8">
+          {/* Vibe Notes Section - internal only (VibePKG staff + finance).
+              Customers, company buyers, vendors and forwarders must never see these. */}
+          {(isVibeAdmin || isFinance) && <div className="border-t border-table-border bg-muted/30 p-8">
             <div className="flex items-center gap-2 mb-4">
               <FileText className="h-5 w-5 text-primary" />
               <h2 className="text-lg font-semibold">Vibe Notes</h2>
+              <Badge variant="outline" className="ml-1 text-xs">Internal</Badge>
             </div>
-            
+
             <div className="mb-6">
-              {/* Vibe Notes - All Users Can Add */}
               <div className="p-4 bg-background rounded-lg border border-table-border">
                 <h3 className="font-medium text-sm mb-3">Add Vibe Note</h3>
                 <Textarea placeholder="Add a note..." value={vibeNotes} onChange={e => setVibeNotes(e.target.value)} rows={3} className="mb-2" />
@@ -2882,7 +2883,6 @@ const OrderDetail = () => {
               </div>
             </div>
 
-            {/* Display Vibe Notes (Visible to All) */}
             <div className="space-y-3">
               <h3 className="font-medium text-sm">Notes</h3>
               {!order.vibenotes || order.vibenotes.length === 0 ? <p className="text-sm text-muted-foreground p-4 bg-background rounded border border-table-border">
@@ -2895,7 +2895,7 @@ const OrderDetail = () => {
                     <p className="text-sm">{note.text}</p>
                   </div>)}
             </div>
-          </div>
+          </div>}
 
           {/* Order Attachments Section - Admin only */}
           {isAdmin && <div className="border-t border-table-border bg-muted/30 p-8">

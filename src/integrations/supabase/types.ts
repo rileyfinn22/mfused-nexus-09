@@ -4445,6 +4445,29 @@ export type Database = {
             }
             Returns: Json
           }
+      submit_customer_order: {
+        Args: {
+          p_billing_city?: string
+          p_billing_name?: string
+          p_billing_state?: string
+          p_billing_street?: string
+          p_billing_zip?: string
+          p_company_id: string
+          p_customer_email?: string
+          p_customer_name?: string
+          p_customer_phone?: string
+          p_due_date?: string
+          p_items: Json
+          p_memo?: string
+          p_po_number?: string
+          p_shipping_city: string
+          p_shipping_name: string
+          p_shipping_state: string
+          p_shipping_street: string
+          p_shipping_zip: string
+        }
+        Returns: string
+      }
       user_has_company_access: {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean

@@ -836,8 +836,8 @@ Return ONLY valid JSON:
           quantity: item.quantity || 1,
           unit_price: item.unit_price || 0,
           item_id: matchedProduct?.item_id || item.sku || null,
-          vendor_id: matchedProduct?.preferred_vendor_id || null,
-          vendor_cost: matchedProduct?.cost || null,
+          // vendor_id / vendor_cost are deliberately not returned — this payload
+          // reaches the browser and vendor identity + cost are internal-only.
         };
       });
       
@@ -940,16 +940,21 @@ Return ONLY valid JSON:
       // Parse hint for matching context
       const hintCtx = parseAnalysisHint(analysisHint);
       
-      const orderItems = extractedData.items.map((item: any) => {
+      // Vendor/cost assignments, indexed to match orderItems positionally.
+      const pendingCosts: (Record<string, any> | undefined)[] = [];
+
+      const orderItems = extractedData.items.map((item: any, index: number) => {
         const matchedProduct = findMatchingProduct(item, hintCtx);
-        
+
         // ALWAYS use PO unit_price, never pull from product cost
         const unitPrice = item.unit_price || 0;
         const quantity = item.quantity || 1;
         
         console.log(`Item "${item.name}": unit_price=${item.unit_price}, type=${typeof item.unit_price}`);
         
-        // If product matched, use its full identity including vendor assignment
+        // If product matched, use its full identity. Vendor + cost are NOT written
+        // here — they live in order_item_costs, which is vibe_admin/finance-only.
+        // Anything on order_items is readable by the buying company.
         const orderItem: any = {
           order_id: order.id,
           product_id: matchedProduct?.id || null,
@@ -962,23 +967,28 @@ Return ONLY valid JSON:
           shipped_quantity: 0, // Initialize as 0 for new orders
           item_id: matchedProduct?.item_id || item.sku || null
         };
-        
-        // If product has a preferred vendor, assign it to the order item
+
+        // Carried alongside, not on the row itself — applied to the companion
+        // table once the items have ids. Keyed by position so duplicate
+        // sku/name lines stay distinct.
         if (matchedProduct?.preferred_vendor_id) {
-          orderItem.vendor_id = matchedProduct.preferred_vendor_id;
-          orderItem.vendor_cost = matchedProduct.cost || null;
+          pendingCosts[index] = {
+            vendor_id: matchedProduct.preferred_vendor_id,
+            vendor_cost: matchedProduct.cost || null,
+          };
           console.log(`✓ Assigned vendor ${matchedProduct.preferred_vendor_id} to item "${item.name}"`);
         }
-        
+
         return orderItem;
       });
 
       console.log(`Creating ${orderItems.length} order items, ${orderItems.filter(i => i.product_id).length} matched to products`);
       console.log('Sample order item:', JSON.stringify(orderItems[0], null, 2));
 
-      const { error: itemsError } = await supabase
+      const { data: insertedItems, error: itemsError } = await supabase
         .from('order_items')
-        .insert(orderItems);
+        .insert(orderItems)
+        .select('id');
 
       if (itemsError) {
         console.error('Error creating order items:', itemsError);
@@ -986,7 +996,34 @@ Return ONLY valid JSON:
         await supabase.from('orders').delete().eq('id', order.id);
         throw new Error(`Failed to create order items: ${itemsError.message}`);
       }
-      
+
+      // Vendor assignment + cost go to the internal-only companion table.
+      if (pendingCosts.length > 0 && insertedItems) {
+        const costRows = pendingCosts
+          .map((pending, index) => {
+            const match = insertedItems[index];
+            if (!pending || !match) return null;
+            return {
+              order_item_id: match.id,
+              vendor_id: pending.vendor_id,
+              vendor_cost: pending.vendor_cost,
+            };
+          })
+          .filter(Boolean);
+
+        if (costRows.length > 0) {
+          const { error: costError } = await supabase
+            .from('order_item_costs')
+            .upsert(costRows, { onConflict: 'order_item_id' });
+
+          // Non-fatal: the order and its items are valid without cost rows, and
+          // a vibe_admin can assign vendors manually.
+          if (costError) {
+            console.error('Error writing order_item_costs:', costError);
+          }
+        }
+      }
+
       if (orderItems.length === 0) {
         console.warn('No items extracted from PO');
         // Clean up the order
