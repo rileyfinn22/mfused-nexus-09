@@ -25,10 +25,19 @@ interface CompanyInfo {
 }
 
 interface TeamMember {
-  id: string;
   user_id: string;
   role: string;
   email?: string;
+}
+
+interface PendingInvite {
+  id: string;
+  email: string;
+  role: string;
+  status: string;
+  created_at: string;
+  expires_at: string;
+  is_expired: boolean;
 }
 
 export default function Settings() {
@@ -41,6 +50,7 @@ export default function Settings() {
   const [companyDomain, setCompanyDomain] = useState<string | null>(null);
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteLoading, setInviteLoading] = useState(false);
   const [settings, setSettings] = useState({
@@ -158,8 +168,11 @@ export default function Settings() {
         });
       }
 
-      // Load team members for this company
-      await loadTeamMembers(userRole.company_id);
+      // Load team members and outstanding invites for this company
+      await Promise.all([
+        loadTeamMembers(userRole.company_id),
+        loadPendingInvites(userRole.company_id),
+      ]);
     } catch (error: any) {
       toast({
         title: "Error loading settings",
@@ -169,38 +182,31 @@ export default function Settings() {
     }
   };
 
+  // Both lists come from SECURITY DEFINER RPCs. Querying user_roles directly
+  // returned only the viewer (its SELECT policy is `auth.uid() = user_id`), and
+  // company_invitations is vibe-admin-only, so the customer portal always showed
+  // a company of one and no invites at all.
   const loadTeamMembers = async (companyIdParam: string) => {
     try {
-      const { data: members, error } = await supabase
-        .from("user_roles")
-        .select("id, user_id, role")
-        .eq("company_id", companyIdParam)
-        .in("role", ["company", "admin"]);
-
+      const { data, error } = await (supabase as any).rpc("company_team_members", {
+        p_company_id: companyIdParam,
+      });
       if (error) throw error;
-
-      // Get emails for each member
-      const membersWithEmails = await Promise.all(
-        (members || []).map(async (member) => {
-          const { data: userData } = await supabase.auth.admin.getUserById(member.user_id).catch(() => ({ data: null }));
-          // Fallback: try to get from company_invitations
-          let email = userData?.user?.email;
-          if (!email) {
-            const { data: invitation } = await supabase
-              .from("company_invitations")
-              .select("email")
-              .eq("company_id", companyIdParam)
-              .eq("status", "accepted")
-              .limit(1);
-            email = invitation?.[0]?.email;
-          }
-          return { ...member, email };
-        })
-      );
-
-      setTeamMembers(membersWithEmails);
+      setTeamMembers((data || []) as TeamMember[]);
     } catch (error) {
       console.error("Error loading team members:", error);
+    }
+  };
+
+  const loadPendingInvites = async (companyIdParam: string) => {
+    try {
+      const { data, error } = await (supabase as any).rpc("company_pending_invitations", {
+        p_company_id: companyIdParam,
+      });
+      if (error) throw error;
+      setPendingInvites((data || []) as PendingInvite[]);
+    } catch (error) {
+      console.error("Error loading pending invitations:", error);
     }
   };
 
@@ -227,34 +233,27 @@ export default function Settings() {
 
     setInviteLoading(true);
     try {
-      const { data: user } = await supabase.auth.getUser();
-
-      const { data: invitation, error } = await supabase
-        .from("company_invitations")
-        .insert({
-          email: inviteEmail,
-          company_id: companyId,
-          role: "company",
-          invited_by: user.user?.id,
-        })
-        .select()
-        .single();
+      // Inserting straight into company_invitations is denied for company users,
+      // and the RPC also pins the new seat to the `company` role so a member
+      // can't mint an admin seat for their own company.
+      const { data, error } = await (supabase as any).rpc("create_company_invitation", {
+        p_company_id: companyId,
+        p_email: inviteEmail,
+      });
 
       if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || "Could not create the invitation");
 
-      // Generate invite link
-      const portalUrl = window.location.origin;
-      const link = `${portalUrl}/accept-invite?token=${invitation.invitation_token}`;
-
-      // Copy to clipboard
+      const link = `${window.location.origin}/accept-invite?token=${data.invitation_token}`;
       await navigator.clipboard.writeText(link);
 
       toast({
-        title: "Invitation created",
-        description: "Invite link copied to clipboard. Share it with your team member.",
+        title: data.reused ? "Invitation refreshed" : "Invitation created",
+        description: `Invite link for ${data.email} copied to clipboard. Send it to them to give them access.`,
       });
 
       setInviteEmail("");
+      await loadPendingInvites(companyId);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -579,21 +578,20 @@ export default function Settings() {
                 </div>
               </div>
 
-              {/* Team Members List */}
+              {/* Who has access */}
               {teamMembers.length > 0 ? (
                 <div className="space-y-4">
-                  <Label>Current Team Members</Label>
+                  <Label>Who Has Access</Label>
                   <div className="space-y-2">
                     {teamMembers.map((member) => (
-                      <div key={member.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                      <div key={member.user_id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                         <div className="flex items-center gap-3">
                           <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
                             <Users className="h-4 w-4 text-primary" />
                           </div>
-                          <div>
-                            <p className="text-sm font-medium">{member.email || "Unknown"}</p>
-                          </div>
+                          <p className="text-sm font-medium">{member.email || "Unknown"}</p>
                         </div>
+                        <Badge variant="secondary" className="capitalize">{member.role}</Badge>
                       </div>
                     ))}
                   </div>
@@ -602,6 +600,40 @@ export default function Settings() {
                 <p className="text-sm text-muted-foreground">
                   No team members yet. Invite someone to get started.
                 </p>
+              )}
+
+              {/* Invites sent but not yet accepted */}
+              {pendingInvites.length > 0 && (
+                <div className="space-y-4">
+                  <Label>Pending Invitations</Label>
+                  <div className="space-y-2">
+                    {pendingInvites.map((invite) => (
+                      <div key={invite.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+                            <UserPlus className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">{invite.email}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Invited {new Date(invite.created_at).toLocaleDateString()}
+                              {" · "}
+                              {invite.is_expired
+                                ? "expired"
+                                : `expires ${new Date(invite.expires_at).toLocaleDateString()}`}
+                            </p>
+                          </div>
+                        </div>
+                        <Badge variant={invite.is_expired ? "destructive" : "outline"}>
+                          {invite.is_expired ? "Expired" : "Pending"}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Re-inviting the same address refreshes its link for another 7 days.
+                  </p>
+                </div>
               )}
             </CardContent>
           </Card>
