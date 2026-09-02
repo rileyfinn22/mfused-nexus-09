@@ -524,8 +524,11 @@ export function TemplateProductsView({
                 onClick={() => isVibeAdmin && openEditDialog(product)}
               >
                 {product.item_id && artworkThumbnails[product.item_id] ? (
-                  <img 
-                    src={artworkThumbnails[product.item_id]} 
+                  // SignedImage, not a bare <img>: these are stored as
+                  // /object/public/artwork/... but that bucket is private, so the
+                  // raw URL 400s and the card shows a broken-image icon.
+                  <SignedImage
+                    src={artworkThumbnails[product.item_id]}
                     alt={product.name}
                     className="w-full h-full object-cover"
                   />

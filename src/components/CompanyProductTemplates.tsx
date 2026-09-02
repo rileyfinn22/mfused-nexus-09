@@ -771,8 +771,9 @@ export function CompanyProductTemplates({
                   onClick={() => openEditProduct(product)}
                 >
                   {product.item_id && artworkThumbnails[product.item_id] ? (
-                    <img 
-                      src={artworkThumbnails[product.item_id]} 
+                    // Private bucket — a bare <img> on the stored public URL 400s.
+                    <SignedImage
+                      src={artworkThumbnails[product.item_id]}
                       alt={product.name}
                       className="w-full h-full object-cover"
                     />
@@ -858,8 +859,9 @@ export function CompanyProductTemplates({
                     onClick={() => openEditProduct(product)}
                   >
                     {product.item_id && artworkThumbnails[product.item_id] ? (
-                      <img 
-                        src={artworkThumbnails[product.item_id]} 
+                      // Private bucket — a bare <img> on the stored public URL 400s.
+                      <SignedImage
+                        src={artworkThumbnails[product.item_id]}
                         alt={product.name}
                         className="w-full h-full object-cover rounded"
                       />

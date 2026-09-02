@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import SignedImage from "@/components/SignedImage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -738,8 +739,10 @@ const Inventory = () => {
                   )}
                   <div className={isVibeAdmin && isEditMode ? "col-span-1" : "col-span-1"}>
                     {group.productImage ? (
-                      <img 
-                        src={group.productImage} 
+                      // Artwork previews and product images both live in private
+                      // buckets; a bare <img> on the stored URL 400s.
+                      <SignedImage
+                        src={group.productImage}
                         alt={group.sku}
                         className="w-12 h-12 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
                         onClick={(e) => {
