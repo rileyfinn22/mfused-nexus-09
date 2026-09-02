@@ -145,7 +145,11 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
           }
         });
 
-      const companyList: Company[] = Array.from(byCompanyId.values());
+      // Alphabetical, so the list is predictable rather than following whatever
+      // order the role rows happened to be created in.
+      const companyList: Company[] = Array.from(byCompanyId.values()).sort((a, b) =>
+        a.name.localeCompare(b.name)
+      );
 
       setCompanies(companyList);
 

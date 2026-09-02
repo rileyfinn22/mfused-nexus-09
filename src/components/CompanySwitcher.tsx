@@ -73,7 +73,9 @@ export function CompanySwitcher({ collapsed = false }: CompanySwitcherProps) {
           )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-[220px]">
+      {/* Capped and scrollable — a staff account can hold dozens of seats, and
+          an uncapped menu runs off the bottom of the viewport. */}
+      <DropdownMenuContent align="start" className="w-[220px] max-h-[60vh] overflow-y-auto">
         {companies.map((company) => (
           <DropdownMenuItem
             key={company.id}

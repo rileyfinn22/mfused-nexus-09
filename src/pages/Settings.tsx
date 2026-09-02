@@ -12,6 +12,7 @@ import { Building2, Bell, Users, Save, Link2, Shield, Download, UserPlus, Trash2
 import { QuickBooksConnect } from "@/components/QuickBooksConnect";
 import { VibeAdminManagement } from "@/components/VibeAdminManagement";
 import { QBImportManager } from "@/components/QBImportManager";
+import { useCompany } from "@/contexts/CompanyContext";
 
 interface CompanyInfo {
   name: string;
@@ -41,6 +42,7 @@ interface PendingInvite {
 }
 
 export default function Settings() {
+  const { activeCompany, loading: companyLoading } = useCompany();
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [isCompanyUser, setIsCompanyUser] = useState(false);
   const { toast } = useToast();
@@ -69,11 +71,16 @@ export default function Settings() {
     },
   });
 
+  // Follow the company switcher. This page used to resolve the company itself
+  // with `.single()` on user_roles keyed only by user_id, which errors outright
+  // for anyone holding more than one seat - loadSettings then bailed at its
+  // `if (!userRole) return`, leaving the Team tab permanently empty.
   useEffect(() => {
+    if (companyLoading) return;
     loadSettings();
     handleOAuthCallback();
     checkUserRole();
-  }, []);
+  }, [activeCompany?.id, companyLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const checkUserRole = async () => {
     try {
@@ -87,18 +94,13 @@ export default function Settings() {
 
       setIsVibeAdmin(!!vibeAdmin);
 
-      // Check if user is a company user
-      const { data: userRole } = await supabase
-        .from("user_roles")
-        .select("role, company_id")
-        .eq("user_id", user.id)
-        .single();
-
-      if (userRole && userRole.role === "company") {
+      if (activeCompany?.role === "company") {
         setIsCompanyUser(true);
         // Extract domain from user email
         const emailDomain = user.email?.split("@")[1] || null;
         setCompanyDomain(emailDomain);
+      } else {
+        setIsCompanyUser(false);
       }
     } catch (error) {
       console.error("Error checking user role:", error);
@@ -110,19 +112,14 @@ export default function Settings() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: userRole } = await supabase
-        .from("user_roles")
-        .select("company_id, role")
-        .eq("user_id", user.id)
-        .single();
-
-      if (!userRole) return;
-      setCompanyId(userRole.company_id);
+      const activeCompanyId = activeCompany?.id;
+      if (!activeCompanyId) return;
+      setCompanyId(activeCompanyId);
 
       const { data: company } = await supabase
         .from("companies")
         .select("name")
-        .eq("id", userRole.company_id)
+        .eq("id", activeCompanyId)
         .single();
 
       if (company) setCompanyName(company.name);
@@ -130,7 +127,7 @@ export default function Settings() {
       const { data: companySettings } = await supabase
         .from("company_settings")
         .select("*")
-        .eq("company_id", userRole.company_id)
+        .eq("company_id", activeCompanyId)
         .maybeSingle();
 
       if (companySettings) {
@@ -170,8 +167,8 @@ export default function Settings() {
 
       // Load team members and outstanding invites for this company
       await Promise.all([
-        loadTeamMembers(userRole.company_id),
-        loadPendingInvites(userRole.company_id),
+        loadTeamMembers(activeCompanyId),
+        loadPendingInvites(activeCompanyId),
       ]);
     } catch (error: any) {
       toast({

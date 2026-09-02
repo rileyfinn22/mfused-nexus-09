@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { Check, ChevronsUpDown, Building2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +17,11 @@ import {
  */
 export function CompanyHeaderSwitcher({ className }: { className?: string }) {
   const { companies, activeCompany, setActiveCompany, isMultiCompany } = useCompany();
+  const [query, setQuery] = useState("");
+
+  const visibleCompanies = query.trim()
+    ? companies.filter((c) => c.name.toLowerCase().includes(query.trim().toLowerCase()))
+    : companies;
 
   if (!activeCompany) return null;
 
@@ -61,26 +68,51 @@ export function CompanyHeaderSwitcher({ className }: { className?: string }) {
 
       <DropdownMenuContent
         align="start"
-        className="w-[260px] bg-popover text-popover-foreground border shadow-md z-50"
+        className="w-[260px] bg-popover text-popover-foreground border shadow-md z-50 p-0"
       >
-        {companies.map((company) => (
-          <DropdownMenuItem
-            key={company.id}
-            onClick={() => setActiveCompany(company)}
-            className="flex items-center gap-2 cursor-pointer"
-          >
-            <div className="w-7 h-7 bg-muted rounded-md flex items-center justify-center shrink-0">
-              <Building2 className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{company.name}</p>
-              <p className="text-xs text-muted-foreground capitalize">{company.role}</p>
-            </div>
-            {company.id === activeCompany.id && (
-              <Check className="h-4 w-4 text-primary shrink-0" />
-            )}
-          </DropdownMenuItem>
-        ))}
+        {/* Staff accounts can hold seats in dozens of companies. Without a cap
+            and a scroller the menu ran off the bottom of the viewport with no
+            way to reach the companies below the fold. */}
+        {companies.length > 8 && (
+          <div className="p-2 border-b">
+            <Input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              // The menu's own typeahead otherwise swallows these keystrokes.
+              onKeyDown={(e) => e.stopPropagation()}
+              placeholder="Search companies..."
+              className="h-8"
+            />
+          </div>
+        )}
+
+        <div className="max-h-[60vh] overflow-y-auto p-1">
+          {visibleCompanies.length === 0 ? (
+            <p className="px-2 py-6 text-center text-sm text-muted-foreground">
+              No companies match “{query}”.
+            </p>
+          ) : (
+            visibleCompanies.map((company) => (
+              <DropdownMenuItem
+                key={company.id}
+                onClick={() => setActiveCompany(company)}
+                className="flex items-center gap-2 cursor-pointer"
+              >
+                <div className="w-7 h-7 bg-muted rounded-md flex items-center justify-center shrink-0">
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{company.name}</p>
+                  <p className="text-xs text-muted-foreground capitalize">{company.role}</p>
+                </div>
+                {company.id === activeCompany.id && (
+                  <Check className="h-4 w-4 text-primary shrink-0" />
+                )}
+              </DropdownMenuItem>
+            ))
+          )}
+        </div>
       </DropdownMenuContent>
     </DropdownMenu>
   );
