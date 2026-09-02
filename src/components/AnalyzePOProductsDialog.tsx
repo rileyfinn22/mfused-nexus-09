@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
@@ -67,6 +68,7 @@ function normalizeName(name: string): string {
 
 export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: AnalyzePOProductsDialogProps) {
   const { toast } = useToast();
+  const { activeCompanyId } = useActiveCompany();
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -102,17 +104,17 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
+    // Match across every role row - .single() errors on more than one - and take
+    // the company from the switcher rather than an arbitrary seat.
     const { data } = await supabase
       .from('user_roles')
-      .select('role, company_id')
-      .eq('user_id', user.id)
-      .single();
+      .select('role')
+      .eq('user_id', user.id);
 
-    if (data) {
-      setIsVibeAdmin(data.role === 'vibe_admin');
-      if (data.role !== 'vibe_admin') {
-        setCompanyId(data.company_id);
-      }
+    const vibeAdmin = (data || []).some((r: any) => r.role === 'vibe_admin');
+    setIsVibeAdmin(vibeAdmin);
+    if (!vibeAdmin && activeCompanyId) {
+      setCompanyId(activeCompanyId);
     }
   };
 

@@ -419,11 +419,17 @@ const CreateOrder = () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
+    // Scope to the company the switcher is on. Keying user_roles by user_id and
+    // calling .single() errors outright for anyone holding more than one seat.
+    if (!activeCompanyId) return;
+
     const { data: userRole } = await supabase
       .from('user_roles')
       .select('company_id, companies(name)')
       .eq('user_id', user.id)
-      .single();
+      .eq('company_id', activeCompanyId)
+      .limit(1)
+      .maybeSingle();
 
     if (userRole?.company_id && userRole.companies) {
       const companyName = (userRole.companies as any).name;
@@ -547,13 +553,8 @@ const CreateOrder = () => {
         if (!selectedCompanyId) return; // Can't auto-save without company
         companyId = selectedCompanyId;
       } else {
-        const { data: userRole } = await supabase
-          .from('user_roles')
-          .select('company_id')
-          .eq('user_id', user.id)
-          .single();
-        if (!userRole?.company_id) return;
-        companyId = userRole.company_id;
+        if (!activeCompanyId) return;
+        companyId = activeCompanyId;
       }
 
       // Calculate subtotal
@@ -704,13 +705,14 @@ const CreateOrder = () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { data: userRole } = await supabase
+    // A user can hold several role rows, so match across all of them rather than
+    // .single(), which errors the moment there is more than one.
+    const { data: userRoles } = await supabase
       .from('user_roles')
       .select('role')
-      .eq('user_id', user.id)
-      .single();
+      .eq('user_id', user.id);
 
-    setIsVibeAdmin(userRole?.role === 'vibe_admin');
+    setIsVibeAdmin((userRoles || []).some((r: any) => r.role === 'vibe_admin'));
   };
 
   const fetchCompanies = async () => {
@@ -938,16 +940,11 @@ const CreateOrder = () => {
         }
         companyId = selectedCompanyId;
       } else {
-        // Get user's company
-        const { data: userRole } = await supabase
-          .from('user_roles')
-          .select('company_id')
-          .eq('user_id', user.id)
-          .single();
-
-        if (!userRole?.company_id) {
+        // The company the switcher is on, not a .single() over every seat.
+        if (!activeCompanyId) {
           throw new Error('User not associated with a company');
         }
+        const userRole = { company_id: activeCompanyId };
         companyId = userRole.company_id;
       }
 
@@ -1125,16 +1122,11 @@ const CreateOrder = () => {
         }
         companyId = selectedCompanyId;
       } else {
-        // Get user's company
-        const { data: userRole } = await supabase
-          .from('user_roles')
-          .select('company_id')
-          .eq('user_id', user.id)
-          .single();
-
-        if (!userRole?.company_id) {
+        // The company the switcher is on, not a .single() over every seat.
+        if (!activeCompanyId) {
           throw new Error('User not associated with a company');
         }
+        const userRole = { company_id: activeCompanyId };
         companyId = userRole.company_id;
       }
 
@@ -1494,13 +1486,7 @@ const CreateOrder = () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
     
-    const { data: userRole } = await supabase
-      .from('user_roles')
-      .select('company_id')
-      .eq('user_id', user.id)
-      .single();
-    
-    return userRole?.company_id || null;
+    return activeCompanyId || null;
   };
 
   const openSaveAddressDialog = (type: 'shipping' | 'billing') => {
@@ -1814,14 +1800,8 @@ const CreateOrder = () => {
         }
         companyId = selectedCompanyId;
       } else {
-        const { data: userRole } = await supabase
-          .from('user_roles')
-          .select('company_id')
-          .eq('user_id', user.id)
-          .single();
-
-        if (!userRole) throw new Error("User company not found");
-        companyId = userRole.company_id;
+        if (!activeCompanyId) throw new Error("User company not found");
+        companyId = activeCompanyId;
       }
 
       // Calculate subtotal from matched items

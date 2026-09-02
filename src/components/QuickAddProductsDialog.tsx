@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Zap } from "lucide-react";
 import { useQuickBooksAutoSync } from "@/hooks/useQuickBooksAutoSync";
+import { useActiveCompany } from "@/hooks/useActiveCompany";
 
 interface QuickAddProductsDialogProps {
   onProductsAdded: () => void;
@@ -26,6 +27,7 @@ interface ProductTemplate {
 }
 
 export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: QuickAddProductsDialogProps) {
+  const { activeCompanyId } = useActiveCompany();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [templates, setTemplates] = useState<ProductTemplate[]>([]);
@@ -60,19 +62,20 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { data: userRole } = await supabase
+    // Match across every role row - .single() errors on more than one - and take
+    // the company from the switcher rather than an arbitrary seat.
+    const { data: userRoles } = await supabase
       .from('user_roles')
-      .select('role, company_id')
-      .eq('user_id', user.id)
-      .single();
+      .select('role')
+      .eq('user_id', user.id);
 
-    const vibeAdmin = userRole?.role === 'vibe_admin';
+    const vibeAdmin = (userRoles || []).some((r: any) => r.role === 'vibe_admin');
     setIsVibeAdmin(vibeAdmin);
-    
+
     if (vibeAdmin) {
       fetchCompanies();
-    } else if (userRole?.company_id) {
-      setCompanyId(userRole.company_id);
+    } else if (activeCompanyId) {
+      setCompanyId(activeCompanyId);
     }
   };
 

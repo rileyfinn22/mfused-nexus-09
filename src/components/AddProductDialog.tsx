@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Plus, Upload } from "lucide-react";
 import { useQuickBooksAutoSync } from "@/hooks/useQuickBooksAutoSync";
+import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { z } from "zod";
 
 const productSchema = z.object({
@@ -26,6 +27,7 @@ interface AddProductDialogProps {
 }
 
 export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProductDialogProps) {
+  const { activeCompanyId } = useActiveCompany();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [vendors, setVendors] = useState<any[]>([]);
@@ -64,15 +66,15 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProdu
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { data: userRole } = await supabase
+    // A user can hold several role rows; .single() errors on more than one.
+    const { data: userRoles } = await supabase
       .from('user_roles')
       .select('role')
-      .eq('user_id', user.id)
-      .single();
+      .eq('user_id', user.id);
 
-    const vibeAdmin = userRole?.role === 'vibe_admin';
+    const vibeAdmin = (userRoles || []).some((r: any) => r.role === 'vibe_admin');
     setIsVibeAdmin(vibeAdmin);
-    
+
     if (vibeAdmin) {
       fetchCompanies();
     }
@@ -154,15 +156,9 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProdu
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const { data: userRole } = await supabase
-        .from('user_roles')
-        .select('company_id, role')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!userRole) throw new Error("No company associated");
-
-      // Determine company ID
+      // Determine company ID. Reading it back off user_roles with .single()
+      // errored for anyone holding more than one seat, throwing "No company
+      // associated"; the switcher's active company is the right source.
       let finalCompanyId: string;
       if (isVibeAdmin) {
         if (!companyId) {
@@ -172,7 +168,8 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProdu
         }
         finalCompanyId = companyId;
       } else {
-        finalCompanyId = userRole.company_id;
+        if (!activeCompanyId) throw new Error("No company associated");
+        finalCompanyId = activeCompanyId;
       }
 
       let imageUrl = null;
