@@ -1715,6 +1715,7 @@ export type Database = {
           tracking_number: string | null
           tracking_url: string | null
           updated_at: string
+          submitted_by_customer: boolean
           vibe_approved: boolean
           vibe_approved_at: string | null
           vibe_approved_by: string | null
@@ -1777,6 +1778,7 @@ export type Database = {
           tracking_number?: string | null
           tracking_url?: string | null
           updated_at?: string
+          submitted_by_customer?: boolean
           vibe_approved?: boolean
           vibe_approved_at?: string | null
           vibe_approved_by?: string | null
@@ -1839,6 +1841,7 @@ export type Database = {
           tracking_number?: string | null
           tracking_url?: string | null
           updated_at?: string
+          submitted_by_customer?: boolean
           vibe_approved?: boolean
           vibe_approved_at?: string | null
           vibe_approved_by?: string | null

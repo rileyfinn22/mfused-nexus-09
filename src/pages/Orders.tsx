@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 
 // Helper to parse date-only strings (YYYY-MM-DD) as local time, not UTC
 const parseDateAsLocal = (dateStr: string | null): Date | undefined => {
@@ -33,7 +34,8 @@ import {
   Circle,
   Truck,
   Factory,
-  Download
+  Download,
+  UserCircle
 } from "lucide-react";
 import { exportToCSV } from "@/lib/exportUtils";
 import { EditableDescription } from "@/components/EditableDescription";
@@ -283,7 +285,45 @@ const Orders = () => {
   }, [companyFilter]);
 
   const draftOrders = filteredOrders.filter(o => o.status.toLowerCase() === 'draft');
-  const allNonDraftOrders = filteredOrders.filter(o => o.status.toLowerCase() !== 'draft');
+
+  // Orders the customer placed themselves sit in their own queue until VibePKG
+  // approves them, rather than appearing mid-pipeline at 5%.
+  const isAwaitingApproval = (o: any) =>
+    o.submitted_by_customer && !o.vibe_approved && o.status?.toLowerCase() === 'pending';
+
+  const awaitingApprovalOrders = filteredOrders.filter(isAwaitingApproval);
+  const allNonDraftOrders = filteredOrders.filter(
+    o => o.status.toLowerCase() !== 'draft' && !isAwaitingApproval(o)
+  );
+
+  const handleApproveOrder = async (orderId: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('orders')
+      .update({
+        vibe_approved: true,
+        vibe_approved_by: user.id,
+        vibe_approved_at: new Date().toISOString(),
+      })
+      .eq('id', orderId);
+
+    if (error) {
+      toast({
+        title: "Couldn't approve the order",
+        description: error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({
+      title: "Order approved",
+      description: "It's moved into the main order list.",
+    });
+    fetchOrders();
+  };
 
   return (
     <div className="space-y-6">
@@ -453,6 +493,103 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
           </div>
         )}
 
+        {/* Customer-submitted orders awaiting VibePKG approval. Held out of the
+            main pipeline so they don't read as "in progress" before anyone has
+            looked at them. */}
+        {awaitingApprovalOrders.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-medium">
+                {isVibeAdmin ? "Pending Approval - Customer Submitted" : "Pending Approval"}
+              </h2>
+              <Badge variant="secondary" className="bg-amber-500/15 text-amber-700 dark:text-amber-400 font-normal">
+                {awaitingApprovalOrders.length}
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {isVibeAdmin
+                ? "Placed by the customer. Review and approve to move them into the pipeline."
+                : "Submitted to VibePKG. Production starts once these are approved."}
+            </p>
+            <div className="border border-amber-500/30 rounded-xl bg-amber-500/[0.03] shadow-sm overflow-hidden">
+              <div className="bg-amber-500/10 border-b-2 border-amber-500/20">
+                <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  <div className="col-span-2">Order # / Type</div>
+                  <div className="col-span-1">Submitted</div>
+                  {isVibeAdmin && <div className="col-span-2">Company</div>}
+                  <div className={isVibeAdmin ? "col-span-2" : "col-span-4"}>Description</div>
+                  <div className="col-span-1">Total</div>
+                  <div className="col-span-2">Status</div>
+                  <div className="col-span-2">Actions</div>
+                </div>
+              </div>
+              <div className="divide-y divide-border">
+                {awaitingApprovalOrders.map((order) => (
+                  <div
+                    key={order.id}
+                    className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="col-span-2 space-y-1">
+                      <div className="font-medium font-mono text-sm">{order.order_number}</div>
+                      <Badge
+                        variant="secondary"
+                        className="bg-amber-500/15 text-amber-700 dark:text-amber-400 flex items-center gap-1 w-fit font-normal"
+                      >
+                        <UserCircle className="h-2.5 w-2.5" />
+                        Customer order
+                      </Badge>
+                    </div>
+                    <div className="col-span-1 text-sm text-muted-foreground">
+                      {order.order_date ? new Date(order.order_date).toLocaleDateString() : '-'}
+                    </div>
+                    {isVibeAdmin && (
+                      <div className="col-span-2 text-sm font-medium">{order.companies?.name || '-'}</div>
+                    )}
+                    <div className={isVibeAdmin ? "col-span-2" : "col-span-4"}>
+                      <EditableDescription
+                        value={order.description}
+                        onSave={(text) => handleDescriptionChange(order.id, text)}
+                      />
+                    </div>
+                    <div className="col-span-1 text-sm">${order.total?.toFixed(2)}</div>
+                    <div className="col-span-2 text-sm text-amber-700 dark:text-amber-400">
+                      Awaiting approval
+                    </div>
+                    <div className="col-span-2 flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/orders/${order.id}`);
+                        }}
+                        title="View Order"
+                      >
+                        <Eye className="h-3 w-3" />
+                      </Button>
+                      {isVibeAdmin && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-6 px-2 text-xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleApproveOrder(order.id);
+                          }}
+                        >
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Approve
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* All Orders */}
         <div className="space-y-3">
           <h2 className="text-lg font-medium">All Orders</h2>
@@ -505,6 +642,15 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
                         <Badge variant="secondary" className={`${orderTypeInfo.badgeColor} flex items-center gap-0.5 w-fit font-normal`}>
                           <OrderIcon className="h-2.5 w-2.5" />
                           {orderTypeInfo.label}
+                        </Badge>
+                      )}
+                      {order.submitted_by_customer && (
+                        <Badge
+                          variant="secondary"
+                          className="bg-amber-500/15 text-amber-700 dark:text-amber-400 flex items-center gap-0.5 w-fit font-normal"
+                        >
+                          <UserCircle className="h-2.5 w-2.5" />
+                          Customer order
                         </Badge>
                       )}
                     </div>
