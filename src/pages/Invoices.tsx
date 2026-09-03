@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -415,10 +415,10 @@ const Invoices = () => {
 
   // Canonical blanket/child lifecycle math.
   // - Blankets represent the full ordered amount. Children DRAW DOWN against the blanket.
-  // - Open  = Î£ blanket.total (lifetime ordered) âˆ’ all payments (parent + children).
+  // - Open  = Σ blanket.total (lifetime ordered) − all payments (parent + children).
   //   This is the running AR balance against everything ever ordered.
-  // - Billed (Unpaid) = Î£ (total âˆ’ paid) for docs with status 'billed' (not past due).
-  // - Due    (Unpaid) = Î£ (total âˆ’ paid) for docs with status 'due'    (past due).
+  // - Billed (Unpaid) = Σ (total − paid) for docs with status 'billed' (not past due).
+  // - Due    (Unpaid) = Σ (total − paid) for docs with status 'due'    (past due).
 
   const blanketParents = filteredInvoices.filter(
     inv => (inv.invoice_type === 'full' || !inv.invoice_type)
@@ -739,7 +739,7 @@ const Invoices = () => {
                       return invoice.due_date ? formatDocDate(invoice.due_date, 'numeric') : '-';
                     })()}
                     {(() => {
-                      // Shipped date â€” drives Net 30 start. Shows on child/shipped invoices and any invoice with a shipped_date.
+                      // Shipped date — drives Net 30 start. Shows on child/shipped invoices and any invoice with a shipped_date.
                       let shippedDate = invoice.shipped_date;
                       if (!shippedDate && isParent && hasChildren) {
                         // Show earliest child shipped date as fallback for parent rollup
@@ -753,9 +753,9 @@ const Invoices = () => {
                       return (
                         <div
                           className="text-[11px] text-blue-600 whitespace-nowrap mt-0.5"
-                          title="Shipped date â€” Net 30 starts here"
+                          title="Shipped date — Net 30 starts here"
                         >
-                          ðŸ“¦ {new Date(shippedDate).toLocaleDateString()}
+                          📦 {new Date(shippedDate).toLocaleDateString()}
                         </div>
                       );
                     })()}
@@ -780,7 +780,7 @@ const Invoices = () => {
                       <div className="space-y-2">
                         <EditableDescription
                           value={invoice.orders?.description}
-                          placeholder="Add descriptionâ€¦"
+                          placeholder="Add description…"
                           onSave={(text) => {
                             if (!invoice.order_id) return;
                             return handleOrderDescriptionChange(invoice.order_id, text);
@@ -791,7 +791,7 @@ const Invoices = () => {
                           <div className="pl-3 border-l border-border">
                             <EditableDescription
                               value={invoice.description}
-                              placeholder="Add invoice descriptionâ€¦"
+                              placeholder="Add invoice description…"
                               className="text-xs"
                               onSave={(text) => handleInvoiceDescriptionChange(invoice.id, text)}
                             />

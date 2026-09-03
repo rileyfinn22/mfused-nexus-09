@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useMemo, Fragment } from "react";
+import { useState, useEffect, useMemo, Fragment } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -589,7 +589,7 @@ function VendorPORowExpanded({ po }: { po: any }) {
       loading={loading}
       itemColumns={[
         { key: "sku", label: "SKU", className: "font-mono text-xs" },
-        { key: "product_name", label: "Product", render: (r) => r.product_name || r.description || "â€”" },
+        { key: "product_name", label: "Product", render: (r) => r.product_name || r.description || "—" },
         { key: "quantity", label: "Qty", render: (r) => Number(r.quantity || 0).toLocaleString() },
         { key: "unit_cost", label: "Unit $", render: (r) => `$${Number(r.unit_cost || 0).toFixed(2)}` },
         { key: "line_total", label: "Line $", render: (r) => `$${(Number(r.quantity || 0) * Number(r.unit_cost || 0)).toFixed(2)}` },

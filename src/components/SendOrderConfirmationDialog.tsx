@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -214,7 +214,7 @@ Thank you for your business!`;
                 ${VIBE_COMPANY.address.city}, ${VIBE_COMPANY.address.state} ${VIBE_COMPANY.address.zip}
               </p>
               <p style="color: #ef4444; font-size: 11px; margin-top: 12px; font-weight: bold;">
-                âš ï¸ This email was sent from an unmonitored mailbox. Please do not reply directly to this email.
+                ⚠️ This email was sent from an unmonitored mailbox. Please do not reply directly to this email.
               </p>
             </div>
           `,
@@ -373,7 +373,7 @@ Thank you for your business!`;
                         <TableCell className="text-sm font-medium">{item.name}</TableCell>
                         <TableCell className="text-sm font-mono">{item.sku}</TableCell>
                         <TableCell className="text-sm text-center">{item.quantity}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{item.description || "â€”"}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{item.description || "—"}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

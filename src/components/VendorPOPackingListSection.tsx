@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -620,7 +620,7 @@ export const VendorPOPackingListSection = ({
                         <div>
                           <p className="font-medium">{packingList.file_name}</p>
                           <p className="text-xs text-muted-foreground">
-                            Generated {format(new Date(packingList.created_at), 'MMM d, yyyy h:mm a')} â€¢ {formatFileSize(packingList.file_size)}
+                            Generated {format(new Date(packingList.created_at), 'MMM d, yyyy h:mm a')} • {formatFileSize(packingList.file_size)}
                           </p>
                         </div>
                         <Badge variant="secondary" className="ml-2">
@@ -676,7 +676,7 @@ export const VendorPOPackingListSection = ({
                         <div>
                           <p className="font-medium">{packingList.file_name}</p>
                           <p className="text-xs text-muted-foreground">
-                            Uploaded {format(new Date(packingList.created_at), 'MMM d, yyyy h:mm a')} â€¢ {formatFileSize(packingList.file_size)}
+                            Uploaded {format(new Date(packingList.created_at), 'MMM d, yyyy h:mm a')} • {formatFileSize(packingList.file_size)}
                           </p>
                           {packingList.notes && (
                             <p className="text-xs text-muted-foreground mt-1">{packingList.notes}</p>

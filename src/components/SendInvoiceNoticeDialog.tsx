@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { pdfItemDescription } from "@/lib/pdfItemText";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -112,10 +112,10 @@ export function SendInvoiceNoticeDialog({
       const amount = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(invoice?.total || 0);
 
       if (isBilled) {
-        setEditableSubject(`Invoice ${invoice?.invoice_number} â€” ${amount} Due ${dueDate}`);
+        setEditableSubject(`Invoice ${invoice?.invoice_number} — ${amount} Due ${dueDate}`);
         setEditableBody(`Dear ${customerDisplayName},\n\nYour order has shipped and invoice ${invoice?.invoice_number} is now ready for payment. Per our Net 30 terms, payment is due by ${dueDate}.\n\nYou can view the full invoice and make a payment through our portal.`);
       } else {
-        setEditableSubject(`âš ï¸ Payment Due â€” Invoice ${invoice?.invoice_number} (${amount})`);
+        setEditableSubject(`⚠️ Payment Due — Invoice ${invoice?.invoice_number} (${amount})`);
         setEditableBody(`Dear ${customerDisplayName},\n\nThis is a friendly reminder that invoice ${invoice?.invoice_number} for ${amount} was due on ${dueDate}.\n\nIf payment has already been sent, please disregard this notice. Otherwise, we kindly ask that you arrange payment at your earliest convenience.\n\nYou can view the invoice and make a payment through our secure portal below.`);
       }
     }
@@ -447,7 +447,7 @@ export function SendInvoiceNoticeDialog({
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Notice Type:</span>
                 <Badge variant={isBilled ? "default" : "destructive"}>
-                  {isBilled ? "Billed â€“ Net 30" : "Payment Due"}
+                  {isBilled ? "Billed – Net 30" : "Payment Due"}
                 </Badge>
               </div>
             </div>
@@ -585,7 +585,7 @@ export function SendInvoiceNoticeDialog({
 
               <p className="text-xs text-muted-foreground">
                 {attachPdf ? 'Invoice PDF will be included.' : 'Invoice PDF is currently excluded.'}
-                {additionalAttachments.length > 0 ? ` ${additionalAttachments.length} extra file${additionalAttachments.length > 1 ? 's' : ''} added â€¢ Total ${formatFileSize(additionalAttachments.reduce((sum, attachment) => sum + attachment.file.size, 0))}` : ' Add extra files if needed.'}
+                {additionalAttachments.length > 0 ? ` ${additionalAttachments.length} extra file${additionalAttachments.length > 1 ? 's' : ''} added • Total ${formatFileSize(additionalAttachments.reduce((sum, attachment) => sum + attachment.file.size, 0))}` : ' Add extra files if needed.'}
               </p>
             </div>
 
@@ -684,9 +684,9 @@ export function SendInvoiceNoticeDialog({
 
                   {/* Footer */}
                   <div className="bg-muted/50 rounded-b-lg p-4 border-x border-b space-y-2">
-                    <p className="text-xs text-destructive font-semibold">âš ï¸ Please do not reply to this email â€” this mailbox is not monitored.</p>
+                    <p className="text-xs text-destructive font-semibold">⚠️ Please do not reply to this email — this mailbox is not monitored.</p>
                     <p className="text-sm text-muted-foreground">Questions? Contact us at <span className="text-primary">{senderEmail}</span></p>
-                    <p className="text-xs text-muted-foreground">Â© {new Date().getFullYear()} VibePKG. All rights reserved.</p>
+                    <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} VibePKG. All rights reserved.</p>
                   </div>
                 </div>
               </div>

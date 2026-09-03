@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { pdfItemDescription } from "@/lib/pdfItemText";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -930,7 +930,7 @@ const InvoiceDetail = () => {
         console.error('Vendor PO sync error (non-fatal):', syncErr);
       }
 
-      // Recalculate totals using shared calculator - shipped qty Ã— price
+      // Recalculate totals using shared calculator - shipped qty × price
       // Check if this blanket has child (partial) invoices — if so, keep placeholder
       const hasChildren = relatedInvoices.some(
         (ri: any) => ri.parent_invoice_id === invoiceId
@@ -1298,7 +1298,7 @@ const InvoiceDetail = () => {
       !confirm(
         `Finalise this blanket at ${formatCurrency(newTotal)}?\n\n` +
         `Current total: ${formatCurrency(Number(invoice.total || 0))}\n` +
-        `Shipped Ã— price: ${formatCurrency(newSubtotal)}\n` +
+        `Shipped × price: ${formatCurrency(newSubtotal)}\n` +
         `Freight${children.length > 0 && childShipping > 0 ? ' (from shipments)' : ''}: ${formatCurrency(newShipping)}\n` +
         `Tax: ${formatCurrency(Number(invoice.tax || 0))}` +
         reconciliation +
@@ -1526,7 +1526,7 @@ const InvoiceDetail = () => {
   
   const { subtotal: displaySubtotal, total: rawDisplayTotal } = computeDisplayTotals();
   // For blanket invoices with children, roll up child shipping for display.
-  // NOTE: "Update Blanket Total" / "Set Shipped Qty" persist Î£(child shipping) into the
+  // NOTE: "Update Blanket Total" / "Set Shipped Qty" persist Σ(child shipping) into the
   // blanket's own shipping_cost. To avoid double counting, only add child shipping on top
   // when the blanket's stored shipping_cost is 0 (legacy / not yet rolled up).
   const rawChildShipping = isBlanketDisplay
@@ -3636,7 +3636,7 @@ const InvoiceDetail = () => {
           <DialogHeader>
             <DialogTitle>Set Shipped Quantities</DialogTitle>
             <DialogDescription>
-              Quickly enter shipped quantity for each line item. The blanket total will be recalculated as Î£(shipped Ã— price) + child shipping.
+              Quickly enter shipped quantity for each line item. The blanket total will be recalculated as Σ(shipped × price) + child shipping.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 max-h-[60vh] overflow-y-auto py-2">

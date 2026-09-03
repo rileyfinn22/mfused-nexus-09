@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge, badgeVariants } from "@/components/ui/badge";
@@ -684,7 +684,7 @@ export default function Production() {
       ? formatCompletionDate(order.order_finalized_at) 
       : (isCompleted ? formatCompletionDate(order.updated_at) : null);
     const deliveryText = deliveryInfo?.text ?? 'TBD';
-    const completionText = completionDate ?? 'â€”';
+    const completionText = completionDate ?? '—';
     const dateBadgeVariant = isCompleted ? 'success' : 'outline';
     const isSelected = selectedOrderIds.has(order.id);
 
@@ -742,7 +742,7 @@ export default function Production() {
                     <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-destructive"></span>
                   </span>
                   <span>Delayed</span>
-                  <span className="text-destructive/50">Â· View</span>
+                  <span className="text-destructive/50">· View</span>
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-64 p-3" align="start">
@@ -1026,7 +1026,7 @@ export default function Production() {
         <OrderTable 
           orderList={filteredCompletedOrders} 
           title="Completed Orders" 
-          emptyMessage="No completed orders yet â€” orders auto-complete when all invoices are paid"
+          emptyMessage="No completed orders yet — orders auto-complete when all invoices are paid"
         />
       </div>
 

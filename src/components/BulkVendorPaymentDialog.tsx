@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -543,7 +543,7 @@ export function BulkVendorPaymentDialog({
                                   </Button>
                                 </>
                               ) : (
-                                <span className="text-xs text-muted-foreground pr-2">â€”</span>
+                                <span className="text-xs text-muted-foreground pr-2">—</span>
                               )}
                             </div>
                           </div>

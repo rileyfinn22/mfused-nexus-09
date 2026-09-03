@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -451,8 +451,8 @@ const VendorPODetail = () => {
 
   /**
    * Builds the payload for the one PO renderer in src/lib/vendorPoPdf.ts. This
-   * page used to carry two byte-identical 130-line copies of the document â€” one
-   * for Download, one for the email attachment â€” plus a third copy lived in the
+   * page used to carry two byte-identical 130-line copies of the document — one
+   * for Download, one for the email attachment — plus a third copy lived in the
    * vendor portal, so any fix had to be made three times and never was.
    * splitPOTotals stays the owner of the money math; the renderer is handed its
    * result rather than re-deriving it.
@@ -901,8 +901,8 @@ Thank you for your business.`;
                     <Label className="text-sm font-medium">Show in customer production tracking</Label>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {customerSheetVisible
-                        ? 'The customer can see this POâ€™s progress, dates and published updates.'
-                        : 'Internal only â€” the customer will not see this PO at all.'}
+                        ? 'The customer can see this PO’s progress, dates and published updates.'
+                        : 'Internal only — the customer will not see this PO at all.'}
                       {po.show_on_customer_sheet == null && (
                         <span className="ml-1 opacity-70">
                           (default for a {po.po_type || 'production'} PO)
@@ -1349,7 +1349,7 @@ Thank you for your business.`;
         </CardContent>
       </Card>
 
-      {/* Vendor production (same panel the vendor sees) â€” here unless it already led the page */}
+      {/* Vendor production (same panel the vendor sees) — here unless it already led the page */}
       {!vendorViewFirst && (
         <div className="mt-6">
           <VendorProductionPanel poId={po.id} />

@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { pdfItemDescription } from "@/lib/pdfItemText";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -895,7 +895,7 @@ export const InvoicePackingListSection = ({
                     </p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <span>{formatFileSize(pl.file_size)}</span>
-                      <span>â€¢</span>
+                      <span>•</span>
                       <span>{format(new Date(pl.created_at), 'MMM d, yyyy h:mm a')}</span>
                       {isVibeAdmin && (
                         <Badge variant="outline" className="text-xs">
@@ -1014,7 +1014,7 @@ export const InvoicePackingListSection = ({
           <DialogHeader>
             <DialogTitle>Attach Spreadsheet</DialogTitle>
             <DialogDescription>
-              Attach an Excel or CSV file as-is to this invoice. Shipped quantities will not be changed â€” use "Input Shipped Qty" or "Rebrand PDF" for those flows.
+              Attach an Excel or CSV file as-is to this invoice. Shipped quantities will not be changed — use "Input Shipped Qty" or "Rebrand PDF" for those flows.
             </DialogDescription>
           </DialogHeader>
           

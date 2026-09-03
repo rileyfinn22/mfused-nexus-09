@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { pdfItemDescription } from "@/lib/pdfItemText";
 import {
   Dialog,
@@ -268,7 +268,7 @@ export function SendVendorPOFromAssignDialog({
       if (row.orderNumber) parts.push(`Order #${row.orderNumber}`);
       if (row.invoiceNumber) parts.push(`Inv # ${row.invoiceNumber}`);
       if (row.customerPO) parts.push(`PO ${row.customerPO}`);
-      doc.text("â€¢ " + parts.join("   |   "), boxX + padding, y);
+      doc.text("• " + parts.join("   |   "), boxX + padding, y);
       y += lineHeight;
     });
 
@@ -425,9 +425,9 @@ ${formattedDeliveryDate ? `<tr><td style="padding-top:16px;border-top:1px solid 
 <p style="margin:0;color:#6b7280;font-size:14px;line-height:1.6;">The purchase order PDF is attached to this email for your records.</p>
 </td></tr>
 <tr><td style="background-color:#f9fafb;padding:24px 40px;border-radius:0 0 12px 12px;border-top:1px solid #e5e7eb;">
-<p style="margin:0;color:#ef4444;font-size:12px;font-weight:600;">âš ï¸ Please do not reply to this email â€” this mailbox is not monitored.</p>
+<p style="margin:0;color:#ef4444;font-size:12px;font-weight:600;">⚠️ Please do not reply to this email — this mailbox is not monitored.</p>
 <p style="margin:8px 0 0 0;color:#6b7280;font-size:14px;">Questions? Contact us at <a href="mailto:accounting@vibepkg.com" style="color:#16a34a;text-decoration:none;">accounting@vibepkg.com</a></p>
-<p style="margin:16px 0 0 0;color:#9ca3af;font-size:12px;">Â© ${new Date().getFullYear()} VibePKG. All rights reserved.</p>
+<p style="margin:16px 0 0 0;color:#9ca3af;font-size:12px;">© ${new Date().getFullYear()} VibePKG. All rights reserved.</p>
 </td></tr></table></td></tr></table></body></html>`;
   };
 
