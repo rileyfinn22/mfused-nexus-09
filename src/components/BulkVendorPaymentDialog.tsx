@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+﻿import { useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Upload, X, FileText, DollarSign, AlertCircle } from "lucide-react";
+import { formatDocDate } from "@/lib/utils";
 
 interface VendorPO {
   id: string;
@@ -488,7 +489,7 @@ export function BulkVendorPaymentDialog({
                             <div className="col-span-2">
                               <span className="font-medium text-sm">{po.po_number}</span>
                               <div className="text-xs text-muted-foreground">
-                                {new Date(po.order_date).toLocaleDateString()}
+                                {formatDocDate(po.order_date, "numeric")}
                               </div>
                             </div>
                             
@@ -542,7 +543,7 @@ export function BulkVendorPaymentDialog({
                                   </Button>
                                 </>
                               ) : (
-                                <span className="text-xs text-muted-foreground pr-2">—</span>
+                                <span className="text-xs text-muted-foreground pr-2">â€”</span>
                               )}
                             </div>
                           </div>

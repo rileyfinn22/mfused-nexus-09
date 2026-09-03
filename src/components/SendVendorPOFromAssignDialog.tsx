@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { pdfItemDescription } from "@/lib/pdfItemText";
 import {
   Dialog,
@@ -25,6 +25,19 @@ import { Loader2, Send, ArrowLeft, Edit, Save, X, Eye, Download } from "lucide-r
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { VIBE_COMPANY } from "@/lib/pdfBranding";
+import { formatCurrency, formatDocDate, formatUnitPrice } from "@/lib/utils";
+import {
+  DOC,
+  DOC_COLORS,
+  docTableStyles,
+  drawDetailRows,
+  drawDocumentTitle,
+  drawFooter,
+  drawMasthead,
+  drawPartyBlock,
+  drawTotals,
+  ensureRoom,
+} from "@/lib/pdfDocument";
 import { EmailPreviewDialog, AdditionalAttachment, ArtworkFile } from "@/components/EmailPreviewDialog";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -255,7 +268,7 @@ export function SendVendorPOFromAssignDialog({
       if (row.orderNumber) parts.push(`Order #${row.orderNumber}`);
       if (row.invoiceNumber) parts.push(`Inv # ${row.invoiceNumber}`);
       if (row.customerPO) parts.push(`PO ${row.customerPO}`);
-      doc.text("• " + parts.join("   |   "), boxX + padding, y);
+      doc.text("â€¢ " + parts.join("   |   "), boxX + padding, y);
       y += lineHeight;
     });
 
@@ -267,114 +280,47 @@ export function SendVendorPOFromAssignDialog({
 
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const primaryGreen = [22, 163, 74] as const;
-    const darkGray = [17, 24, 39] as const;
-    const mediumGray = [107, 114, 128] as const;
-    const lightGray = [249, 250, 251] as const;
 
-    // Header
-    let yPos = 20;
-    doc.setFontSize(20);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.text(VIBE_COMPANY.name, 14, yPos);
+    await drawMasthead(doc);
 
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    yPos += 8;
-    doc.text(VIBE_COMPANY.address.street, 14, yPos);
-    yPos += 5;
-    doc.text(`${VIBE_COMPANY.address.city}, ${VIBE_COMPANY.address.state} ${VIBE_COMPANY.address.zip}`, 14, yPos);
-    yPos += 5;
-    doc.text("accounting@vibepkg.com", 14, yPos);
-    yPos += 10;
+    let yPos = drawDocumentTitle(doc, {
+      label: "PURCHASE ORDER",
+      value: po.po_number,
+      metaLabel: "Issued",
+      metaValue: formatDocDate(po.order_date, "long"),
+    });
 
-    // Divider
-    doc.setDrawColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.setLineWidth(0.5);
-    doc.line(14, yPos, pageWidth - 14, yPos);
-    yPos += 12;
+    const leftColX = DOC.MARGIN;
+    const rightColX = pageWidth / 2 + 4;
+    const detailsStartY = yPos;
 
-    // Title
-    doc.setFontSize(24);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    doc.text("Purchase Order", 14, yPos);
-    yPos += 15;
+    const vendorY = drawPartyBlock(doc, leftColX, yPos, {
+      label: "VENDOR",
+      name: vendor.name,
+      lines: [vendor.contact_name, vendor.contact_email, vendor.contact_phone],
+    });
 
-    // Vendor info (left)
-    const leftColX = 14;
-    const rightColX = pageWidth / 2 + 10;
-
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    doc.text("Vendor", leftColX, yPos);
-
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    doc.text(vendor.name, leftColX, yPos + 8);
-
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    let vendorY = yPos + 14;
-    if (vendor.contact_name) { doc.text(vendor.contact_name, leftColX, vendorY); vendorY += 5; }
-    if (vendor.contact_email) { doc.text(vendor.contact_email, leftColX, vendorY); vendorY += 5; }
-    if (vendor.contact_phone) { doc.text(vendor.contact_phone, leftColX, vendorY); }
-
-    // PO details (right)
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    doc.text("PO #:", rightColX, yPos);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    doc.text(po.po_number, rightColX + 45, yPos);
-
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    doc.text("Date:", rightColX, yPos + 7);
-    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    doc.text(new Date(po.order_date).toLocaleDateString(), rightColX + 45, yPos + 7);
-
+    const detailRows: Array<[string, string]> = [];
     if (po.expected_delivery_date) {
-      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-      doc.text("Due Date:", rightColX, yPos + 14);
-      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-      doc.text(new Date(po.expected_delivery_date).toLocaleDateString(), rightColX + 45, yPos + 14);
+      detailRows.push(["Due Date", formatDocDate(po.expected_delivery_date, "medium")]);
     }
+    detailRows.push(["Order #", getOrderNumbers().join(", ") || po.orders?.order_number || "N/A"]);
 
-    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    doc.text("Order #:", rightColX, yPos + 21);
-    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    const orderNumbersStr = getOrderNumbers().join(", ") || po.orders?.order_number || "N/A";
-    doc.text(orderNumbersStr, rightColX + 45, yPos + 21);
+    const detY = drawDetailRows(doc, rightColX, detailsStartY, detailRows, { valueOffset: 30 });
 
-    yPos += 40;
+    yPos = Math.max(vendorY + 6, detY + 8);
 
     // Ship To
     if (po.ship_to_name) {
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-      doc.text("Ship To", leftColX, yPos);
-
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-      let shipY = yPos + 7;
-      doc.setFont("helvetica", "bold");
-      doc.text(po.ship_to_name, leftColX, shipY);
-      doc.setFont("helvetica", "normal");
-      shipY += 5;
-      if (po.ship_to_street) { doc.text(po.ship_to_street, leftColX, shipY); shipY += 5; }
-      const cityStateZip = [po.ship_to_city, po.ship_to_state, po.ship_to_zip].filter(Boolean).join(", ");
-      if (cityStateZip) doc.text(cityStateZip, leftColX, shipY);
-      yPos += 28;
+      const cityStateZip = [
+        [po.ship_to_city, po.ship_to_state].filter(Boolean).join(", "),
+        po.ship_to_zip,
+      ].filter(Boolean).join(" ");
+      yPos = drawPartyBlock(doc, leftColX, yPos, {
+        label: "SHIP TO",
+        name: po.ship_to_name,
+        lines: [po.ship_to_street, cityStateZip || null],
+      }) + 8;
     }
 
     // Case sticker callout (Vibe Invoice # + Customer PO #)
@@ -386,65 +332,36 @@ export function SendVendorPOFromAssignDialog({
       item.sku,
       pdfItemDescription(item),
       item.quantity.toLocaleString(),
-      `$${Number(item.unit_cost).toFixed(3)}`,
-      `$${Number(item.total).toFixed(2)}`,
+      formatUnitPrice(Number(item.unit_cost)),
+      formatCurrency(Number(item.total)),
     ]);
 
     autoTable(doc, {
+      ...docTableStyles(),
       startY: yPos,
       head: [["SKU", "DESCRIPTION", "QTY", "UNIT COST", "AMOUNT"]],
       body: tableData,
-      theme: "plain",
-      headStyles: {
-        fillColor: [primaryGreen[0], primaryGreen[1], primaryGreen[2]],
-        textColor: 255,
-        fontStyle: "bold",
-        fontSize: 9,
-        cellPadding: 4,
-      },
-      bodyStyles: {
-        fontSize: 9,
-        cellPadding: 4,
-        textColor: [darkGray[0], darkGray[1], darkGray[2]],
-        lineWidth: 0,
-      },
-      alternateRowStyles: { fillColor: [lightGray[0], lightGray[1], lightGray[2]] },
       columnStyles: {
-        0: { cellWidth: 30 },
+        0: { cellWidth: 40, fontStyle: "bold", textColor: DOC_COLORS.ink },
         1: { cellWidth: "auto" },
-        2: { cellWidth: 20, halign: "center" },
-        3: { cellWidth: 28, halign: "right" },
-        4: { cellWidth: 28, halign: "right", fontStyle: "bold" },
+        2: { cellWidth: 20, halign: "right" },
+        3: { cellWidth: 26, halign: "right" },
+        4: { cellWidth: 28, halign: "right", fontStyle: "bold", textColor: DOC_COLORS.ink },
       },
-      margin: { left: 14, right: 14 },
-      showHead: "firstPage",
-      tableLineWidth: 0,
       tableWidth: "auto",
     });
 
     // Total
-    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    const finalY = ensureRoom(doc, (doc as any).lastAutoTable.finalY + 10, 20);
     const totalAmount = poItems.reduce((sum, item) => sum + Number(item.total), 0);
-    const totalsX = pageWidth - 80 - 14;
 
-    doc.setDrawColor(200, 200, 200);
-    doc.setLineWidth(0.3);
-    doc.line(totalsX, finalY, pageWidth - 14, finalY);
+    drawTotals(doc, finalY + 4, {
+      rows: [],
+      grandLabel: "TOTAL",
+      grandValue: formatCurrency(totalAmount),
+    });
 
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.text("TOTAL", totalsX, finalY + 8);
-    doc.text(`$${totalAmount.toFixed(2)}`, pageWidth - 14, finalY + 8, { align: "right" });
-
-    // Footer
-    const footerY = Math.max(finalY + 30, pageHeight - 20);
-    if (footerY < pageHeight - 10) {
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-      doc.text("Thank you for your business!", pageWidth / 2, pageHeight - 12, { align: "center" });
-    }
+    drawFooter(doc, "Reference this PO number on all shipments and invoices.");
 
     return doc.output("datauristring").split(",")[1];
   };
@@ -461,7 +378,7 @@ export function SendVendorPOFromAssignDialog({
 Please find attached the purchase order from ${VIBE_COMPANY.name}.
 
 PO Number: ${po.po_number}
-${orderLine}Order Date: ${new Date(po.order_date).toLocaleDateString()}
+${orderLine}Order Date: ${formatDocDate(po.order_date, "numeric")}
 Total Amount: $${totalAmount.toFixed(2)}
 
 Please confirm receipt of this order and provide an estimated delivery date.
@@ -475,9 +392,9 @@ Thank you for your business.`;
     if (!po || !vendor) return undefined;
     const totalAmount = poItems.reduce((sum, item) => sum + Number(item.total), 0);
     const formattedAmount = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(totalAmount);
-    const formattedOrderDate = new Date(po.order_date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+    const formattedOrderDate = formatDocDate(po.order_date, "long");
     const formattedDeliveryDate = po.expected_delivery_date
-      ? new Date(po.expected_delivery_date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+      ? formatDocDate(po.expected_delivery_date, "long")
       : null;
     const vendorName = vendor?.contact_name || vendor?.name || "Valued Vendor";
     const customMessage = getDefaultEmailMessage();
@@ -508,9 +425,9 @@ ${formattedDeliveryDate ? `<tr><td style="padding-top:16px;border-top:1px solid 
 <p style="margin:0;color:#6b7280;font-size:14px;line-height:1.6;">The purchase order PDF is attached to this email for your records.</p>
 </td></tr>
 <tr><td style="background-color:#f9fafb;padding:24px 40px;border-radius:0 0 12px 12px;border-top:1px solid #e5e7eb;">
-<p style="margin:0;color:#ef4444;font-size:12px;font-weight:600;">⚠️ Please do not reply to this email — this mailbox is not monitored.</p>
+<p style="margin:0;color:#ef4444;font-size:12px;font-weight:600;">âš ï¸ Please do not reply to this email â€” this mailbox is not monitored.</p>
 <p style="margin:8px 0 0 0;color:#6b7280;font-size:14px;">Questions? Contact us at <a href="mailto:accounting@vibepkg.com" style="color:#16a34a;text-decoration:none;">accounting@vibepkg.com</a></p>
-<p style="margin:16px 0 0 0;color:#9ca3af;font-size:12px;">© ${new Date().getFullYear()} VibePKG. All rights reserved.</p>
+<p style="margin:16px 0 0 0;color:#9ca3af;font-size:12px;">Â© ${new Date().getFullYear()} VibePKG. All rights reserved.</p>
 </td></tr></table></td></tr></table></body></html>`;
   };
 
@@ -631,7 +548,7 @@ ${formattedDeliveryDate ? `<tr><td style="padding-top:16px;border-top:1px solid 
                   </div>
                   <div>
                     <p className="text-xs font-medium text-muted-foreground uppercase">Date</p>
-                    <p className="text-sm">{new Date(po.order_date).toLocaleDateString()}</p>
+                    <p className="text-sm">{formatDocDate(po.order_date, "numeric")}</p>
                   </div>
                   {po.orders?.order_number && (
                     <div>

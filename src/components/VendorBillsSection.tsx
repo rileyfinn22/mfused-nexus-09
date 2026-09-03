@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+﻿import { useCallback, useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,7 @@ import { AddVendorBillDialog } from "@/components/AddVendorBillDialog";
 import { openStorageObjectInNewTab } from "@/lib/storageUrl";
 import { downloadVendorBillPdf } from "@/lib/vendorBillPdf";
 import { Plus, FileText, Receipt, Pencil, Trash2, Download, FileDown } from "lucide-react";
+import { formatDocDate } from "@/lib/utils";
 
 interface VendorBillsSectionProps {
   vendorPO: any;
@@ -186,7 +187,7 @@ export function VendorBillsSection({ vendorPO, vendorName, onChanged }: VendorBi
                 <p className="mb-3 rounded-md border border-amber-500/40 bg-amber-50/60 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950/20 dark:text-amber-200">
                   {drafts.length === 1 ? 'A bill was' : `${drafts.length} bills were`} read automatically from
                   what the vendor uploaded. Nothing is costed at {drafts.length === 1 ? 'it' : 'them'} until you
-                  confirm — check the figures against the document first, and edit if the read is off.
+                  confirm â€” check the figures against the document first, and edit if the read is off.
                   {finalBills.some((b) => b.source === 'reconstructed') &&
                     ' Confirming replaces the bill migrated from this PO.'}
                 </p>
@@ -208,16 +209,16 @@ export function VendorBillsSection({ vendorPO, vendorName, onChanged }: VendorBi
                     <TableRow key={bill.id} className={bill.status === 'draft' ? 'bg-amber-50/60 dark:bg-amber-950/20' : undefined}>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
-                          {bill.invoice_number || <span className="text-muted-foreground">—</span>}
+                          {bill.invoice_number || <span className="text-muted-foreground">â€”</span>}
                           {bill.status === 'draft' && (
                             <Badge variant="outline" className="border-amber-500 text-amber-700 dark:text-amber-400">
-                              Draft{bill.parse_confidence != null && Number(bill.parse_confidence) < 0.7 ? ' · check' : ''}
+                              Draft{bill.parse_confidence != null && Number(bill.parse_confidence) < 0.7 ? ' Â· check' : ''}
                             </Badge>
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>{bill.bill_date ? new Date(bill.bill_date).toLocaleDateString() : '—'}</TableCell>
-                      <TableCell>{bill.due_date ? new Date(bill.due_date).toLocaleDateString() : '—'}</TableCell>
+                      <TableCell>{bill.bill_date ? formatDocDate(bill.bill_date, 'numeric') : 'â€”'}</TableCell>
+                      <TableCell>{bill.due_date ? formatDocDate(bill.due_date, 'numeric') : 'â€”'}</TableCell>
                       <TableCell className="text-right">{formatCurrency(Number(bill.subtotal || 0))}</TableCell>
                       <TableCell className="text-right">{formatCurrency(Number(bill.freight || 0))}</TableCell>
                       <TableCell className="text-right font-semibold">{formatCurrency(Number(bill.total || 0))}</TableCell>

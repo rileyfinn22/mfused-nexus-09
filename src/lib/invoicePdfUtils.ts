@@ -1,8 +1,7 @@
 import jsPDF from "jspdf";
 import { pdfItemDescription } from "@/lib/pdfItemText";
 import autoTable from "jspdf-autotable";
-import { format } from "date-fns";
-import { formatCurrency, formatUnitPrice } from "@/lib/utils";
+import { formatCurrency, formatDocDate, formatUnitPrice } from "@/lib/utils";
 import {
   DOC,
   DOC_COLORS,
@@ -88,7 +87,7 @@ const renderInvoiceToDoc = async (
     label: 'INVOICE',
     value: invoice.invoice_number,
     metaLabel: 'Issued',
-    metaValue: format(new Date(invoice.invoice_date), 'MMMM d, yyyy'),
+    metaValue: formatDocDate(invoice.invoice_date, 'long'),
   });
 
   // ============ BILLED TO & INVOICE DETAILS SECTION ============
@@ -113,7 +112,7 @@ const renderInvoiceToDoc = async (
 
   const detailRows: Array<[string, string]> = [];
   if (invoice.due_date) {
-    detailRows.push(['Due Date', format(new Date(invoice.due_date), 'MMM d, yyyy')]);
+    detailRows.push(['Due Date', formatDocDate(invoice.due_date, 'medium')]);
   }
   detailRows.push(['Order #', order.order_number]);
   if (order.po_number) detailRows.push(['PO #', order.po_number]);

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,7 @@ import { exportToCSV } from "@/lib/exportUtils";
 import { EditableDescription } from "@/components/EditableDescription";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { ExpandToggleButton, ExpandDetailsPanel } from "@/components/RowExpandPanel";
+import { formatDocDate } from "@/lib/utils";
 
 const Orders = () => {
   const navigate = useNavigate();
@@ -428,7 +429,7 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
                         )}
                       </div>
                       <div className="col-span-1 text-sm text-muted-foreground">
-                        {order.order_date ? new Date(order.order_date).toLocaleDateString() : '-'}
+                        {order.order_date ? formatDocDate(order.order_date, 'numeric') : '-'}
                       </div>
                       {isVibeAdmin && (
                         <div className="col-span-2 text-sm font-medium">{order.companies?.name || '-'}</div>
@@ -540,7 +541,7 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
                       </Badge>
                     </div>
                     <div className="col-span-1 text-sm text-muted-foreground">
-                      {order.order_date ? new Date(order.order_date).toLocaleDateString() : '-'}
+                      {order.order_date ? formatDocDate(order.order_date, 'numeric') : '-'}
                     </div>
                     {isVibeAdmin && (
                       <div className="col-span-2 text-sm font-medium">{order.companies?.name || '-'}</div>
@@ -655,7 +656,7 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
                       )}
                     </div>
                     <div className="col-span-1 text-sm text-muted-foreground">
-                      {order.order_date ? new Date(order.order_date).toLocaleDateString() : '-'}
+                      {order.order_date ? formatDocDate(order.order_date, 'numeric') : '-'}
                     </div>
                     {isVibeAdmin && (
                       <div className="col-span-1 text-sm font-medium truncate">{order.companies?.name || '-'}</div>
@@ -762,9 +763,9 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
                     <ExpandDetailsPanel
                       details={[
                         { label: "Order Type", value: order.order_type || "standard" },
-                        { label: "PO #", value: order.po_number || "—" },
-                        { label: "Customer", value: order.customer_name || "—" },
-                        { label: "Ship To", value: [order.shipping_city, order.shipping_state].filter(Boolean).join(", ") || "—" },
+                        { label: "PO #", value: order.po_number || "â€”" },
+                        { label: "Customer", value: order.customer_name || "â€”" },
+                        { label: "Ship To", value: [order.shipping_city, order.shipping_state].filter(Boolean).join(", ") || "â€”" },
                         { label: "Items", value: order.order_items?.length ?? 0 },
                         { label: "Total Qty", value: (order.order_items || []).reduce((s: number, i: any) => s + (Number(i.quantity) || 0), 0).toLocaleString() },
                         { label: "Shipped Qty", value: (order.order_items || []).reduce((s: number, i: any) => s + (Number(i.shipped_quantity) || 0), 0).toLocaleString() },

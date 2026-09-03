@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+﻿import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +28,16 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import jsPDF from "jspdf";
+import {
+  DOC,
+  DOC_COLORS,
+  drawDetailRows,
+  drawDocumentTitle,
+  drawFooter,
+  drawMasthead,
+  drawPartyBlock,
+  ensureRoom,
+} from "@/lib/pdfDocument";
 import autoTable from "jspdf-autotable";
 
 interface PackingListFile {
@@ -282,140 +292,47 @@ export const VendorPOPackingListSection = ({
       
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      const margin = 14;
-      
-      // Colors
-      const primaryGreen: [number, number, number] = [76, 175, 80];
-      const darkGray: [number, number, number] = [51, 51, 51];
-      const lightGray: [number, number, number] = [245, 245, 245];
-      const mediumGray: [number, number, number] = [100, 100, 100];
-      const borderColor: [number, number, number] = [200, 200, 200];
-      const headerBg: [number, number, number] = [240, 240, 240];
-      
-      let yPos = 15;
-      
+      const margin = DOC.MARGIN;
+
       // ===== HEADER SECTION =====
-      // Logo on left
-      try {
-        const logoResponse = await fetch('/images/vibe-logo.png');
-        const logoBlob = await logoResponse.blob();
-        const logoBase64 = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.readAsDataURL(logoBlob);
-        });
-        doc.addImage(logoBase64, 'PNG', margin, yPos - 5, 35, 22);
-      } catch (error) {
-        doc.setFontSize(16);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-        doc.text('VIBE', margin, yPos + 10);
-      }
-      
-      // Company info centered
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-      doc.text('ArmorPak Inc. DBA Vibe Packaging', pageWidth / 2, yPos, { align: 'center' });
-      
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-      doc.text('1415 S 700 W, Salt Lake City, UT 84104', pageWidth / 2, yPos + 6, { align: 'center' });
-      doc.text('www.vibepkg.com', pageWidth / 2, yPos + 11, { align: 'center' });
-      
-      // Packing List title on right
-      doc.setFontSize(20);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-      doc.text('PACKING LIST', pageWidth - margin, yPos + 8, { align: 'right' });
-      
-      yPos += 25;
-      
-      // Divider line
-      doc.setDrawColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-      doc.setLineWidth(1);
-      doc.line(margin, yPos, pageWidth - margin, yPos);
-      
-      yPos += 10;
-      
-      // ===== INFO GRID SECTION =====
-      // Two-column info boxes
-      const boxWidth = (pageWidth - margin * 2 - 10) / 2;
-      const boxHeight = 38;
-      const leftBoxX = margin;
-      const rightBoxX = margin + boxWidth + 10;
-      
-      // Ship To Box
-      doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
-      doc.setLineWidth(0.5);
-      doc.setFillColor(255, 255, 255);
-      doc.roundedRect(leftBoxX, yPos, boxWidth, boxHeight, 2, 2, 'FD');
-      
-      // Ship To header
-      doc.setFillColor(headerBg[0], headerBg[1], headerBg[2]);
-      doc.rect(leftBoxX, yPos, boxWidth, 8, 'F');
-      doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
-      doc.line(leftBoxX, yPos + 8, leftBoxX + boxWidth, yPos + 8);
-      
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-      doc.text('DELIVERY ADDRESS', leftBoxX + 4, yPos + 5.5);
-      
-      // Ship To content
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-      doc.text(vendorPO?.ship_to_name || order?.shipping_name || '', leftBoxX + 4, yPos + 15);
-      
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+      await drawMasthead(doc);
+
+      let yPos = drawDocumentTitle(doc, {
+        label: 'PACKING LIST',
+        value: vendorPO?.po_number || order?.order_number || '',
+        metaLabel: 'Packed',
+        metaValue: format(new Date(), 'MMMM d, yyyy'),
+      });
+
+      // ===== DELIVERY ADDRESS + ORDER DETAILS =====
+      const detailsStartY = yPos;
       const street = vendorPO?.ship_to_street || order?.shipping_street || '';
       const city = vendorPO?.ship_to_city || order?.shipping_city || '';
       const state = vendorPO?.ship_to_state || order?.shipping_state || '';
       const zip = vendorPO?.ship_to_zip || order?.shipping_zip || '';
-      if (street) doc.text(street, leftBoxX + 4, yPos + 22);
-      doc.text(`${city}, ${state} ${zip}`.trim(), leftBoxX + 4, yPos + street ? 29 : 22);
-      
-      // Details Box
-      doc.setFillColor(255, 255, 255);
-      doc.roundedRect(rightBoxX, yPos, boxWidth, boxHeight, 2, 2, 'FD');
-      
-      // Details header
-      doc.setFillColor(headerBg[0], headerBg[1], headerBg[2]);
-      doc.rect(rightBoxX, yPos, boxWidth, 8, 'F');
-      doc.line(rightBoxX, yPos + 8, rightBoxX + boxWidth, yPos + 8);
-      
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-      doc.text('ORDER DETAILS', rightBoxX + 4, yPos + 5.5);
-      
-      // Details content - grid layout
-      const detailY = yPos + 14;
-      const labelWidth = 32;
-      
-      const drawDetailRow = (label: string, value: string, rowY: number) => {
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-        doc.text(label + ':', rightBoxX + 4, rowY);
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-        doc.text(value, rightBoxX + 4 + labelWidth, rowY);
-      };
-      
-      drawDetailRow('Invoice #', order?.order_number || '', detailY);
-      drawDetailRow('Order', order?.order_number || vendorPO?.orders?.order_number || '', detailY + 7);
-      drawDetailRow('Date', format(new Date(), 'MMM d, yyyy'), detailY + 14);
-      drawDetailRow('Customer', order?.customer_name || vendorPO?.orders?.customer_name || '', detailY + 21);
-      
-      yPos += boxHeight + 12;
-      
+
+      // The old layout computed this line`s y as `yPos + street ? 29 : 22`, which
+      // concatenates before it tests, so the address always landed at an absolute
+      // y of 29 rather than below the name.
+      const shipY = drawPartyBlock(doc, margin, yPos, {
+        label: 'DELIVERY ADDRESS',
+        name: vendorPO?.ship_to_name || order?.shipping_name || '',
+        lines: [street || null, `${city}, ${state} ${zip}`.trim() || null],
+      });
+
+      const detY = drawDetailRows(
+        doc,
+        pageWidth / 2 + 4,
+        detailsStartY,
+        [
+          ['Order #', order?.order_number || vendorPO?.orders?.order_number || ''],
+          ['Customer', order?.customer_name || vendorPO?.orders?.customer_name || ''],
+        ],
+        { label: 'ORDER DETAILS', valueOffset: 30 }
+      );
+
+      yPos = Math.max(shipY + 8, detY + 10);
+
       // ===== ITEMS TABLE =====
       const tableData = items.map((item) => [
         item.description || '-',
@@ -426,106 +343,101 @@ export const VendorPOPackingListSection = ({
         item.net_weight || '-',
         item.measurement || '-'
       ]);
-      
+
+      // A shipping manifest earns its ruled grid -- seven numeric columns read
+      // better boxed than on hairlines. It uses the house palette, not the
+      // green-on-white it had.
       autoTable(doc, {
         startY: yPos,
-        head: [['Item Description', 'Cartons', 'Qty/Ctn', 'Total Qty', 'Gross Wt.', 'Net Wt.', 'CBM']],
+        head: [['ITEM DESCRIPTION', 'CARTONS', 'QTY/CTN', 'TOTAL QTY', 'GROSS WT.', 'NET WT.', 'CBM']],
         body: tableData,
         theme: 'grid',
         styles: {
           fontSize: 9,
           cellPadding: 4,
-          lineColor: borderColor,
-          lineWidth: 0.3,
+          lineColor: DOC_COLORS.rule,
+          lineWidth: 0.2,
         },
-        headStyles: { 
-          fillColor: primaryGreen, 
-          textColor: 255,
+        headStyles: {
+          fillColor: DOC_COLORS.headerBg,
+          textColor: DOC_COLORS.muted,
           fontStyle: 'bold',
-          fontSize: 9,
-          cellPadding: 5,
+          fontSize: 8,
+          cellPadding: 4,
           halign: 'center'
         },
         bodyStyles: {
-          textColor: darkGray,
+          textColor: DOC_COLORS.body,
           valign: 'middle'
         },
-        alternateRowStyles: {
-          fillColor: lightGray
-        },
         columnStyles: {
-          0: { cellWidth: 'auto', halign: 'left', fontStyle: 'bold' },
-          1: { cellWidth: 22, halign: 'center' },
-          2: { cellWidth: 22, halign: 'center' },
-          3: { cellWidth: 25, halign: 'center', fontStyle: 'bold' },
+          0: { cellWidth: 'auto', halign: 'left', fontStyle: 'bold', textColor: DOC_COLORS.ink },
+          1: { cellWidth: 22, halign: 'right' },
+          2: { cellWidth: 22, halign: 'right' },
+          3: { cellWidth: 25, halign: 'right', fontStyle: 'bold', textColor: DOC_COLORS.ink },
           4: { cellWidth: 25, halign: 'right' },
           5: { cellWidth: 22, halign: 'right' },
           6: { cellWidth: 22, halign: 'right' }
         },
-        margin: { left: margin, right: margin },
-        tableLineColor: borderColor,
-        tableLineWidth: 0.3,
+        margin: { left: margin, right: margin, bottom: DOC.FOOTER_RESERVE },
+        tableLineColor: DOC_COLORS.rule,
+        tableLineWidth: 0.2,
       });
-      
+
       // ===== SUMMARY SECTION =====
-      let tableEndY = (doc as any).lastAutoTable.finalY + 8;
-      
-      // Check if summary + footer will overflow the page
-      const summaryNeededSpace = 24 + 30; // summaryBoxHeight + footer
-      if (tableEndY + summaryNeededSpace > pageHeight - 10) {
-        doc.addPage();
-        tableEndY = 20;
-      }
-      
+      const summaryBoxHeight = 20;
+      const tableEndY = ensureRoom(doc, (doc as any).lastAutoTable.finalY + 10, summaryBoxHeight + 10);
+
       // Calculate totals
       const totalCartons = items.reduce((sum, item) => {
         const num = parseInt(item.cartons?.replace(/[^\d]/g, '') || '0');
         return sum + (isNaN(num) ? 0 : num);
       }, 0);
-      
+
       const totalQty = items.reduce((sum, item) => {
         const num = parseInt(item.total_qty?.replace(/[^\d]/g, '') || '0');
         return sum + (isNaN(num) ? 0 : num);
       }, 0);
-      
+
       const totalGrossWeight = items.reduce((sum, item) => {
         const num = parseFloat(item.gross_weight?.replace(/[^\d.]/g, '') || '0');
         return sum + (isNaN(num) ? 0 : num);
       }, 0);
-      
+
       const totalCBM = items.reduce((sum, item) => {
         const num = parseFloat(item.measurement?.replace(/[^\d.]/g, '') || '0');
         return sum + (isNaN(num) ? 0 : num);
       }, 0);
-      
-      // Summary box
+
+      // Summary band -- charcoal, echoing the masthead.
       const summaryBoxWidth = pageWidth - margin * 2;
-      const summaryBoxHeight = 24;
-      
-      doc.setFillColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-      doc.roundedRect(margin, tableEndY, summaryBoxWidth, summaryBoxHeight, 2, 2, 'F');
-      
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(255, 255, 255);
-      
-      const summaryY = tableEndY + 15;
+      doc.setFillColor(...DOC_COLORS.ink);
+      doc.rect(margin, tableEndY, summaryBoxWidth, summaryBoxHeight, 'F');
+
       const colWidth = summaryBoxWidth / 4;
-      
-      doc.text(`Total Cartons: ${totalCartons}`, margin + colWidth * 0.5, summaryY, { align: 'center' });
-      doc.text(`Total Qty: ${totalQty.toLocaleString()}`, margin + colWidth * 1.5, summaryY, { align: 'center' });
-      doc.text(`Gross Weight: ${totalGrossWeight.toFixed(1)} kg`, margin + colWidth * 2.5, summaryY, { align: 'center' });
-      doc.text(`Total CBM: ${totalCBM.toFixed(2)}`, margin + colWidth * 3.5, summaryY, { align: 'center' });
-      
+      const summaryLabelY = tableEndY + 8;
+      const summaryValueY = tableEndY + 15;
+      const summary: Array<[string, string]> = [
+        ['CARTONS', `${totalCartons}`],
+        ['TOTAL QTY', totalQty.toLocaleString()],
+        ['GROSS WEIGHT', `${totalGrossWeight.toFixed(1)} kg`],
+        ['CBM', totalCBM.toFixed(2)],
+      ];
+
+      summary.forEach(([label, value], i) => {
+        const cx = margin + colWidth * (i + 0.5);
+        doc.setFontSize(7.5);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...DOC_COLORS.onInkMuted);
+        doc.text(label, cx, summaryLabelY, { align: 'center' });
+        doc.setFontSize(11);
+        doc.setTextColor(255, 255, 255);
+        doc.text(value, cx, summaryValueY, { align: 'center' });
+      });
+
       // ===== FOOTER =====
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-      doc.text('Thank you for your business!', pageWidth / 2, pageHeight - 15, { align: 'center' });
-      
-      doc.setFontSize(8);
-      doc.text(`Generated: ${format(new Date(), 'MMM d, yyyy h:mm a')}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
-      
+      drawFooter(doc, `Generated ${format(new Date(), 'MMM d, yyyy h:mm a')}`);
+
       // Convert to blob and upload
       const pdfBlob = doc.output('blob');
       const fileName = `${vendorPOId}/${Date.now()}-branded-packing-list-${vendorPO?.po_number || 'PO'}.pdf`;
@@ -708,7 +620,7 @@ export const VendorPOPackingListSection = ({
                         <div>
                           <p className="font-medium">{packingList.file_name}</p>
                           <p className="text-xs text-muted-foreground">
-                            Generated {format(new Date(packingList.created_at), 'MMM d, yyyy h:mm a')} • {formatFileSize(packingList.file_size)}
+                            Generated {format(new Date(packingList.created_at), 'MMM d, yyyy h:mm a')} â€¢ {formatFileSize(packingList.file_size)}
                           </p>
                         </div>
                         <Badge variant="secondary" className="ml-2">
@@ -764,7 +676,7 @@ export const VendorPOPackingListSection = ({
                         <div>
                           <p className="font-medium">{packingList.file_name}</p>
                           <p className="text-xs text-muted-foreground">
-                            Uploaded {format(new Date(packingList.created_at), 'MMM d, yyyy h:mm a')} • {formatFileSize(packingList.file_size)}
+                            Uploaded {format(new Date(packingList.created_at), 'MMM d, yyyy h:mm a')} â€¢ {formatFileSize(packingList.file_size)}
                           </p>
                           {packingList.notes && (
                             <p className="text-xs text-muted-foreground mt-1">{packingList.notes}</p>

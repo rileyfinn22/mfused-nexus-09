@@ -21,6 +21,7 @@ import { getTrackingUrl, CARRIERS } from "@/lib/trackingUtils";
 import { InlineTrackingEditor } from "@/components/InlineTrackingEditor";
 import { normalizeStorageObjectPath, openStorageObjectInNewTab } from "@/lib/storageUrl";
 import VendorProductionPanel from "@/components/vendor/VendorProductionPanel";
+import { formatDocDate } from "@/lib/utils";
 
 // Shipping lives on a SHIPPING line item on some POs and on vendor_pos.shipping_cost on others,
 // and on a few it is on both. The line wins when present; summing both double-counted freight.
@@ -578,7 +579,7 @@ const VendorPODetail = () => {
 Please find attached the purchase order from ${VIBE_COMPANY.name}.
 
 PO Number: ${po.po_number}
-Order Date: ${new Date(po.order_date).toLocaleDateString()}
+Order Date: ${formatDocDate(po.order_date, "numeric")}
 Total Amount: $${totalAmount.toFixed(2)}
 
 Please confirm receipt of this order and provide an estimated delivery date.

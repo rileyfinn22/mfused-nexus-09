@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+﻿import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { downloadStorageObject, getStoragePreviewUrl, normalizeStorageObjectPath, sanitizeStorageFileName } from "@/lib/storageUrl";
+import { formatDocDate } from "@/lib/utils";
 
 const ProjectDetail = () => {
   const { projectId } = useParams();
@@ -306,7 +307,7 @@ const ProjectDetail = () => {
             </Badge>
           </div>
           <p className="text-muted-foreground">
-            {order.customer_name} • {(order.companies as any)?.name}
+            {order.customer_name} â€¢ {(order.companies as any)?.name}
           </p>
         </div>
         <Button variant="outline" onClick={() => navigate(`/orders/${projectId}`)}>
@@ -515,7 +516,7 @@ const ProjectDetail = () => {
                         id: vp.id,
                         reference: vp.reference_number || `Payment for ${po?.po_number || '-'}`,
                         date: new Date(vp.payment_date),
-                        details: `${po?.vendors?.name || 'Vendor'} • ${vp.payment_method?.replace('_', ' ')}`,
+                        details: `${po?.vendors?.name || 'Vendor'} â€¢ ${vp.payment_method?.replace('_', ' ')}`,
                         status: 'paid',
                         amount: vp.amount,
                         isOrder: false,
@@ -620,7 +621,7 @@ const ProjectDetail = () => {
                         <TableCell className="font-medium">
                           {invoice.invoice_number}
                         </TableCell>
-                        <TableCell>{new Date(invoice.invoice_date).toLocaleDateString()}</TableCell>
+                        <TableCell>{formatDocDate(invoice.invoice_date, "numeric")}</TableCell>
                         <TableCell>
                           <Badge variant="outline">{typeLabel}</Badge>
                         </TableCell>
@@ -823,7 +824,7 @@ const ProjectDetail = () => {
                         onClick={() => navigate(`/vendor-pos/${po.id}?returnTo=/projects/${projectId}`)}
                       >
                         <TableCell className="font-medium">{po.po_number}</TableCell>
-                        <TableCell>{new Date(po.order_date).toLocaleDateString()}</TableCell>
+                        <TableCell>{formatDocDate(po.order_date, "numeric")}</TableCell>
                         <TableCell>{(po.vendors as any)?.name || '-'}</TableCell>
                         <TableCell>
                           <Badge variant="outline">{po.po_type || 'Standard'}</Badge>
@@ -926,7 +927,7 @@ const ProjectDetail = () => {
                         <div className="p-3 space-y-2">
                           <p className="text-sm font-medium truncate" title={doc.file_name}>{doc.file_name}</p>
                           <p className="text-xs text-muted-foreground">
-                            {formatFileSize(doc.file_size)} • {new Date(doc.created_at).toLocaleDateString()}
+                            {formatFileSize(doc.file_size)} â€¢ {new Date(doc.created_at).toLocaleDateString()}
                           </p>
                           <div className="flex gap-2">
                             <Button

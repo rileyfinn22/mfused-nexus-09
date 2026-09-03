@@ -1,7 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { pdfItemDescription } from "@/lib/pdfItemText";
-import { formatCurrency, formatUnitPrice } from "@/lib/utils";
+import { formatCurrency, formatDocDate, formatUnitPrice } from "@/lib/utils";
 import {
   DOC,
   DOC_COLORS,
@@ -51,11 +51,7 @@ export async function generateOrderConfirmationPdf(
     label: "ORDER CONFIRMATION",
     value: order.order_number,
     metaLabel: "Ordered",
-    metaValue: new Date(order.order_date).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    }),
+    metaValue: formatDocDate(order.order_date, "long"),
   });
 
   // ============ SHIP TO & ORDER DETAILS ============

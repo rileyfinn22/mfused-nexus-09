@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+﻿import { useState, useRef, useEffect } from "react";
 import { pdfItemDescription } from "@/lib/pdfItemText";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -34,6 +34,17 @@ import { calculateInvoiceTotals } from "@/lib/invoiceTotals";
 import { normalizeStorageObjectPath, openSignedFileInNewTab, sanitizeStorageFileName, triggerSignedFileDownload, triggerBlobFileDownload } from "@/lib/storageUrl";
 import { format } from "date-fns";
 import jsPDF from "jspdf";
+import {
+  DOC,
+  DOC_COLORS,
+  docTableStyles,
+  drawDetailRows,
+  drawDocumentTitle,
+  drawFooter,
+  drawMasthead,
+  drawPartyBlock,
+  ensureRoom,
+} from "@/lib/pdfDocument";
 import autoTable from "jspdf-autotable";
 
 import { RebrandPreviewDialog } from "@/components/RebrandPreviewDialog";
@@ -485,107 +496,35 @@ export const InvoicePackingListSection = ({
   const createPackingListPdfBlob = async () => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
 
-    const primaryGreen = [76, 175, 80];
-    const darkGray = [51, 51, 51];
-    const lightGray = [248, 248, 248];
-    const mediumGray = [100, 100, 100];
+    await drawMasthead(doc);
 
-    let yPos = 15;
+    let yPos = drawDocumentTitle(doc, {
+      label: 'PACKING LIST',
+      value: invoice.invoice_number,
+      metaLabel: 'Packed',
+      metaValue: format(new Date(), 'MMMM d, yyyy'),
+    });
 
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.text('ArmorPak Inc. DBA Vibe Packaging', 14, yPos);
-
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    doc.text('1415 S 700 W', 14, yPos + 7);
-    doc.text('Salt Lake City, UT 84104', 14, yPos + 12);
-    doc.text('www.vibepkg.com', 14, yPos + 17);
-
-    try {
-      const logoResponse = await fetch('/images/vibe-logo.png');
-      const logoBlob = await logoResponse.blob();
-      const logoBase64 = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.readAsDataURL(logoBlob);
-      });
-      doc.addImage(logoBase64, 'PNG', pageWidth - 54, yPos - 5, 40, 25);
-    } catch (error) {
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-      doc.text('VIBE', pageWidth - 14, yPos + 8, { align: 'right' });
-    }
-
-    yPos += 28;
-
-    doc.setDrawColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.setLineWidth(0.5);
-    doc.line(14, yPos, pageWidth - 14, yPos);
-
-    yPos += 12;
-
-    doc.setFontSize(24);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    doc.text('Packing List', 14, yPos);
-
-    yPos += 15;
-
-    const leftColX = 14;
-    const rightColX = pageWidth / 2 + 10;
-
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    doc.text('Delivery Address', leftColX, yPos);
-
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    doc.text(order?.shipping_name || '', leftColX, yPos + 8);
-
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-
-    let shipY = yPos + 14;
-    if (order?.shipping_street) {
-      doc.text(order.shipping_street, leftColX, shipY);
-      shipY += 5;
-    }
-    doc.text(`${order?.shipping_city || ''}, ${order?.shipping_state || ''} ${order?.shipping_zip || ''}`, leftColX, shipY);
-
+    const leftColX = DOC.MARGIN;
+    const rightColX = pageWidth / 2 + 4;
     const detailsStartY = yPos;
-    doc.text('Invoice #:', rightColX, detailsStartY);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    doc.text(invoice.invoice_number, rightColX + 45, detailsStartY);
 
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    doc.text('Order #:', rightColX, detailsStartY + 7);
-    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    doc.text(order?.order_number || '', rightColX + 45, detailsStartY + 7);
+    const shipY = drawPartyBlock(doc, leftColX, yPos, {
+      label: 'DELIVERY ADDRESS',
+      name: order?.shipping_name || '',
+      lines: [
+        order?.shipping_street || null,
+        `${order?.shipping_city || ''}, ${order?.shipping_state || ''} ${order?.shipping_zip || ''}`,
+      ],
+    });
 
-    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    doc.text('Date:', rightColX, detailsStartY + 14);
-    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    doc.text(format(new Date(), 'MMM d, yyyy'), rightColX + 45, detailsStartY + 14);
+    const detailRows: Array<[string, string]> = [['Order #', order?.order_number || '']];
+    if (order?.po_number) detailRows.push(['PO #', order.po_number]);
 
-    if (order?.po_number) {
-      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-      doc.text('PO #:', rightColX, detailsStartY + 21);
-      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-      doc.text(order.po_number, rightColX + 45, detailsStartY + 21);
-    }
+    const detY = drawDetailRows(doc, rightColX, detailsStartY, detailRows, { valueOffset: 30 });
 
-    yPos += 40;
+    yPos = Math.max(shipY + 8, detY + 10);
 
     const { data: allocationItems, error: allocationError } = await supabase
       .from('inventory_allocations')
@@ -630,54 +569,26 @@ export const InvoicePackingListSection = ({
     ]);
 
     autoTable(doc, {
+      ...docTableStyles(),
       startY: yPos,
       head: [['ITEM ID', 'SKU', 'DESCRIPTION', 'QTY']],
       body: tableData,
-      theme: 'plain',
-      headStyles: {
-        fillColor: [primaryGreen[0], primaryGreen[1], primaryGreen[2]],
-        textColor: 255,
-        fontStyle: 'bold',
-        fontSize: 9,
-        cellPadding: 4
-      },
-      bodyStyles: {
-        fontSize: 9,
-        cellPadding: 4,
-        textColor: [darkGray[0], darkGray[1], darkGray[2]],
-        lineWidth: 0
-      },
-      alternateRowStyles: {
-        fillColor: [lightGray[0], lightGray[1], lightGray[2]]
-      },
       columnStyles: {
-        0: { cellWidth: 30 },
-        1: { cellWidth: 40 },
-        2: { cellWidth: 85 },
-        3: { cellWidth: 25, halign: 'center' }
+        0: { cellWidth: 28 },
+        1: { cellWidth: 36, fontStyle: 'bold', textColor: DOC_COLORS.ink },
+        3: { cellWidth: 22, halign: 'right', fontStyle: 'bold', textColor: DOC_COLORS.ink }
       },
-      margin: { left: 14, right: 14 },
-      showHead: 'firstPage',
-      tableLineWidth: 0
     });
 
     const totalItems = itemsForPacking.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0);
-    let tableEndY = (doc as any).lastAutoTable.finalY + 15;
+    const tableEndY = ensureRoom(doc, (doc as any).lastAutoTable.finalY + 12, 20);
 
-    if (tableEndY + 30 > pageHeight - 10) {
-      doc.addPage();
-      tableEndY = 20;
-    }
-
-    doc.setFontSize(11);
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    doc.text(`Total Quantity: ${totalItems.toLocaleString()}`, 14, tableEndY);
+    doc.setTextColor(...DOC_COLORS.ink);
+    doc.text(`Total quantity: ${totalItems.toLocaleString()}`, DOC.MARGIN, tableEndY + 4);
 
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.text('Thank you for your business!', pageWidth / 2, pageHeight - 12, { align: 'center' });
+    drawFooter(doc);
 
     return {
       pdfBlob: doc.output('blob'),
@@ -984,7 +895,7 @@ export const InvoicePackingListSection = ({
                     </p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <span>{formatFileSize(pl.file_size)}</span>
-                      <span>•</span>
+                      <span>â€¢</span>
                       <span>{format(new Date(pl.created_at), 'MMM d, yyyy h:mm a')}</span>
                       {isVibeAdmin && (
                         <Badge variant="outline" className="text-xs">
@@ -1103,7 +1014,7 @@ export const InvoicePackingListSection = ({
           <DialogHeader>
             <DialogTitle>Attach Spreadsheet</DialogTitle>
             <DialogDescription>
-              Attach an Excel or CSV file as-is to this invoice. Shipped quantities will not be changed — use "Input Shipped Qty" or "Rebrand PDF" for those flows.
+              Attach an Excel or CSV file as-is to this invoice. Shipped quantities will not be changed â€” use "Input Shipped Qty" or "Rebrand PDF" for those flows.
             </DialogDescription>
           </DialogHeader>
           

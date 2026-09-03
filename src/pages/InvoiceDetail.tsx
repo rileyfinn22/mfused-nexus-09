@@ -12,7 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { ArrowLeft, Download, FileText, Edit, Trash2, RefreshCw, Copy, ExternalLink, CheckCircle2, DollarSign, CalendarIcon, Mail, RotateCcw, ChevronDown, Check, Unlink, Bell, Loader2, AlertCircle, Package, ChevronsUpDown, FileSpreadsheet, Sparkles, Plus, X } from "lucide-react";
 
 import { format } from "date-fns";
-import { cn, formatCurrency, formatUnitPrice } from "@/lib/utils";
+import { formatDocDate, cn, formatCurrency, formatUnitPrice } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "@/hooks/use-toast";
@@ -2002,7 +2002,7 @@ const InvoiceDetail = () => {
                           )}
                         >
                           <CalendarIcon className="mr-2 h-4 w-4" />
-                          {invoice.due_date ? format(new Date(invoice.due_date), "MMM d, yyyy") : "Set Due Date"}
+                          {invoice.due_date ? formatDocDate(invoice.due_date, "medium") : "Set Due Date"}
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="end">
@@ -2029,7 +2029,7 @@ const InvoiceDetail = () => {
                     </Popover>
                   ) : (
                     <p className="font-medium">
-                      {invoice.due_date ? format(new Date(invoice.due_date), "MMM d, yyyy") : "Not set"}
+                      {invoice.due_date ? formatDocDate(invoice.due_date, "medium") : "Not set"}
                     </p>
                   )}
                   <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
@@ -2038,7 +2038,7 @@ const InvoiceDetail = () => {
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button variant="ghost" className="h-auto p-0 text-xs font-medium hover:bg-transparent">
-                            {format(new Date(invoice.invoice_date), "MMM d, yyyy")}
+                            {formatDocDate(invoice.invoice_date, "medium")}
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="end">
@@ -2064,7 +2064,7 @@ const InvoiceDetail = () => {
                         </PopoverContent>
                       </Popover>
                     ) : (
-                      <span>{new Date(invoice.invoice_date).toLocaleDateString()}</span>
+                      <span>{formatDocDate(invoice.invoice_date, "numeric")}</span>
                     )}
                   </div>
                 </div>
@@ -2336,7 +2336,7 @@ const InvoiceDetail = () => {
                                 )}
                               >
                                 <CalendarIcon className="mr-2 h-4 w-4" />
-                                {invoice.due_date ? format(new Date(invoice.due_date), "MMM d, yyyy") : "Set Due Date"}
+                                {invoice.due_date ? formatDocDate(invoice.due_date, "medium") : "Set Due Date"}
                               </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-0" align="start">
@@ -2365,7 +2365,7 @@ const InvoiceDetail = () => {
                           </Popover>
                         ) : (
                           <p className="font-semibold text-xl">
-                            {invoice.due_date ? format(new Date(invoice.due_date), "MMM d, yyyy") : "Not set"}
+                            {invoice.due_date ? formatDocDate(invoice.due_date, "medium") : "Not set"}
                           </p>
                         )}
                       </div>
@@ -3284,7 +3284,7 @@ const InvoiceDetail = () => {
                           </span>
                           {po.expected_delivery_date && (
                             <span className="text-xs text-muted-foreground">
-                              Delivery: {new Date(po.expected_delivery_date).toLocaleDateString()}
+                              Delivery: {formatDocDate(po.expected_delivery_date, "numeric")}
                             </span>
                           )}
                         </div>
@@ -3467,7 +3467,7 @@ const InvoiceDetail = () => {
                     <div className="text-right">
                       <p className="font-semibold">{formatCurrency(Number(relInvoice.total))}</p>
                       <p className="text-xs text-muted-foreground">
-                        {new Date(relInvoice.invoice_date).toLocaleDateString()}
+                        {formatDocDate(relInvoice.invoice_date, "numeric")}
                       </p>
                     </div>
                   </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,6 +27,7 @@ import {
   ensureRoom,
 } from "@/lib/pdfDocument";
 import { approvePullShipOrder } from "@/lib/pullShipApproval";
+import { formatDocDate } from "@/lib/utils";
 
 const PullShipOrderDetail = () => {
   const { orderId } = useParams();
@@ -924,8 +925,8 @@ const PullShipOrderDetail = () => {
                 </div>
                 <div className="flex items-center gap-4 text-sm text-muted-foreground">
                   <span>Created: {new Date(order.created_at).toLocaleDateString()}</span>
-                  <span>•</span>
-                  <span>Due: {order.due_date ? new Date(order.due_date).toLocaleDateString() : 'Not set'}</span>
+                  <span>â€¢</span>
+                  <span>Due: {order.due_date ? formatDocDate(order.due_date, 'numeric') : 'Not set'}</span>
                 </div>
               </div>
               <div className="text-right">

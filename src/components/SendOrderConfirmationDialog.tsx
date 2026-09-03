@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+﻿import { useState, useEffect, useRef } from "react";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -18,6 +18,7 @@ import { VIBE_COMPANY } from "@/lib/pdfBranding";
 import { generateOrderConfirmationPdf } from "@/lib/orderConfirmationPdf";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { formatDocDate } from "@/lib/utils";
 
 interface SendOrderConfirmationDialogProps {
   open: boolean;
@@ -95,7 +96,7 @@ export function SendOrderConfirmationDialog({
 Thank you for your order! Below is a summary of your order with ${VIBE_COMPANY.name}.
 
 Order Number: ${order.order_number}
-Order Date: ${new Date(order.order_date).toLocaleDateString()}${order.po_number ? `\nPO Number: ${order.po_number}` : ""}
+Order Date: ${formatDocDate(order.order_date, "numeric")}${order.po_number ? `\nPO Number: ${order.po_number}` : ""}
 
 A detailed order confirmation is attached as a PDF.
 
@@ -213,7 +214,7 @@ Thank you for your business!`;
                 ${VIBE_COMPANY.address.city}, ${VIBE_COMPANY.address.state} ${VIBE_COMPANY.address.zip}
               </p>
               <p style="color: #ef4444; font-size: 11px; margin-top: 12px; font-weight: bold;">
-                ⚠️ This email was sent from an unmonitored mailbox. Please do not reply directly to this email.
+                âš ï¸ This email was sent from an unmonitored mailbox. Please do not reply directly to this email.
               </p>
             </div>
           `,
@@ -372,7 +373,7 @@ Thank you for your business!`;
                         <TableCell className="text-sm font-medium">{item.name}</TableCell>
                         <TableCell className="text-sm font-mono">{item.sku}</TableCell>
                         <TableCell className="text-sm text-center">{item.quantity}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{item.description || "—"}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{item.description || "â€”"}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

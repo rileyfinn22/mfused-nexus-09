@@ -4,7 +4,7 @@
 // totals). Used by the vendor portal's Download PDF button.
 import jsPDF from "jspdf";
 import { pdfItemDescription } from "@/lib/pdfItemText";
-import { formatCurrency, formatUnitPrice } from "@/lib/utils";
+import { formatCurrency, formatDocDate, formatUnitPrice } from "@/lib/utils";
 import autoTable from "jspdf-autotable";
 import {
   DOC,
@@ -128,11 +128,7 @@ export async function renderVendorPoDoc(
     label: "PURCHASE ORDER",
     value: data.poNumber,
     metaLabel: "Issued",
-    metaValue: new Date(data.orderDate).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    }),
+    metaValue: formatDocDate(data.orderDate, "long"),
   });
 
   // ============ VENDOR & DETAILS ============
@@ -148,14 +144,7 @@ export async function renderVendorPoDoc(
 
   const detailRows: Array<[string, string]> = [];
   if (data.expectedDeliveryDate) {
-    detailRows.push([
-      "Due Date",
-      new Date(data.expectedDeliveryDate).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      }),
-    ]);
+    detailRows.push(["Due Date", formatDocDate(data.expectedDeliveryDate, "medium")]);
   }
   detailRows.push(["Order #", data.orderNumber || "N/A"]);
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+﻿import { useState, useEffect, useRef } from "react";
 import { pdfItemDescription } from "@/lib/pdfItemText";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -15,6 +15,20 @@ import { supabase } from "@/integrations/supabase/client";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { VIBE_COMPANY } from "@/lib/pdfBranding";
+import { formatDocDate } from "@/lib/utils";
+import {
+  DOC,
+  DOC_COLORS,
+  docTableStyles,
+  drawDetailRows,
+  drawDocumentTitle,
+  drawFooter,
+  drawMasthead,
+  drawPartyBlock,
+  drawTotals,
+  ensureRoom,
+  type TotalsRow,
+} from "@/lib/pdfDocument";
 
 interface AdditionalAttachment {
   file: File;
@@ -93,15 +107,15 @@ export function SendInvoiceNoticeDialog({
       setAdditionalAttachments([]);
 
       const dueDate = invoice?.due_date
-        ? new Date(invoice.due_date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+        ? formatDocDate(invoice.due_date, "long")
         : "Upon Receipt";
       const amount = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(invoice?.total || 0);
 
       if (isBilled) {
-        setEditableSubject(`Invoice ${invoice?.invoice_number} — ${amount} Due ${dueDate}`);
+        setEditableSubject(`Invoice ${invoice?.invoice_number} â€” ${amount} Due ${dueDate}`);
         setEditableBody(`Dear ${customerDisplayName},\n\nYour order has shipped and invoice ${invoice?.invoice_number} is now ready for payment. Per our Net 30 terms, payment is due by ${dueDate}.\n\nYou can view the full invoice and make a payment through our portal.`);
       } else {
-        setEditableSubject(`⚠️ Payment Due — Invoice ${invoice?.invoice_number} (${amount})`);
+        setEditableSubject(`âš ï¸ Payment Due â€” Invoice ${invoice?.invoice_number} (${amount})`);
         setEditableBody(`Dear ${customerDisplayName},\n\nThis is a friendly reminder that invoice ${invoice?.invoice_number} for ${amount} was due on ${dueDate}.\n\nIf payment has already been sent, please disregard this notice. Otherwise, we kindly ask that you arrange payment at your earliest convenience.\n\nYou can view the invoice and make a payment through our secure portal below.`);
       }
     }
@@ -223,94 +237,44 @@ export function SendInvoiceNoticeDialog({
   const generatePdfBase64 = async (): Promise<string> => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const primaryGreen = [76, 175, 80];
-    const darkGray = [51, 51, 51];
-    const lightGray = [248, 248, 248];
-    const mediumGray = [100, 100, 100];
 
-    let yPos = 15;
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.text('ArmorPak Inc. DBA Vibe Packaging', 14, yPos);
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    doc.text('1415 S 700 W', 14, yPos + 7);
-    doc.text('Salt Lake City, UT 84104', 14, yPos + 12);
-    doc.text('www.vibepkg.com', 14, yPos + 17);
+    await drawMasthead(doc);
 
-    try {
-      const logoResponse = await fetch('/images/vibe-logo.png');
-      const logoBlob = await logoResponse.blob();
-      const logoBase64 = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.readAsDataURL(logoBlob);
-      });
-      doc.addImage(logoBase64, 'PNG', pageWidth - 54, yPos - 5, 40, 25);
-    } catch { }
+    let yPos = drawDocumentTitle(doc, {
+      label: 'INVOICE',
+      value: invoice.invoice_number,
+      metaLabel: 'Issued',
+      metaValue: formatDocDate(invoice.invoice_date, 'long'),
+    });
 
-    yPos += 28;
-    doc.setDrawColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.setLineWidth(0.5);
-    doc.line(14, yPos, pageWidth - 14, yPos);
-    yPos += 12;
+    const leftColX = DOC.MARGIN;
+    const rightColX = pageWidth / 2 + 4;
+    const detailsStartY = yPos;
 
-    doc.setFontSize(24);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    doc.text('Invoice', 14, yPos);
-    yPos += 15;
-
-    const leftColX = 14;
-    const rightColX = pageWidth / 2 + 10;
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    doc.text('Billed to', leftColX, yPos);
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    doc.text(invoice.companies?.name || order?.customer_name || '', leftColX, yPos + 8);
-
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
     const billStreet = order?.billing_street || order?.shipping_street || '';
     const billCity = order?.billing_city || order?.shipping_city || '';
     const billState = order?.billing_state || order?.shipping_state || '';
     const billZip = order?.billing_zip || order?.shipping_zip || '';
-    let billY = yPos + 14;
-    if (billStreet) { doc.text(billStreet, leftColX, billY); billY += 5; }
-    if (billCity) { doc.text(`${billCity}, ${billState} ${billZip}`, leftColX, billY); billY += 5; }
-    if (order?.po_number) { doc.setFont('helvetica', 'bold'); doc.text(`PO: ${order.po_number}`, leftColX, billY); }
 
-    const detailsStartY = yPos;
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    doc.text('Invoice #:', rightColX, detailsStartY);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    doc.text(invoice.invoice_number, rightColX + 45, detailsStartY);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    doc.text('Date:', rightColX, detailsStartY + 7);
-    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    doc.text(new Date(invoice.invoice_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }), rightColX + 45, detailsStartY + 7);
+    const billY = drawPartyBlock(doc, leftColX, yPos, {
+      label: 'BILLED TO',
+      name: invoice.companies?.name || order?.customer_name || '',
+      lines: [
+        billStreet || null,
+        billCity ? `${billCity}, ${billState} ${billZip}` : null,
+      ],
+    });
+
+    const detailRows: Array<[string, string]> = [];
     if (invoice.due_date) {
-      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-      doc.text('Due Date:', rightColX, detailsStartY + 14);
-      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-      doc.text(new Date(invoice.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }), rightColX + 45, detailsStartY + 14);
+      detailRows.push(['Due Date', formatDocDate(invoice.due_date, 'medium')]);
     }
-    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    doc.text('Order #:', rightColX, detailsStartY + 21);
-    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    doc.text(order?.order_number || '', rightColX + 45, detailsStartY + 21);
-    yPos += 40;
+    detailRows.push(['Order #', order?.order_number || '']);
+    if (order?.po_number) detailRows.push(['PO #', order.po_number]);
+
+    const detY = drawDetailRows(doc, rightColX, detailsStartY, detailRows, { valueOffset: 30 });
+
+    yPos = Math.max(billY + 8, detY + 10);
 
     const tableData = items.map((item) => [
       item.sku || '',
@@ -320,65 +284,52 @@ export function SendInvoiceNoticeDialog({
       formatCurrency((item.quantity || item.shipped_quantity || 0) * (item.unit_price || 0))
     ]);
 
+    const tableInnerWidth = pageWidth - DOC.MARGIN * 2;
     autoTable(doc, {
+      ...docTableStyles(),
       startY: yPos,
       head: [['SKU', 'DESCRIPTION', 'QTY', 'UNIT PRICE', 'AMOUNT']],
       body: tableData,
-      theme: 'plain',
-      headStyles: { fillColor: [primaryGreen[0], primaryGreen[1], primaryGreen[2]], textColor: 255, fontStyle: 'bold', fontSize: 9, cellPadding: 4 },
-      bodyStyles: { fontSize: 9, cellPadding: 4, textColor: [darkGray[0], darkGray[1], darkGray[2]], lineWidth: 0 },
-      alternateRowStyles: { fillColor: [lightGray[0], lightGray[1], lightGray[2]] },
-      columnStyles: { 0: { cellWidth: 35 }, 1: { cellWidth: 70 }, 2: { cellWidth: 25, halign: 'center' }, 3: { cellWidth: 30, halign: 'right' }, 4: { cellWidth: 32, halign: 'right', fontStyle: 'bold' } },
-      margin: { left: 14, right: 14 },
-      showHead: 'firstPage',
-      tableLineWidth: 0
+      columnStyles: {
+        0: { cellWidth: 40, fontStyle: 'bold', textColor: DOC_COLORS.ink },
+        1: { cellWidth: tableInnerWidth - 40 - 20 - 26 - 30 },
+        2: { cellWidth: 20, halign: 'right' },
+        3: { cellWidth: 26, halign: 'right' },
+        4: { cellWidth: 30, halign: 'right', fontStyle: 'bold', textColor: DOC_COLORS.ink }
+      },
     });
 
     let finalY = (doc as any).lastAutoTable.finalY + 10;
-    const totalsWidth = 85;
-    const totalsX = pageWidth - totalsWidth - 14;
     const totalPaid = invoice.total_paid || 0;
     const balance = (invoice.total || 0) - totalPaid;
     const hasPayments = totalPaid > 0;
     const hasShipping = (invoice.shipping_cost || 0) > 0;
 
-    doc.setFontSize(9);
-    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    let totalsY = finalY + 5;
-    doc.setFont('helvetica', 'normal');
-    doc.text('Subtotal', totalsX, totalsY);
-    doc.text(formatCurrency(invoice.subtotal || invoice.total || 0), totalsX + totalsWidth, totalsY, { align: 'right' });
-    totalsY += 8;
+    const totalsRows: TotalsRow[] = [
+      { label: 'Subtotal', value: formatCurrency(invoice.subtotal || invoice.total || 0) },
+    ];
     if (hasShipping) {
-      doc.text('Shipping', totalsX, totalsY);
-      doc.text(formatCurrency(invoice.shipping_cost || 0), totalsX + totalsWidth, totalsY, { align: 'right' });
-      totalsY += 8;
+      totalsRows.push({ label: 'Shipping', value: formatCurrency(invoice.shipping_cost || 0) });
     }
     if (hasPayments) {
-      doc.text('Less Deposit', totalsX, totalsY);
-      doc.text(`(${formatCurrency(totalPaid)})`, totalsX + totalsWidth, totalsY, { align: 'right' });
-      totalsY += 8;
+      totalsRows.push({ label: 'Less Deposit', value: `(${formatCurrency(totalPaid)})` });
     }
-    doc.setDrawColor(200, 200, 200);
-    doc.setLineWidth(0.3);
-    doc.line(totalsX, totalsY, totalsX + totalsWidth, totalsY);
-    totalsY += 6;
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.text('BALANCE DUE', totalsX, totalsY);
-    doc.text(formatCurrency(hasPayments ? balance : (invoice.total || 0)), totalsX + totalsWidth, totalsY, { align: 'right' });
 
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.text('Thank you for your business!', pageWidth / 2, pageHeight - 12, { align: 'center' });
+    finalY = ensureRoom(doc, finalY, totalsRows.length * 9 + 16);
+    drawTotals(doc, finalY + 5, {
+      rows: totalsRows,
+      grandLabel: 'BALANCE DUE',
+      grandValue: formatCurrency(hasPayments ? balance : (invoice.total || 0)),
+      width: 85,
+    });
+
+    drawFooter(doc);
 
     return doc.output("datauristring").split(",")[1];
   };
 
   const formattedDueDate = invoice?.due_date
-    ? new Date(invoice.due_date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+    ? formatDocDate(invoice.due_date, "long")
     : "Upon Receipt";
 
   const formattedAmount = formatCurrency(invoice?.total || 0);
@@ -496,7 +447,7 @@ export function SendInvoiceNoticeDialog({
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Notice Type:</span>
                 <Badge variant={isBilled ? "default" : "destructive"}>
-                  {isBilled ? "Billed – Net 30" : "Payment Due"}
+                  {isBilled ? "Billed â€“ Net 30" : "Payment Due"}
                 </Badge>
               </div>
             </div>
@@ -634,7 +585,7 @@ export function SendInvoiceNoticeDialog({
 
               <p className="text-xs text-muted-foreground">
                 {attachPdf ? 'Invoice PDF will be included.' : 'Invoice PDF is currently excluded.'}
-                {additionalAttachments.length > 0 ? ` ${additionalAttachments.length} extra file${additionalAttachments.length > 1 ? 's' : ''} added • Total ${formatFileSize(additionalAttachments.reduce((sum, attachment) => sum + attachment.file.size, 0))}` : ' Add extra files if needed.'}
+                {additionalAttachments.length > 0 ? ` ${additionalAttachments.length} extra file${additionalAttachments.length > 1 ? 's' : ''} added â€¢ Total ${formatFileSize(additionalAttachments.reduce((sum, attachment) => sum + attachment.file.size, 0))}` : ' Add extra files if needed.'}
               </p>
             </div>
 
@@ -733,9 +684,9 @@ export function SendInvoiceNoticeDialog({
 
                   {/* Footer */}
                   <div className="bg-muted/50 rounded-b-lg p-4 border-x border-b space-y-2">
-                    <p className="text-xs text-destructive font-semibold">⚠️ Please do not reply to this email — this mailbox is not monitored.</p>
+                    <p className="text-xs text-destructive font-semibold">âš ï¸ Please do not reply to this email â€” this mailbox is not monitored.</p>
                     <p className="text-sm text-muted-foreground">Questions? Contact us at <span className="text-primary">{senderEmail}</span></p>
-                    <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} VibePKG. All rights reserved.</p>
+                    <p className="text-xs text-muted-foreground">Â© {new Date().getFullYear()} VibePKG. All rights reserved.</p>
                   </div>
                 </div>
               </div>

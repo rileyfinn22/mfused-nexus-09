@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge, badgeVariants } from "@/components/ui/badge";
@@ -13,7 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, Search, CheckCircle2, Clock, Circle, ChevronRight, Factory, CalendarClock, FileText, CalendarDays, Building2, RefreshCw, Truck, X, Link2, AlertCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { ProductionProgressBar, ProductionStatusIndicator } from "@/components/ProductionProgressBar";
-import { cn } from "@/lib/utils";
+import { formatDocDate, cn } from "@/lib/utils";
 import { format, parseISO } from "date-fns";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -684,7 +684,7 @@ export default function Production() {
       ? formatCompletionDate(order.order_finalized_at) 
       : (isCompleted ? formatCompletionDate(order.updated_at) : null);
     const deliveryText = deliveryInfo?.text ?? 'TBD';
-    const completionText = completionDate ?? '—';
+    const completionText = completionDate ?? 'â€”';
     const dateBadgeVariant = isCompleted ? 'success' : 'outline';
     const isSelected = selectedOrderIds.has(order.id);
 
@@ -742,7 +742,7 @@ export default function Production() {
                     <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-destructive"></span>
                   </span>
                   <span>Delayed</span>
-                  <span className="text-destructive/50">· View</span>
+                  <span className="text-destructive/50">Â· View</span>
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-64 p-3" align="start">
@@ -891,7 +891,7 @@ export default function Production() {
         
         <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground">
           <span>${order.total?.toFixed(2)}</span>
-          <span>{new Date(order.order_date).toLocaleDateString()}</span>
+          <span>{formatDocDate(order.order_date, "numeric")}</span>
         </div>
       </div>
     );
@@ -1026,7 +1026,7 @@ export default function Production() {
         <OrderTable 
           orderList={filteredCompletedOrders} 
           title="Completed Orders" 
-          emptyMessage="No completed orders yet — orders auto-complete when all invoices are paid"
+          emptyMessage="No completed orders yet â€” orders auto-complete when all invoices are paid"
         />
       </div>
 

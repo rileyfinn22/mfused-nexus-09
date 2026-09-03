@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { formatDocDate } from "@/lib/utils";
 import {
   DOC,
   DOC_COLORS,
@@ -41,7 +42,7 @@ export interface VendorBillPdfData {
 const money = (n: number, currency: string) =>
   `${currency === 'USD' ? '$' : ''}${Number(n || 0).toFixed(2)}${currency && currency !== 'USD' ? ' ' + currency : ''}`;
 
-const asDate = (v?: string | null) => (v ? new Date(v).toLocaleDateString() : '—');
+const asDate = (v?: string | null) => (v ? formatDocDate(v, 'medium') : '—');
 
 export function downloadVendorBillPdf(data: VendorBillPdfData) {
   const doc = new jsPDF();

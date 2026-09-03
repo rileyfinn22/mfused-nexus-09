@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Search, FolderKanban, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { formatDocDate } from "@/lib/utils";
 
 interface ProjectSummary {
   id: string;
@@ -298,7 +299,7 @@ const Projects = () => {
                         {project.description || <span className="text-muted-foreground">-</span>}
                       </span>
                     </TableCell>
-                    <TableCell className="py-4">{new Date(project.order_date).toLocaleDateString()}</TableCell>
+                    <TableCell className="py-4">{formatDocDate(project.order_date, "numeric")}</TableCell>
                     <TableCell className="py-4">
                       <Badge variant={project.status === 'completed' ? 'default' : 'secondary'}>
                         {project.status}
