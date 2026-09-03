@@ -679,116 +679,60 @@ function CustomerOrderView({
     try {
       const { default: jsPDF } = await import("jspdf");
       const { default: autoTable } = await import("jspdf-autotable");
+      const {
+        DOC,
+        DOC_COLORS,
+        docTableStyles,
+        drawDetailRows,
+        drawDocumentTitle,
+        drawFooter,
+        drawMasthead,
+        drawPartyBlock,
+      } = await import("@/lib/pdfDocument");
+
       const doc = new jsPDF(); // default mm units, a4-ish
       const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-
-      const primaryGreen = [76, 175, 80];
-      const darkGray = [51, 51, 51];
-      const mediumGray = [100, 100, 100];
 
       // ============ HEADER ============
-      let yPos = 15;
+      await drawMasthead(doc);
 
-      // Company name + address on left (matches invoice PDF)
-      doc.setFontSize(16);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-      doc.text("ArmorPak Inc. DBA Vibe Packaging", 14, yPos);
-
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-      doc.text("1415 S 700 W", 14, yPos + 7);
-      doc.text("Salt Lake City, UT 84104", 14, yPos + 12);
-      doc.text("www.vibepkg.com", 14, yPos + 17);
-
-      // Logo on right (same size as invoice PDF: 40×25)
-      try {
-        const logoResponse = await fetch("/images/vibe-logo.png");
-        const logoBlob = await logoResponse.blob();
-        const logoBase64 = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.readAsDataURL(logoBlob);
-        });
-        doc.addImage(logoBase64, "PNG", pageWidth - 54, yPos - 5, 40, 25);
-      } catch {
-        doc.setFontSize(14);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-        doc.text("VIBE", pageWidth - 14, yPos + 8, { align: "right" });
-      }
-
-      yPos += 28;
-
-      // Green divider
-      doc.setDrawColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-      doc.setLineWidth(0.5);
-      doc.line(14, yPos, pageWidth - 14, yPos);
-
-      yPos += 12;
-
-      // ============ TITLE ============
-      doc.setFontSize(24);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-      doc.text("Order Confirmation", 14, yPos);
-
-      yPos += 15;
+      let yPos = drawDocumentTitle(doc, {
+        label: "ORDER CONFIRMATION",
+        value: order.order_number,
+        metaLabel: "Ordered",
+        metaValue: format(new Date(order.created_at), "MMMM d, yyyy"),
+      });
 
       // ============ SHIP TO & ORDER DETAILS (two columns) ============
-      const leftColX = 14;
-      const rightColX = pageWidth / 2 + 10;
-
-      // Ship To label
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-      doc.text("Ship to", leftColX, yPos);
-
-      doc.setFontSize(11);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-      doc.text(order.shipping_name || "", leftColX, yPos + 8);
-
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-      let shipY = yPos + 14;
-      if (order.shipping_street) { doc.text(order.shipping_street, leftColX, shipY); shipY += 5; }
-      const cityLine = [order.shipping_city, order.shipping_state].filter(Boolean).join(", ") + (order.shipping_zip ? ` ${order.shipping_zip}` : "");
-      if (cityLine.trim()) { doc.text(cityLine, leftColX, shipY); }
-
-      // Order details on right
+      const leftColX = DOC.MARGIN;
+      const rightColX = pageWidth / 2 + 4;
       const detailsY = yPos;
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
 
-      doc.text("Order #:", rightColX, detailsY);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-      doc.text(order.order_number, rightColX + 45, detailsY);
+      const cityLine =
+        [order.shipping_city, order.shipping_state].filter(Boolean).join(", ") +
+        (order.shipping_zip ? ` ${order.shipping_zip}` : "");
 
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-      doc.text("Date:", rightColX, detailsY + 7);
-      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-      doc.text(format(new Date(order.created_at), "MMM d, yyyy"), rightColX + 45, detailsY + 7);
+      const shipY = drawPartyBlock(doc, leftColX, yPos, {
+        label: "SHIP TO",
+        name: order.shipping_name || "",
+        lines: [order.shipping_street || null, cityLine.trim() || null],
+      });
 
-      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-      doc.text("Status:", rightColX, detailsY + 14);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-      doc.text(formatLabel(order.status), rightColX + 45, detailsY + 14);
+      const detY = drawDetailRows(
+        doc,
+        rightColX,
+        detailsY,
+        [["Status", formatLabel(order.status)]],
+        { valueOffset: 30 }
+      );
 
-      yPos += 30;
+      yPos = Math.max(shipY + 8, detY + 10);
 
       // ============ ITEMS TABLE ============
       autoTable(doc, {
+        ...docTableStyles(),
         startY: yPos,
-        head: [["Item", "Material", "Qty", "Unit Price", "Total"]],
+        head: [["ITEM", "MATERIAL", "QTY", "UNIT PRICE", "TOTAL"]],
         body: lineItems.map((item: any) => [
           item.template_name,
           item.material || "—",
@@ -797,23 +741,24 @@ function CustomerOrderView({
           item.total != null && item.total > 0 ? `$${Number(item.total).toFixed(2)}` : "—",
         ]),
         foot: Number(order.total) > 0 ? [["", "", "", "Total", `$${Number(order.total).toFixed(2)}`]] : undefined,
-        styles: { fontSize: 9, cellPadding: 4 },
-        headStyles: { fillColor: [41, 41, 41], textColor: 255 },
-        footStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0], fontStyle: "bold" },
-        margin: { left: 14, right: 14 },
+        footStyles: {
+          fillColor: DOC_COLORS.headerBg,
+          textColor: DOC_COLORS.ink,
+          fontStyle: "bold",
+          fontSize: 9.5,
+          cellPadding: { top: 4, right: 4, bottom: 4, left: 6 },
+        },
+        columnStyles: {
+          0: { fontStyle: "bold", textColor: DOC_COLORS.ink },
+          1: { cellWidth: 32 },
+          2: { cellWidth: 22, halign: "right" },
+          3: { cellWidth: 28, halign: "right" },
+          4: { cellWidth: 28, halign: "right", fontStyle: "bold", textColor: DOC_COLORS.ink },
+        },
       });
 
       // ============ FOOTER ============
-      doc.setFontSize(8);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(128, 128, 128);
-      doc.text("Thank you for your order!", pageWidth / 2, pageHeight - 15, { align: "center" });
-      doc.text(
-        "ArmorPak Inc. DBA Vibe Packaging | 1415 S 700 W, Salt Lake City, UT 84104",
-        pageWidth / 2,
-        pageHeight - 10,
-        { align: "center" }
-      );
+      drawFooter(doc, "Thank you for your order.");
 
       doc.save(`${order.order_number}_confirmation.pdf`);
     } catch (e) {

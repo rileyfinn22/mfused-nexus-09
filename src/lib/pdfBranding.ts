@@ -1,6 +1,21 @@
+// Branding helpers for the pull & ship documents.
+//
+// The header these used to draw was a #4CAF50 "Vibe Packaging" set in 16pt
+// Helvetica with the address stacked opposite — no wordmark at all in the sync
+// path, because it "would be loaded async in enhanced version" and never was.
+// They now delegate to src/lib/pdfDocument.ts, the single owner of the house
+// style, so a packing list and an invoice come off the same press.
 import jsPDF from 'jspdf';
+import {
+  DOC,
+  DOC_COLORS,
+  drawFooter,
+  drawMastheadSync,
+  preloadPrintLogo,
+} from '@/lib/pdfDocument';
 
-// Company branding constants
+// Company branding constants. Kept here because the Send* email dialogs read
+// the structured address off it; the PDF masthead uses COMPANY in pdfDocument.
 export const VIBE_COMPANY = {
   name: 'Vibe Packaging',
   address: {
@@ -9,204 +24,57 @@ export const VIBE_COMPANY = {
     state: 'UT',
     zip: '84104'
   },
-  logoPath: '/images/vibe-logo.png'
+  logoPath: '/images/vibe-logo-print.png'
 };
 
-// Pre-load logo and cache as base64
-let cachedLogoBase64: string | null = null;
+/** @deprecated Use preloadPrintLogo from @/lib/pdfDocument. */
+export const preloadLogo = preloadPrintLogo;
 
-/**
- * Preloads the logo and caches it for synchronous use
- */
-export async function preloadLogo(): Promise<string | null> {
-  if (cachedLogoBase64) return cachedLogoBase64;
-  
-  try {
-    const response = await fetch(VIBE_COMPANY.logoPath);
-    const blob = await response.blob();
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        cachedLogoBase64 = reader.result as string;
-        resolve(cachedLogoBase64);
-      };
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(blob);
-    });
-  } catch (error) {
-    console.error('Failed to preload logo:', error);
-    return null;
-  }
+interface BrandingOptions {
+  documentTitle?: string;
+  /**
+   * Retained for call-site compatibility. The masthead always carries the
+   * company address now, so this no longer toggles anything.
+   */
+  showAddress?: boolean;
+  titleAlign?: 'left' | 'center' | 'right';
+}
+
+function drawTitleUnderMasthead(doc: jsPDF, options: BrandingOptions): number {
+  const { documentTitle } = options;
+  if (!documentTitle) return DOC.MASTHEAD_H + 14;
+
+  const yPos = DOC.MASTHEAD_H + 16;
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...DOC_COLORS.ink);
+  doc.text(documentTitle, DOC.MARGIN, yPos);
+  doc.setTextColor(...DOC_COLORS.body);
+  return yPos + 6;
 }
 
 /**
- * Adds Vibe Packaging branding header to a PDF document
- * @param doc - jsPDF document instance
- * @param options - Optional configuration
- * @returns The Y position after the header
+ * Adds the house masthead plus an optional document title.
+ * @returns The Y position after the header.
  */
-export async function addPdfBranding(
-  doc: jsPDF, 
-  options: { 
-    showAddress?: boolean;
-    documentTitle?: string;
-    titleAlign?: 'left' | 'center' | 'right';
-  } = {}
-): Promise<number> {
-  const { documentTitle, titleAlign = 'left' } = options;
-  const pageWidth = doc.internal.pageSize.getWidth();
-  
-  let yPos = 15;
-  
-  // Add document title on the left - smaller
-  if (documentTitle) {
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(17, 24, 39);
-    
-    let titleX = 14;
-    if (titleAlign === 'center') titleX = pageWidth / 2;
-    if (titleAlign === 'right') titleX = pageWidth - 14;
-    
-    doc.text(documentTitle, titleX, yPos + 5, { align: titleAlign });
-  }
-  
-  // Try to add logo on the RIGHT side
-  try {
-    const logoBase64 = await preloadLogo();
-    if (logoBase64) {
-      // Logo dimensions - maintain aspect ratio, position on right
-      const logoWidth = 40;
-      const logoHeight = 25;
-      doc.addImage(logoBase64, 'PNG', pageWidth - logoWidth - 14, yPos - 5, logoWidth, logoHeight);
-    } else {
-      throw new Error('Logo not loaded');
-    }
-  } catch (error) {
-    // Fallback to text on right if logo fails to load
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(76, 175, 80); // Green color
-    doc.text('Vibe Packaging', pageWidth - 14, yPos + 10, { align: 'right' });
-  }
-  
-  yPos += 25;
-  
-  // Reset text color
-  doc.setTextColor(0, 0, 0);
-  
-  return yPos;
+export async function addPdfBranding(doc: jsPDF, options: BrandingOptions = {}): Promise<number> {
+  await preloadPrintLogo();
+  drawMastheadSync(doc);
+  return drawTitleUnderMasthead(doc, options);
 }
 
 /**
- * Adds a branded footer to a PDF document
- * @param doc - jsPDF document instance
+ * Synchronous masthead for callers that are not async. The wordmark is
+ * preloaded when pdfDocument is imported, so it is normally warm by the time a
+ * user clicks Download; if not, the charcoal band still carries the company
+ * name and the document reads correctly.
  */
+export function addPdfBrandingSync(doc: jsPDF, options: BrandingOptions = {}): number {
+  drawMastheadSync(doc);
+  return drawTitleUnderMasthead(doc, options);
+}
+
+/** Rule, closing line and `Page n of m` on every page. */
 export function addPdfFooter(doc: jsPDF): void {
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(128, 128, 128);
-  doc.text('Thank you for your business!', pageWidth / 2, pageHeight - 15, { align: 'center' });
-  doc.text(
-    `${VIBE_COMPANY.name} | ${VIBE_COMPANY.address.street}, ${VIBE_COMPANY.address.city}, ${VIBE_COMPANY.address.state} ${VIBE_COMPANY.address.zip}`,
-    pageWidth / 2,
-    pageHeight - 10,
-    { align: 'center' }
-  );
-}
-
-/**
- * Loads an image from a URL and returns a data URL
- */
-async function loadImage(src: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(img, 0, 0);
-        resolve(canvas.toDataURL('image/png'));
-      } else {
-        reject(new Error('Could not get canvas context'));
-      }
-    };
-    img.onerror = () => reject(new Error('Failed to load image'));
-    img.src = src;
-  });
-}
-
-/**
- * Synchronous version that adds branding with embedded logo
- * Uses a pre-encoded base64 logo for immediate rendering
- */
-export function addPdfBrandingSync(
-  doc: jsPDF, 
-  options: { 
-    showAddress?: boolean;
-    documentTitle?: string;
-    titleAlign?: 'left' | 'center' | 'right';
-  } = {}
-): number {
-  const { showAddress = true, documentTitle, titleAlign = 'left' } = options;
-  const pageWidth = doc.internal.pageSize.getWidth();
-  
-  let yPos = 15;
-  
-  // Try to load and embed logo synchronously using canvas
-  try {
-    // Add text-based logo as fallback (logo will be loaded async in enhanced version)
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(76, 175, 80); // Green color matching logo
-    doc.text('Vibe Packaging', 14, yPos + 5);
-  } catch (error) {
-    // Fallback to text
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(76, 175, 80);
-    doc.text('Vibe Packaging', 14, yPos + 5);
-  }
-  
-  // Add company address on the right side
-  if (showAddress) {
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(100, 100, 100);
-    doc.text(VIBE_COMPANY.address.street, pageWidth - 14, yPos, { align: 'right' });
-    doc.text(
-      `${VIBE_COMPANY.address.city}, ${VIBE_COMPANY.address.state} ${VIBE_COMPANY.address.zip}`,
-      pageWidth - 14,
-      yPos + 5,
-      { align: 'right' }
-    );
-  }
-  
-  // Add document title if provided - smaller and left-aligned
-  if (documentTitle) {
-    yPos += 18;
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(17, 24, 39);
-    
-    let titleX = 14;
-    if (titleAlign === 'center') titleX = pageWidth / 2;
-    if (titleAlign === 'right') titleX = pageWidth - 14;
-    
-    doc.text(documentTitle, titleX, yPos, { align: titleAlign });
-    yPos += 8;
-  } else {
-    yPos += 20;
-  }
-  
-  // Reset text color
-  doc.setTextColor(0, 0, 0);
-  
-  return yPos;
+  drawFooter(doc);
 }

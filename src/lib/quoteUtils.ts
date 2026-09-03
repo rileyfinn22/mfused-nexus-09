@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { measureRichText, drawRichText } from './pdfRichText';
+import { DOC, DOC_COLORS, drawMasthead } from './pdfDocument';
 
 interface QuantityTier {
   qty: number;
@@ -50,66 +51,26 @@ interface Quote {
   created_at: string;
 }
 
-// Professional palette — charcoal/slate, no lime green
+// Palette and masthead now live in src/lib/pdfDocument.ts — this file was where
+// the house style was worked out, and every other document has since been moved
+// onto it. The two quote-only bands stay here.
 const COLORS = {
-  ink: [35, 41, 49] as [number, number, number],          // headings / body emphasis
-  body: [70, 78, 89] as [number, number, number],         // body text
-  muted: [120, 128, 138] as [number, number, number],     // labels / secondary
-  rule: [220, 224, 230] as [number, number, number],      // dividers
-  headerBg: [245, 246, 248] as [number, number, number],  // table header band
-  rowAlt: [250, 251, 252] as [number, number, number],    // subtle zebra
-  productBand: [35, 41, 49] as [number, number, number],  // dark product header
+  ...DOC_COLORS,
+  productBand: DOC_COLORS.ink,                             // dark product header
   optionBand: [240, 242, 245] as [number, number, number],
-  onInkMuted: [168, 176, 187] as [number, number, number], // secondary text on charcoal
 };
 
-// Charcoal masthead the wordmark sits in, and the mark's true w/h after the
-// slate plate is keyed out and trimmed (689x507).
-const MASTHEAD_H = 30;
-const LOGO_ASPECT = 1.359;
+const MASTHEAD_H = DOC.MASTHEAD_H;
 
 export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promise<void> {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const MARGIN = 16;
+  const MARGIN = DOC.MARGIN;
   const FOOTER_RESERVE = 36;
 
   // ============ HEADER ============
-  // The wordmark is white script with a green shadow — it is drawn for dark
-  // grounds, so on a white page it arrived as a black plate that read as pasted
-  // on. Give it a charcoal masthead instead: the logo's own ground is keyed out
-  // in vibe-logo-print.png, so it sits seamlessly on COLORS.ink, which is the
-  // same charcoal the product bands below already use.
-  doc.setFillColor(...COLORS.ink);
-  doc.rect(0, 0, pageWidth, MASTHEAD_H, 'F');
-
-  doc.setFontSize(13);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(255, 255, 255);
-  doc.text('ArmorPak Inc. DBA Vibe Packaging', MARGIN, 14);
-
-  doc.setFontSize(8.5);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(...COLORS.onInkMuted);
-  doc.text('1415 S 700 W  ·  Salt Lake City, UT 84104  ·  www.vibepkg.com', MARGIN, 21);
-
-  try {
-    const logoResponse = await fetch('/images/vibe-logo-print.png');
-    const logoBlob = await logoResponse.blob();
-    const logoBase64 = await new Promise<string>((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.readAsDataURL(logoBlob);
-    });
-    // Height-driven so the mark keeps its true proportions; the old call passed
-    // 36x22 against a 1.249 source and stretched it ~31% wide.
-    const logoH = 15;
-    const logoW = logoH * LOGO_ASPECT;
-    doc.addImage(logoBase64, 'PNG', pageWidth - MARGIN - logoW, (MASTHEAD_H - logoH) / 2, logoW, logoH);
-  } catch {
-    // Silent fallback — the masthead still reads without the mark.
-  }
+  await drawMasthead(doc);
 
   let yPos = MASTHEAD_H + 16;
 

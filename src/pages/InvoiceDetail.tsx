@@ -30,6 +30,17 @@ import { Label } from "@/components/ui/label";
 import { useQueryClient } from "@tanstack/react-query";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import {
+  DOC,
+  DOC_COLORS,
+  docTableStyles,
+  drawDetailRows,
+  drawDocumentTitle,
+  drawFooter,
+  drawMasthead,
+  drawPartyBlock,
+  ensureRoom,
+} from "@/lib/pdfDocument";
 
 import { generateInvoicePDF } from "@/lib/invoicePdfUtils";
 import { computeChildCredit } from "@/lib/invoiceBalance";
@@ -676,121 +687,41 @@ const InvoiceDetail = () => {
     try {
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
 
-      const primaryGreen = [76, 175, 80];
-      const darkGray = [51, 51, 51];
-      const mediumGray = [100, 100, 100];
-      const lightGray = [248, 248, 248];
+      await drawMasthead(doc);
 
-      let yPos = 15;
+      let yPos = drawDocumentTitle(doc, {
+        label: 'PACKING LIST',
+        value: String(invoice.invoice_number || ''),
+        metaLabel: 'Packed',
+        metaValue: format(new Date(), 'MMMM d, yyyy'),
+      });
 
-      doc.setFontSize(16);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-      doc.text('ArmorPak Inc. DBA Vibe Packaging', 14, yPos);
+      const leftColX = DOC.MARGIN;
+      const rightColX = pageWidth / 2 + 4;
+      const detailsStartY = yPos;
 
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-      doc.text('1415 S 700 W', 14, yPos + 7);
-      doc.text('Salt Lake City, UT 84104', 14, yPos + 12);
-      doc.text('www.vibepkg.com', 14, yPos + 17);
-
-      try {
-        const logoResponse = await fetch('/images/vibe-logo.png');
-        if (!logoResponse.ok) throw new Error(`Logo fetch failed: ${logoResponse.status}`);
-
-        const logoBlob = await logoResponse.blob();
-        const logoBase64 = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.onerror = () => reject(new Error('Failed to read logo'));
-          reader.readAsDataURL(logoBlob);
-        });
-
-        doc.addImage(logoBase64, 'PNG', pageWidth - 54, yPos - 5, 40, 25);
-      } catch (logoError) {
-        console.error('Packing list logo load failed:', logoError);
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-        doc.text('VIBE', pageWidth - 14, yPos + 8, { align: 'right' });
-      }
-
-      yPos += 28;
-
-      doc.setDrawColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-      doc.setLineWidth(0.5);
-      doc.line(14, yPos, pageWidth - 14, yPos);
-
-      yPos += 12;
-
-      doc.setFontSize(24);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-      doc.text('Packing List', 14, yPos);
-
-      yPos += 15;
-
-      const leftColX = 14;
-      const rightColX = pageWidth / 2 + 10;
-
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-      doc.text('Delivery Address', leftColX, yPos);
-
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
       const shipName = String(invoice.shipping_name || order.shipping_name || '');
       const shipStreet = String(invoice.shipping_street || order.shipping_street || '');
       const shipCity = String(invoice.shipping_city || order.shipping_city || '');
       const shipState = String(invoice.shipping_state || order.shipping_state || '');
       const shipZip = String(invoice.shipping_zip || order.shipping_zip || '');
-      doc.text(shipName || '—', leftColX, yPos + 8);
 
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+      const shipY = drawPartyBlock(doc, leftColX, yPos, {
+        label: 'DELIVERY ADDRESS',
+        name: shipName || '—',
+        lines: [
+          shipStreet || null,
+          [shipCity, shipState, shipZip].filter(Boolean).join(', ').replace(', ,', ',') || '—',
+        ],
+      });
 
-      let shipY = yPos + 14;
-      if (shipStreet) {
-        doc.text(shipStreet, leftColX, shipY);
-        shipY += 5;
-      }
-      doc.text([shipCity, shipState, shipZip].filter(Boolean).join(', ').replace(', ,', ',') || '—', leftColX, shipY);
+      const detailRows: Array<[string, string]> = [['Order #', String(order.order_number || '')]];
+      if (order.po_number) detailRows.push(['PO #', String(order.po_number)]);
 
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+      const detY = drawDetailRows(doc, rightColX, detailsStartY, detailRows, { valueOffset: 30 });
 
-      const detailsStartY = yPos;
-      doc.text('Invoice #:', rightColX, detailsStartY);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-      doc.text(String(invoice.invoice_number || ''), rightColX + 45, detailsStartY);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-      doc.text('Order #:', rightColX, detailsStartY + 7);
-      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-      doc.text(String(order.order_number || ''), rightColX + 45, detailsStartY + 7);
-
-      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-      doc.text('Date:', rightColX, detailsStartY + 14);
-      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-      doc.text(format(new Date(), 'MMM d, yyyy'), rightColX + 45, detailsStartY + 14);
-
-      if (order.po_number) {
-        doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-        doc.text('PO #:', rightColX, detailsStartY + 21);
-        doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-        doc.text(String(order.po_number), rightColX + 45, detailsStartY + 21);
-      }
-
-      yPos += 40;
+      yPos = Math.max(shipY + 8, detY + 10);
 
       let itemsForPacking: any[] = [];
       if (inventoryAllocations.length > 0) {
@@ -823,54 +754,26 @@ const InvoiceDetail = () => {
       ]);
 
       autoTable(doc, {
+        ...docTableStyles(),
         startY: yPos,
         head: [['ITEM ID', 'SKU', 'DESCRIPTION', 'QTY']],
         body: tableData,
-        theme: 'plain',
-        headStyles: {
-          fillColor: [primaryGreen[0], primaryGreen[1], primaryGreen[2]],
-          textColor: 255,
-          fontStyle: 'bold',
-          fontSize: 9,
-          cellPadding: 4
-        },
-        bodyStyles: {
-          fontSize: 9,
-          cellPadding: 4,
-          textColor: [darkGray[0], darkGray[1], darkGray[2]],
-          lineWidth: 0
-        },
-        alternateRowStyles: {
-          fillColor: [lightGray[0], lightGray[1], lightGray[2]]
-        },
         columnStyles: {
-          0: { cellWidth: 30 },
-          1: { cellWidth: 40 },
-          2: { cellWidth: 85 },
-          3: { cellWidth: 25, halign: 'center' }
+          0: { cellWidth: 28 },
+          1: { cellWidth: 36, fontStyle: 'bold', textColor: DOC_COLORS.ink },
+          3: { cellWidth: 22, halign: 'right', fontStyle: 'bold', textColor: DOC_COLORS.ink }
         },
-        margin: { left: 14, right: 14 },
-        showHead: 'firstPage',
-        tableLineWidth: 0
       });
 
       const totalItems = itemsForPacking.reduce((sum: number, item: any) => sum + (Number(item?.quantity) || 0), 0);
-      let tableEndY = ((doc as any).lastAutoTable?.finalY ?? yPos) + 15;
+      const tableEndY = ensureRoom(doc, ((doc as any).lastAutoTable?.finalY ?? yPos) + 12, 20);
 
-      if (tableEndY + 30 > pageHeight - 10) {
-        doc.addPage();
-        tableEndY = 20;
-      }
-
-      doc.setFontSize(11);
+      doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-      doc.text(`Total Quantity: ${totalItems.toLocaleString()}`, 14, tableEndY);
+      doc.setTextColor(...DOC_COLORS.ink);
+      doc.text(`Total quantity: ${totalItems.toLocaleString()}`, DOC.MARGIN, tableEndY + 4);
 
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-      doc.text('Thank you for your business!', pageWidth / 2, pageHeight - 12, { align: 'center' });
+      drawFooter(doc);
 
       triggerBlobFileDownload(doc.output('blob'), `packing-list-${invoice.invoice_number}.pdf`);
 

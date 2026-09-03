@@ -1,5 +1,16 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import {
+  DOC,
+  DOC_COLORS,
+  docTableStyles,
+  drawDetailRows,
+  drawDocumentTitle,
+  drawFooter,
+  drawMastheadSync,
+  drawNotes,
+  ensureRoom,
+} from "@/lib/pdfDocument";
 
 // A one-page record of a vendor bill. Every bill can be downloaded, including the ones migrated
 // off the PO that have no document of their own -- those are exactly the ones you cannot open
@@ -34,49 +45,44 @@ const asDate = (v?: string | null) => (v ? new Date(v).toLocaleDateString() : '�
 
 export function downloadVendorBillPdf(data: VendorBillPdfData) {
   const doc = new jsPDF();
-  const pageWidth = doc.internal.pageSize.getWidth();
   const currency = data.currency || 'USD';
-  const primaryGreen: [number, number, number] = [22, 101, 52];
-  const mediumGray: [number, number, number] = [110, 110, 110];
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(18);
-  doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-  doc.text('VENDOR BILL', 14, 20);
+  drawMastheadSync(doc);
 
-  if (data.status === 'draft') {
-    doc.setFontSize(10);
-    doc.setTextColor(180, 83, 9);
-    doc.text('DRAFT — not yet confirmed', 14, 27);
-  }
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.setTextColor(60, 60, 60);
-
-  let y = data.status === 'draft' ? 37 : 32;
-
-  const refs: Array<[string, string]> = [
-    ['Our PO', data.poNumber || '—'],
-    ["Vendor's invoice #", data.invoiceNumber || '—'],
-    ['Vendor', data.vendorName || '—'],
-    ['Vibe invoice', data.vibeInvoiceNumbers?.length ? data.vibeInvoiceNumbers.join(', ') : '—'],
-    ['Customer PO', data.customerPO || '—'],
-    ['Bill date', asDate(data.billDate)],
-    ['Due date', asDate(data.dueDate)],
-  ];
-
-  refs.forEach(([label, value]) => {
-    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    doc.text(label, 14, y);
-    doc.setTextColor(30, 30, 30);
-    doc.text(String(value), 60, y);
-    y += 6;
+  let y = drawDocumentTitle(doc, {
+    label: 'VENDOR BILL',
+    value: data.invoiceNumber || data.poNumber || '—',
+    metaLabel: 'Bill Date',
+    metaValue: asDate(data.billDate),
   });
 
-  y += 4;
+  if (data.status === 'draft') {
+    // Internal record: say plainly it is not confirmed rather than letting the
+    // figures read as settled.
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(180, 83, 9);
+    doc.text('DRAFT — NOT YET CONFIRMED', DOC.MARGIN, y);
+    y += 8;
+  }
+
+  y = drawDetailRows(
+    doc,
+    DOC.MARGIN,
+    y,
+    [
+      ['Our PO', data.poNumber || '—'],
+      ["Vendor's invoice #", data.invoiceNumber || '—'],
+      ['Vendor', data.vendorName || '—'],
+      ['Vibe invoice', data.vibeInvoiceNumbers?.length ? data.vibeInvoiceNumbers.join(', ') : '—'],
+      ['Customer PO', data.customerPO || '—'],
+      ['Due date', asDate(data.dueDate)],
+    ],
+    { label: 'REFERENCES', valueOffset: 46 }
+  ) + 10;
 
   autoTable(doc, {
+    ...docTableStyles(),
     startY: y,
     head: [['', 'AMOUNT']],
     body: [
@@ -84,39 +90,39 @@ export function downloadVendorBillPdf(data: VendorBillPdfData) {
       ['Freight', money(data.freight, currency)],
       ['Total', money(data.total, currency)],
     ],
-    theme: 'plain',
-    headStyles: {
-      fillColor: primaryGreen, textColor: 255, fontStyle: 'bold', fontSize: 9, cellPadding: 4,
-    },
-    bodyStyles: { fontSize: 10, cellPadding: 4 },
     columnStyles: {
       0: { cellWidth: 'auto' },
-      1: { cellWidth: 45, halign: 'right', fontStyle: 'bold' },
+      1: { cellWidth: 45, halign: 'right', fontStyle: 'bold', textColor: DOC_COLORS.ink },
     },
-    margin: { left: 14, right: 14 },
-    didParseCell: (hook) => {
-      if (hook.section === 'body' && hook.row.index === 2) {
+    didParseCell: (hook: any) => {
+      if (hook.section !== 'body') return;
+      hook.cell.styles.lineColor = DOC_COLORS.rule;
+      hook.cell.styles.lineWidth = { top: 0, right: 0, bottom: 0.1, left: 0 };
+      if (hook.row.index === 2) {
         hook.cell.styles.fontStyle = 'bold';
-        hook.cell.styles.fontSize = 11;
+        hook.cell.styles.fontSize = 10.5;
+        hook.cell.styles.textColor = DOC_COLORS.ink;
+        hook.cell.styles.lineWidth = { top: 0.4, right: 0, bottom: 0, left: 0 };
       }
     },
   });
 
-  let afterY = (doc as any).lastAutoTable.finalY + 10;
+  let afterY = ensureRoom(doc, (doc as any).lastAutoTable.finalY + 12, 20);
 
   if (data.documentName) {
     doc.setFontSize(9);
-    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    doc.text(`Vendor document on file: ${data.documentName}`, 14, afterY);
-    afterY += 6;
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...DOC_COLORS.muted);
+    doc.text(`Vendor document on file: ${data.documentName}`, DOC.MARGIN, afterY);
+    afterY += 10;
   }
 
   if (data.notes) {
-    doc.setFontSize(9);
-    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    const lines = doc.splitTextToSize(data.notes, pageWidth - 28);
-    doc.text(lines, 14, afterY);
+    afterY = ensureRoom(doc, afterY, 24);
+    drawNotes(doc, afterY, 'NOTES', data.notes);
   }
+
+  drawFooter(doc, 'Internal record of the bill entered against this PO.');
 
   const safePo = String(data.poNumber || 'PO').replace(/[^\w.-]+/g, '_');
   const safeInv = data.invoiceNumber ? `-${String(data.invoiceNumber).replace(/[^\w.-]+/g, '_')}` : '';

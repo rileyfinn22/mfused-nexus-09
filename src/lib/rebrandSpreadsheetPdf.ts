@@ -1,13 +1,16 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
+import { COMPANY, DOC, DOC_COLORS } from "@/lib/pdfDocument";
 
-const BRAND_GREEN: [number, number, number] = [76, 175, 80];
-const DARK_GRAY: [number, number, number] = [51, 51, 51];
-const MEDIUM_GRAY: [number, number, number] = [100, 100, 100];
+const DARK_GRAY: [number, number, number] = DOC_COLORS.ink;
+const MEDIUM_GRAY: [number, number, number] = DOC_COLORS.muted;
+const MASTHEAD_INK: [number, number, number] = DOC_COLORS.ink;
+const ON_INK_MUTED: [number, number, number] = DOC_COLORS.onInkMuted;
 const PAGE_MARGIN = 24;
-// Minimal header — just enough room for the Vibe logo at the top
-const HEADER_BOTTOM = 60;
+// This document is laid out in points, so the masthead is sized in points too.
+const MASTHEAD_HEIGHT = 58;
+const HEADER_BOTTOM = MASTHEAD_HEIGHT + 10;
 const TABLE_TOP = HEADER_BOTTOM + 8;
 const MAX_COLUMNS_PER_PAGE = 8;
 
@@ -189,14 +192,34 @@ const drawPageChrome = (
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
 
-  // Just the Vibe logo at the top — no other branding, titles, or metadata
+  // Same charcoal masthead as every other document, redrawn here because this
+  // one is laid out in points rather than the mm the rest of the PDFs use. The
+  // old header dropped the dark-ground wordmark straight onto white at 70x32
+  // against a 1.249 source — a black plate, stretched nearly 2:1.
+  doc.setFillColor(...MASTHEAD_INK);
+  doc.rect(0, 0, pageWidth, MASTHEAD_HEIGHT, "F");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.setTextColor(255, 255, 255);
+  doc.text(COMPANY.legalName, PAGE_MARGIN, 26);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  doc.setTextColor(...ON_INK_MUTED);
+  doc.text(COMPANY.contactLine, PAGE_MARGIN, 40);
+
   if (logoDataUrl) {
-    doc.addImage(logoDataUrl, "PNG", PAGE_MARGIN, 14, 70, 32);
-  } else {
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
-    doc.setTextColor(...BRAND_GREEN);
-    doc.text("Vibe Packaging", PAGE_MARGIN, 32);
+    const logoH = 30;
+    const logoW = logoH * DOC.LOGO_ASPECT;
+    doc.addImage(
+      logoDataUrl,
+      "PNG",
+      pageWidth - PAGE_MARGIN - logoW,
+      (MASTHEAD_HEIGHT - logoH) / 2,
+      logoW,
+      logoH,
+    );
   }
 
   // Footer — page number only
@@ -226,7 +249,7 @@ export const matrixToBrandedPdf = async (
 ): Promise<Blob> => {
   if (matrix.length === 0) throw new Error("No data to render");
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "letter" });
-  const logoDataUrl = await loadLogoDataUrl(options.logoPath || "/images/vibe-logo.png").catch(() => null);
+  const logoDataUrl = await loadLogoDataUrl(options.logoPath || "/images/vibe-logo-print.png").catch(() => null);
 
   const columnGroups = splitColumnGroups(matrix[0].length || 1);
 

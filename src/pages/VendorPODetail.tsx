@@ -1,5 +1,4 @@
-import { useState, useEffect } from "react";
-import { pdfItemDescription } from "@/lib/pdfItemText";
+﻿import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,9 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Download, Edit, Save, X, Plus, Send, DollarSign, Trash2, FileCheck, Paperclip, Upload, FileText, ExternalLink, Package, Banknote } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 import { VIBE_COMPANY } from "@/lib/pdfBranding";
+import { renderVendorPoDoc, type PoPdfData } from "@/lib/vendorPoPdf";
 import { EmailPreviewDialog, AdditionalAttachment, ArtworkFile } from "@/components/EmailPreviewDialog";
 import { RecordVendorPOPaymentDialog } from "@/components/RecordVendorPOPaymentDialog";
 import { VendorPOPackingListSection } from "@/components/VendorPOPackingListSection";
@@ -450,296 +448,54 @@ const VendorPODetail = () => {
     return entries;
   };
 
-  const drawCaseStickerCallout = (
-    doc: jsPDF,
-    startY: number,
-    pageWidth: number,
-    info: Array<{ orderNumber?: string; invoiceNumber?: string; customerPO?: string }>
-  ): number => {
-    if (!info || info.length === 0) return startY;
-    const boxX = 14;
-    const boxW = pageWidth - 28;
-    const lineHeight = 5;
-    const padding = 4;
-    const boxH = 14 + info.length * lineHeight + padding;
+  /**
+   * Builds the payload for the one PO renderer in src/lib/vendorPoPdf.ts. This
+   * page used to carry two byte-identical 130-line copies of the document â€” one
+   * for Download, one for the email attachment â€” plus a third copy lived in the
+   * vendor portal, so any fix had to be made three times and never was.
+   * splitPOTotals stays the owner of the money math; the renderer is handed its
+   * result rather than re-deriving it.
+   */
+  const buildPoPdfData = async (): Promise<{
+    data: PoPdfData;
+    totals: ReturnType<typeof splitPOTotals>;
+  } | null> => {
+    if (!po || !vendor) return null;
 
-    doc.setFillColor(254, 243, 199);
-    doc.setDrawColor(217, 119, 6);
-    doc.setLineWidth(0.4);
-    doc.roundedRect(boxX, startY, boxW, boxH, 1.5, 1.5, 'FD');
+    const data: PoPdfData = {
+      poNumber: po.po_number,
+      orderDate: po.order_date,
+      expectedDeliveryDate: po.expected_delivery_date,
+      orderNumber: po.orders?.order_number || null,
+      vendorName: vendor.name,
+      vendorContact: {
+        name: vendor.contact_name,
+        email: vendor.contact_email,
+        phone: vendor.contact_phone,
+      },
+      shipTo: {
+        name: po.ship_to_name,
+        street: po.ship_to_street,
+        city: po.ship_to_city,
+        state: po.ship_to_state,
+        zip: po.ship_to_zip,
+      },
+      stickerInfo: await fetchCaseStickerInfo(),
+      items: poItems,
+      shippingCost: Number(po.shipping_cost || 0),
+      total: Number(po.total || 0),
+    };
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(146, 64, 14);
-    doc.text('REQUIRED ON CASE STICKERS', boxX + padding, startY + padding + 3);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8.5);
-    doc.setTextColor(60, 60, 60);
-    doc.text('Each case label must include the Vibe Invoice # and Customer PO # below:', boxX + padding, startY + padding + 8);
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(17, 24, 39);
-    let y = startY + padding + 14;
-    info.forEach((row) => {
-      const parts: string[] = [];
-      if (row.orderNumber) parts.push(`Order #${row.orderNumber}`);
-      if (row.invoiceNumber) parts.push(`Inv # ${row.invoiceNumber}`);
-      if (row.customerPO) parts.push(`PO ${row.customerPO}`);
-      doc.text('• ' + parts.join('   |   '), boxX + padding, y);
-      y += lineHeight;
-    });
-
-    return startY + boxH + 6;
+    return { data, totals: splitPOTotals(poItems, po.shipping_cost) };
   };
 
   const handleDownloadPDF = async () => {
-    if (!po || !vendor) return;
+    const built = await buildPoPdfData();
+    if (!built) return;
 
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    
-    // Colors
-    const primaryGreen = [76, 175, 80];
-    const darkGray = [51, 51, 51];
-    const lightGray = [248, 248, 248];
-    const mediumGray = [100, 100, 100];
-    
-    // ============ HEADER SECTION ============
-    let yPos = 15;
-    
-    // Company name and address on left
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.text('ArmorPak Inc. DBA Vibe Packaging', 14, yPos);
-    
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    doc.text('1415 S 700 W', 14, yPos + 7);
-    doc.text('Salt Lake City, UT 84104', 14, yPos + 12);
-    doc.text('www.vibepkg.com', 14, yPos + 17);
-    
-    // Logo on right
-    try {
-      const logoResponse = await fetch('/images/vibe-logo.png');
-      const logoBlob = await logoResponse.blob();
-      const logoBase64 = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.readAsDataURL(logoBlob);
-      });
-      doc.addImage(logoBase64, 'PNG', pageWidth - 54, yPos - 5, 40, 25);
-    } catch (error) {
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-      doc.text('VIBE', pageWidth - 14, yPos + 8, { align: 'right' });
-    }
-    
-    yPos += 28;
-    
-    // Divider line
-    doc.setDrawColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.setLineWidth(0.5);
-    doc.line(14, yPos, pageWidth - 14, yPos);
-    
-    yPos += 12;
-    
-    // ============ PO TITLE ============
-    doc.setFontSize(24);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    doc.text('Purchase Order', 14, yPos);
-    
-    yPos += 15;
-    
-    // ============ VENDOR & PO DETAILS SECTION ============
-    const leftColX = 14;
-    const rightColX = pageWidth / 2 + 10;
-    
-    // Vendor section (left)
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    doc.text('Vendor', leftColX, yPos);
-    
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    doc.text(vendor.name, leftColX, yPos + 8);
-    
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    
-    let vendorY = yPos + 14;
-    if (vendor.contact_name) {
-      doc.text(vendor.contact_name, leftColX, vendorY);
-      vendorY += 5;
-    }
-    if (vendor.contact_email) {
-      doc.text(vendor.contact_email, leftColX, vendorY);
-      vendorY += 5;
-    }
-    if (vendor.contact_phone) {
-      doc.text(vendor.contact_phone, leftColX, vendorY);
-    }
-    
-    // PO details on right
-    const detailsStartY = yPos;
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    
-    doc.text('PO #:', rightColX, detailsStartY);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    doc.text(po.po_number, rightColX + 45, detailsStartY);
-    
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    doc.text('Date:', rightColX, detailsStartY + 7);
-    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    doc.text(new Date(po.order_date).toLocaleDateString(), rightColX + 45, detailsStartY + 7);
-    
-    if (po.expected_delivery_date) {
-      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-      doc.text('Due Date:', rightColX, detailsStartY + 14);
-      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-      doc.text(new Date(po.expected_delivery_date).toLocaleDateString(), rightColX + 45, detailsStartY + 14);
-    }
-    
-    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    doc.text('Order #:', rightColX, detailsStartY + 21);
-    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    doc.text(po.orders?.order_number || 'N/A', rightColX + 45, detailsStartY + 21);
-    
-    yPos += 40;
-    
-    // Ship To section
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    doc.text('Ship To', leftColX, yPos);
-    
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    
-    let shipY = yPos + 7;
-    if (po.ship_to_name) {
-      doc.setFont('helvetica', 'bold');
-      doc.text(po.ship_to_name, leftColX, shipY);
-      doc.setFont('helvetica', 'normal');
-      shipY += 5;
-    }
-    if (po.ship_to_street) {
-      doc.text(po.ship_to_street, leftColX, shipY);
-      shipY += 5;
-    }
-    const cityStateZip = [po.ship_to_city, po.ship_to_state, po.ship_to_zip].filter(Boolean).join(', ');
-    if (cityStateZip) {
-      doc.text(cityStateZip, leftColX, shipY);
-    }
-    
-    yPos += 28;
+    const doc = await renderVendorPoDoc(built.data, built.totals);
+    doc.save(`vendor-po-${built.data.poNumber}.pdf`);
 
-    // Case sticker callout (Vibe Invoice # + Customer PO #)
-    const csInfoDownload = await fetchCaseStickerInfo();
-    yPos = drawCaseStickerCallout(doc, yPos, pageWidth, csInfoDownload);
-
-    // ============ ITEMS TABLE ============
-    // Shipping is summarised in the totals section below, so it must not also appear as a line.
-    const tableData = poItems.filter(item => !isShippingItem(item)).map(item => [
-      item.sku,
-      pdfItemDescription(item),
-      item.quantity.toLocaleString(),
-      `$${Number(item.unit_cost).toFixed(3)}`,
-      `$${orderedLineAmount(item).toFixed(2)}`
-    ]);
-
-    autoTable(doc, {
-      startY: yPos,
-      head: [['SKU', 'DESCRIPTION', 'QTY', 'UNIT COST', 'AMOUNT']],
-      body: tableData,
-      theme: 'plain',
-      headStyles: { 
-        fillColor: [primaryGreen[0], primaryGreen[1], primaryGreen[2]], 
-        textColor: 255,
-        fontStyle: 'bold',
-        fontSize: 9,
-        cellPadding: 4
-      },
-      bodyStyles: {
-        fontSize: 9,
-        cellPadding: 4,
-        textColor: [darkGray[0], darkGray[1], darkGray[2]],
-        lineWidth: 0
-      },
-      alternateRowStyles: {
-        fillColor: [lightGray[0], lightGray[1], lightGray[2]]
-      },
-      columnStyles: {
-        0: { cellWidth: 30 },
-        1: { cellWidth: 'auto' },
-        2: { cellWidth: 20, halign: 'center' },
-        3: { cellWidth: 28, halign: 'right' },
-        4: { cellWidth: 28, halign: 'right', fontStyle: 'bold' }
-      },
-      margin: { left: 14, right: 14 },
-      showHead: 'firstPage',
-      tableLineWidth: 0,
-      tableWidth: 'auto'
-    });
-
-    // ============ TOTALS SECTION ============
-    const finalY = (doc as any).lastAutoTable.finalY + 10;
-    const { itemsTotal, shipping: shippingCost, totalAmount } = splitPOTotals(poItems, po.shipping_cost);
-    
-    const totalsWidth = 80;
-    const totalsX = pageWidth - totalsWidth - 14;
-    
-    // Subtotal
-    if (shippingCost > 0) {
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-      doc.text('Subtotal', totalsX, finalY + 4);
-      doc.text(`$${itemsTotal.toFixed(2)}`, pageWidth - 14, finalY + 4, { align: 'right' });
-      
-      doc.text('Shipping', totalsX, finalY + 12);
-      doc.text(`$${shippingCost.toFixed(2)}`, pageWidth - 14, finalY + 12, { align: 'right' });
-    }
-    
-    // Divider line before total
-    const totalLineY = shippingCost > 0 ? finalY + 16 : finalY;
-    doc.setDrawColor(200, 200, 200);
-    doc.setLineWidth(0.3);
-    doc.line(totalsX, totalLineY, pageWidth - 14, totalLineY);
-    
-    // Total - emphasized
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.text('TOTAL', totalsX, totalLineY + 8);
-    doc.text(`$${totalAmount.toFixed(2)}`, pageWidth - 14, totalLineY + 8, { align: 'right' });
-
-    // ============ FOOTER ============
-    // Only add footer if there's enough space, otherwise it will overlap with table
-    const footerY = Math.max(finalY + 30, pageHeight - 20);
-    if (footerY < pageHeight - 10) {
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-      doc.text('Thank you for your business!', pageWidth / 2, pageHeight - 12, { align: 'center' });
-    }
-
-    doc.save(`vendor-po-${po.po_number}.pdf`);
-    
     toast({
       title: "PDF Downloaded",
       description: "Vendor PO has been downloaded"
@@ -747,245 +503,10 @@ const VendorPODetail = () => {
   };
 
   const generatePdfBase64 = async (): Promise<string> => {
-    if (!po || !vendor) return '';
+    const built = await buildPoPdfData();
+    if (!built) return '';
 
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    
-    // Colors
-    const primaryGreen = [76, 175, 80];
-    const darkGray = [51, 51, 51];
-    const lightGray = [248, 248, 248];
-    const mediumGray = [100, 100, 100];
-    
-    // ============ HEADER SECTION ============
-    let yPos = 15;
-    
-    // Company name and address on left
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.text('ArmorPak Inc. DBA Vibe Packaging', 14, yPos);
-    
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    doc.text('1415 S 700 W', 14, yPos + 7);
-    doc.text('Salt Lake City, UT 84104', 14, yPos + 12);
-    doc.text('www.vibepkg.com', 14, yPos + 17);
-    
-    // Logo on right
-    try {
-      const logoResponse = await fetch('/images/vibe-logo.png');
-      const logoBlob = await logoResponse.blob();
-      const logoBase64 = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.readAsDataURL(logoBlob);
-      });
-      doc.addImage(logoBase64, 'PNG', pageWidth - 54, yPos - 5, 40, 25);
-    } catch (error) {
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-      doc.text('VIBE', pageWidth - 14, yPos + 8, { align: 'right' });
-    }
-    
-    yPos += 28;
-    
-    // Divider line
-    doc.setDrawColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.setLineWidth(0.5);
-    doc.line(14, yPos, pageWidth - 14, yPos);
-    
-    yPos += 12;
-    
-    // ============ PO TITLE ============
-    doc.setFontSize(24);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    doc.text('Purchase Order', 14, yPos);
-    
-    yPos += 15;
-    
-    // ============ VENDOR & PO DETAILS SECTION ============
-    const leftColX = 14;
-    const rightColX = pageWidth / 2 + 10;
-    
-    // Vendor section (left)
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    doc.text('Vendor', leftColX, yPos);
-    
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    doc.text(vendor.name, leftColX, yPos + 8);
-    
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    
-    let vendorY = yPos + 14;
-    if (vendor.contact_name) {
-      doc.text(vendor.contact_name, leftColX, vendorY);
-      vendorY += 5;
-    }
-    if (vendor.contact_email) {
-      doc.text(vendor.contact_email, leftColX, vendorY);
-      vendorY += 5;
-    }
-    if (vendor.contact_phone) {
-      doc.text(vendor.contact_phone, leftColX, vendorY);
-    }
-    
-    // PO details on right
-    const detailsStartY = yPos;
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    
-    doc.text('PO #:', rightColX, detailsStartY);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    doc.text(po.po_number, rightColX + 45, detailsStartY);
-    
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    doc.text('Date:', rightColX, detailsStartY + 7);
-    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    doc.text(new Date(po.order_date).toLocaleDateString(), rightColX + 45, detailsStartY + 7);
-    
-    if (po.expected_delivery_date) {
-      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-      doc.text('Due Date:', rightColX, detailsStartY + 14);
-      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-      doc.text(new Date(po.expected_delivery_date).toLocaleDateString(), rightColX + 45, detailsStartY + 14);
-    }
-    
-    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    doc.text('Order #:', rightColX, detailsStartY + 21);
-    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    doc.text(po.orders?.order_number || 'N/A', rightColX + 45, detailsStartY + 21);
-    
-    yPos += 40;
-    
-    // Ship To section
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-    doc.text('Ship To', leftColX, yPos);
-    
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    
-    let shipY = yPos + 7;
-    if (po.ship_to_name) {
-      doc.setFont('helvetica', 'bold');
-      doc.text(po.ship_to_name, leftColX, shipY);
-      doc.setFont('helvetica', 'normal');
-      shipY += 5;
-    }
-    if (po.ship_to_street) {
-      doc.text(po.ship_to_street, leftColX, shipY);
-      shipY += 5;
-    }
-    const cityStateZip = [po.ship_to_city, po.ship_to_state, po.ship_to_zip].filter(Boolean).join(', ');
-    if (cityStateZip) {
-      doc.text(cityStateZip, leftColX, shipY);
-    }
-    
-    yPos += 28;
-
-    // Case sticker callout (Vibe Invoice # + Customer PO #)
-    const csInfoEmail = await fetchCaseStickerInfo();
-    yPos = drawCaseStickerCallout(doc, yPos, pageWidth, csInfoEmail);
-
-    // ============ ITEMS TABLE ============
-    // Shipping is summarised in the totals section below, so it must not also appear as a line.
-    const tableData = poItems.filter(item => !isShippingItem(item)).map(item => [
-      item.sku,
-      pdfItemDescription(item),
-      item.quantity.toLocaleString(),
-      `$${Number(item.unit_cost).toFixed(3)}`,
-      `$${orderedLineAmount(item).toFixed(2)}`
-    ]);
-
-    autoTable(doc, {
-      startY: yPos,
-      head: [['SKU', 'DESCRIPTION', 'QTY', 'UNIT COST', 'AMOUNT']],
-      body: tableData,
-      theme: 'plain',
-      headStyles: { 
-        fillColor: [primaryGreen[0], primaryGreen[1], primaryGreen[2]], 
-        textColor: 255,
-        fontStyle: 'bold',
-        fontSize: 9,
-        cellPadding: 4
-      },
-      bodyStyles: {
-        fontSize: 9,
-        cellPadding: 4,
-        textColor: [darkGray[0], darkGray[1], darkGray[2]],
-        lineWidth: 0
-      },
-      alternateRowStyles: {
-        fillColor: [lightGray[0], lightGray[1], lightGray[2]]
-      },
-      columnStyles: {
-        0: { cellWidth: 30 },
-        1: { cellWidth: 'auto' },
-        2: { cellWidth: 20, halign: 'center' },
-        3: { cellWidth: 28, halign: 'right' },
-        4: { cellWidth: 28, halign: 'right', fontStyle: 'bold' }
-      },
-      margin: { left: 14, right: 14 },
-      showHead: 'firstPage',
-      tableLineWidth: 0,
-      tableWidth: 'auto'
-    });
-
-    // ============ TOTALS SECTION ============
-    const finalY = (doc as any).lastAutoTable.finalY + 10;
-    const { itemsTotal, shipping: shippingCost, totalAmount } = splitPOTotals(poItems, po.shipping_cost);
-    
-    const totalsWidth = 80;
-    const totalsX = pageWidth - totalsWidth - 14;
-    
-    if (shippingCost > 0) {
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-      doc.text('Subtotal', totalsX, finalY + 4);
-      doc.text(`$${itemsTotal.toFixed(2)}`, pageWidth - 14, finalY + 4, { align: 'right' });
-      
-      doc.text('Shipping', totalsX, finalY + 12);
-      doc.text(`$${shippingCost.toFixed(2)}`, pageWidth - 14, finalY + 12, { align: 'right' });
-    }
-    
-    const totalLineY = shippingCost > 0 ? finalY + 16 : finalY;
-    doc.setDrawColor(200, 200, 200);
-    doc.setLineWidth(0.3);
-    doc.line(totalsX, totalLineY, pageWidth - 14, totalLineY);
-    
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.text('TOTAL', totalsX, totalLineY + 8);
-    doc.text(`$${totalAmount.toFixed(2)}`, pageWidth - 14, totalLineY + 8, { align: 'right' });
-
-    // ============ FOOTER ============
-    const footerY = Math.max(finalY + 30, pageHeight - 20);
-    if (footerY < pageHeight - 10) {
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-      doc.text('Thank you for your business!', pageWidth / 2, pageHeight - 12, { align: 'center' });
-    }
-
+    const doc = await renderVendorPoDoc(built.data, built.totals);
     return doc.output('datauristring').split(',')[1];
   };
 
@@ -1379,8 +900,8 @@ Thank you for your business.`;
                     <Label className="text-sm font-medium">Show in customer production tracking</Label>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {customerSheetVisible
-                        ? 'The customer can see this PO’s progress, dates and published updates.'
-                        : 'Internal only — the customer will not see this PO at all.'}
+                        ? 'The customer can see this POâ€™s progress, dates and published updates.'
+                        : 'Internal only â€” the customer will not see this PO at all.'}
                       {po.show_on_customer_sheet == null && (
                         <span className="ml-1 opacity-70">
                           (default for a {po.po_type || 'production'} PO)
@@ -1827,7 +1348,7 @@ Thank you for your business.`;
         </CardContent>
       </Card>
 
-      {/* Vendor production (same panel the vendor sees) — here unless it already led the page */}
+      {/* Vendor production (same panel the vendor sees) â€” here unless it already led the page */}
       {!vendorViewFirst && (
         <div className="mt-6">
           <VendorProductionPanel poId={po.id} />
