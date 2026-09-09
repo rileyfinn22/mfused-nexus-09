@@ -20,9 +20,10 @@ interface Props {
 /**
  * Admin-only banner that surfaces invoices whose stored subtotal has drifted
  * from its true source-of-truth value:
- *   - child invoices  → Σ(inventory_allocations.qty × unit_price)
- *   - open blankets   → Σ(quantity × unit_price)
- *   - closed blankets → Σ(shipped_quantity × unit_price)
+ *   - child invoices          → Σ(inventory_allocations.qty × unit_price)
+ *   - open blankets, no kids  → shipped where recorded, ordered where not (the trigger's rule)
+ *   - blankets with children  → not checked; the children are the invoices
+ *   - closed blankets         → Σ(shipped_quantity × unit_price)
  */
 export default function InvoiceReconciliationBanner({ enabled }: Props) {
   const [rows, setRows] = useState<DriftRow[]>([]);
