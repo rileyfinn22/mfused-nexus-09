@@ -70,7 +70,12 @@ SELECT i.id AS invoice_id,
    AND COALESCE(ce.expected_subtotal, be.expected_subtotal) IS NOT NULL
    AND abs(i.subtotal - COALESCE(ce.expected_subtotal, be.expected_subtotal)) > 0.01
    AND COALESCE(i.notes, ''::text) !~* '\[WRITE-OFF'::text
-   AND COALESCE(i.notes, ''::text) !~* '\[RECONCILED'::text;
+   AND COALESCE(i.notes, ''::text) !~* '\[RECONCILED'::text
+   -- Paid blankets that would only GROW (overs recorded after payment) were deliberately parked
+   -- off-screen on 2026-08-05 ("remove these drifts from screen, we can go back later"); 10708
+   -- is the biggest. They stay off the banner. A paid blanket billing MORE than shipped still shows.
+   AND NOT (i.parent_invoice_id IS NULL AND i.status = 'paid'::text
+            AND i.subtotal < COALESCE(ce.expected_subtotal, be.expected_subtotal));
 
 -- Keep RLS applying to whoever reads the view (it was created this way; restated so a
 -- CREATE OR REPLACE can never silently drop it).
