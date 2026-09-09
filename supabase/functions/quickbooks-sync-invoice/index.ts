@@ -179,8 +179,6 @@ serve(async (req) => {
     }
 
     // Determine effective billing percentage (explicit request wins)
-    const orderTotal = Number(invoice.orders?.total || 0);
-    const invoiceTotal = Number(invoice.total || 0);
     const isPullShipInvoice = String(invoice.notes || '').toLowerCase().includes('pull & ship order');
 
     const isChildInvoice = !!invoice.parent_invoice_id;
@@ -206,10 +204,11 @@ serve(async (req) => {
       // 11025 sat at 3,368 against a 3,963 order and billed 85% instead of its 50% deposit.
       billingPercentage = storedBilledPercentage;
       console.log('Using stored deposit percentage:', billingPercentage);
-    } else if (!isChildInvoice && orderTotal > 0 && invoiceTotal > 0 && invoiceTotal < orderTotal) {
-      billingPercentage = Math.round((invoiceTotal / orderTotal) * 100);
-      console.log(`Calculated billing percentage from totals: ${invoiceTotal}/${orderTotal} = ${billingPercentage}%`);
     }
+    // There is deliberately no "infer a percentage because the invoice is smaller than the
+    // order" branch any more. billed_percentage is the deposit a human set and nothing else; an
+    // invoice below its order is a short shipment, and treating that as a deposit appended a
+    // "Less: Unbilled portion" line to QuickBooks for goods that were never going to ship.
     console.log('Effective billing percentage:', billingPercentage);
 
     // Get VibePKG's company_id (the vibe_admin's company that manages QuickBooks)
@@ -633,8 +632,66 @@ serve(async (req) => {
     // Track which order_item IDs are covered by allocations
     const allocatedOrderItemIds = new Set<string>();
 
-    if (allocations && allocations.length > 0) {
-      // Use inventory allocations for line items
+    const isFullInvoice = !invoice.invoice_type || invoice.invoice_type === 'full';
+    const isBlanket = isFullInvoice && !invoice.parent_invoice_id && !isPullShipInvoice;
+
+    if (isBlanket) {
+      // A blanket with no shipment invoices IS the invoice, so QuickBooks must carry exactly the
+      // lines the portal bills. That basis lives in one place, recalc_blanket_invoices_for_order,
+      // and is repeated here line for line:
+      //   open      -> a line bills what shipped; a line nobody has recorded yet bills as ordered.
+      //                A recorded 0 counts as "not recorded" until something on the order has
+      //                shipped, because new orders are seeded with zeros.
+      //   finalised -> only what shipped.
+      // This used to send only lines with shipped_quantity > 0 and drop the rest, so an order
+      // with a shipment recorded on some lines and lines added afterwards (10989: bags shipped,
+      // then a case line and freight added) reached QuickBooks short of what the portal showed.
+      const orderItems = [...(invoice.orders?.order_items || [])].sort(
+        (a: any, b: any) => Number(a.line_number || 0) - Number(b.line_number || 0)
+      );
+      const anyShipped = orderItems.some((it: any) => Number(it.shipped_quantity || 0) > 0);
+      const closed = !!invoice.blanket_closed_at;
+      console.log(`Blanket invoice: ${closed ? 'finalised, billing shipped only' : 'open, billing shipped where recorded and ordered where not'}`);
+
+      for (const item of orderItems) {
+        const shipped = item.shipped_quantity;
+        const ordered = Number(item.quantity || 0);
+        let qty: number;
+        if (closed) {
+          qty = Number(shipped || 0);
+        } else if (shipped === null || shipped === undefined) {
+          qty = ordered;
+        } else if (Number(shipped) === 0 && !anyShipped) {
+          qty = ordered;
+        } else {
+          qty = Number(shipped);
+        }
+        if (qty <= 0) continue;
+
+        const unitPrice = Number(item.unit_price || 0);
+        const fullAmount = qty * unitPrice;
+        calculatedSubtotal += fullAmount;
+
+        const qbItemId = await findOrCreateQBItem(item.name, item.description || item.name, unitPrice);
+
+        console.log(`Item: ${item.name}, Qty: ${qty}, Unit Price: ${unitPrice}, Full Amount: ${fullAmount}, QB Item ID: ${qbItemId}`);
+
+        lineItems.push({
+          DetailType: 'SalesItemLineDetail',
+          Amount: fullAmount,
+          SalesItemLineDetail: {
+            ItemRef: {
+              value: qbItemId,
+              name: item.name,
+            },
+            Qty: qty,
+            UnitPrice: unitPrice,
+          },
+          Description: item.description || item.name,
+        });
+      }
+    } else if (allocations && allocations.length > 0) {
+      // Shipment invoices bill their own allocations
       console.log('Using inventory allocations for line items');
       for (const alloc of allocations) {
         const item = alloc.order_items;
@@ -664,46 +721,9 @@ serve(async (req) => {
         });
       }
 
-      // Also include order items that have shipped_quantity but NO allocation for this invoice
-      // This handles cases where some items were shipped directly (not via Pull & Ship)
-      // ONLY for full/blanket invoices — partial/child invoices should only include their allocations
-      const isFullInvoice = !invoice.invoice_type || invoice.invoice_type === 'full';
-      if (isFullInvoice) {
-        const nonAllocatedShippedItems = (invoice.orders?.order_items || [])
-          .filter((item: any) => item.shipped_quantity > 0 && !allocatedOrderItemIds.has(item.id));
-
-        if (nonAllocatedShippedItems.length > 0) {
-          console.log(`Including ${nonAllocatedShippedItems.length} non-allocated shipped items (blanket invoice)`);
-          for (const item of nonAllocatedShippedItems) {
-            const qty = item.shipped_quantity;
-            const unitPrice = item.unit_price;
-            const fullAmount = qty * unitPrice;
-            calculatedSubtotal += fullAmount;
-
-            const qbItemId = await findOrCreateQBItem(item.name, item.description || item.name, unitPrice);
-
-            console.log(`Non-allocated item: ${item.name}, Shipped Qty: ${qty}, Unit Price: ${unitPrice}, Full Amount: ${fullAmount}, QB Item ID: ${qbItemId}`);
-
-            lineItems.push({
-              DetailType: 'SalesItemLineDetail',
-              Amount: fullAmount,
-              SalesItemLineDetail: {
-                ItemRef: {
-                  value: qbItemId,
-                  name: item.name,
-                },
-                Qty: qty,
-                UnitPrice: unitPrice,
-              },
-              Description: item.description || item.name,
-            });
-          }
-        }
-      } else {
-        console.log('Skipping non-allocated shipped items for partial/child invoice');
-      }
     } else {
-      // Fallback: Use order items with shipped_quantity or all items
+      // Fallback for a shipment invoice with no allocation rows (10743-01 lost its detail;
+      // the 10932 family never had any): order items with shipped_quantity, else all items.
       console.log('No allocations found, using order items with shipped_quantity');
       const shippedItems = invoice.orders?.order_items
         ?.filter((item: any) => item.shipped_quantity > 0) || [];
@@ -934,7 +954,7 @@ serve(async (req) => {
         if (depositCredit > 0.005) {
           console.log(
             `Applying $${depositCredit} parent blanket deposit credit from invoice ${parentInvoice?.invoice_number} ` +
-            `(parent paid $${parentPaidTotal}, prior child shipped value $${priorShipmentValue})`
+            `(parent paid $${parentPaidTotal})`
           );
 
           const depositItemId = await findOrCreateQBItem(

@@ -486,9 +486,9 @@ export function CreateShipmentInvoiceDialog({ open, onOpenChange, order, onSucce
         
         // Overs roll into the blanket automatically: the shipped_quantity writes
         // above fired the DB trigger (recalc_blanket_invoices_for_order), which
-        // grows an open blanket to GREATEST(ordered, shipped) per line and keeps
-        // tax/shipping intact. The client-side rewrite that used to live here
-        // dropped tax/shipping and bypassed the QB-sync guard.
+        // keeps a blanket that has shipment invoices at max(ordered, shipped) per
+        // line and keeps tax/shipping intact. The client-side rewrite that used to
+        // live here dropped tax/shipping and bypassed the QB-sync guard.
       }
 
       toast({

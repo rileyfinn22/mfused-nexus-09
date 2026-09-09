@@ -11,6 +11,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency, formatUnitPrice } from "@/lib/utils";
 import { InvoicePackingListSection } from "@/components/InvoicePackingListSection";
+import { blanketTotalItems, calculateInvoiceTotals } from "@/lib/invoiceTotals";
 
 interface OrderItemRow {
   id: string;
@@ -75,16 +76,23 @@ const InvoiceShippedEdit = () => {
       setOrder({ ...ord, order_items: sortedItems });
       setItems(sortedItems);
 
+      // A blank input is "not recorded yet" and stays null on save. This used to pre-fill every
+      // unrecorded line with its ORDERED quantity and then save that as shipped, silently
+      // marking lines that never left the warehouse as fully shipped.
       const initial: Record<string, string> = {};
       sortedItems.forEach((oi: any) => {
-        initial[oi.id] = String(Number(oi.shipped_quantity ?? oi.quantity ?? 0));
+        initial[oi.id] =
+          oi.shipped_quantity === null || oi.shipped_quantity === undefined
+            ? ""
+            : String(Number(oi.shipped_quantity));
       });
       setShippedQtys(initial);
 
       const { data: related } = await supabase
         .from("invoices")
         .select("id, parent_invoice_id, shipping_cost")
-        .eq("order_id", inv.order_id);
+        .eq("order_id", inv.order_id)
+        .is("deleted_at", null);
       setRelatedInvoices(related || []);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -100,17 +108,28 @@ const InvoiceShippedEdit = () => {
 
   const isBlanket = invoice?.invoice_type === "full" || invoice?.invoice_type == null;
 
-  const newSubtotal = useMemo(
+  const hasChildren = useMemo(
+    () => (relatedInvoices || []).some((ri: any) => ri.parent_invoice_id === invoiceId),
+    [relatedInvoices, invoiceId]
+  );
+
+  // Preview with the SAME rule the database applies (see invoiceTotals.ts), so the number shown
+  // here is the number the trigger writes: a typed quantity bills what shipped, a blank line
+  // bills as ordered until the blanket is finalised.
+  const previewItems = useMemo(
     () =>
-      items.reduce((sum, oi) => {
+      items.map((oi) => {
         const raw = shippedQtys[oi.id];
-        const qty = raw !== undefined && raw !== "" ? Number(raw) : Number(oi.shipped_quantity || 0);
-        return sum + (isFinite(qty) ? qty : 0) * Number(oi.unit_price || 0);
-      }, 0),
+        const shipped =
+          raw === undefined ? oi.shipped_quantity : raw === "" ? null : Number(raw);
+        return { ...oi, shipped_quantity: isFinite(Number(shipped)) || shipped === null ? shipped : null };
+      }),
     [items, shippedQtys]
   );
 
-  const newShipping = useMemo(
+  const previewLines = useMemo(() => blanketTotalItems(previewItems, hasChildren), [previewItems, hasChildren]);
+
+  const childShipping = useMemo(
     () =>
       (relatedInvoices || [])
         .filter((ri: any) => ri.parent_invoice_id === invoiceId)
@@ -118,7 +137,14 @@ const InvoiceShippedEdit = () => {
     [relatedInvoices, invoiceId]
   );
 
-  const newTotal = newSubtotal + Number(invoice?.tax || 0) + newShipping;
+  // Freight is billed on the shipment that carried it; with no children the blanket keeps its own.
+  const newShipping = hasChildren && childShipping > 0 ? childShipping : Number(invoice?.shipping_cost || 0);
+
+  const { subtotal: newSubtotal, total: newTotal } = calculateInvoiceTotals(
+    previewLines,
+    Number(invoice?.tax || 0),
+    newShipping
+  );
 
   const handleAiAnalyze = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -183,11 +209,21 @@ const InvoiceShippedEdit = () => {
     if (!order?.order_items) return;
     setSaving(true);
     try {
+      // Freight first, so the trigger fired by the item writes below folds it into the total.
+      if (isBlanket && hasChildren && childShipping > 0) {
+        const { error: shipErr } = await supabase
+          .from("invoices")
+          .update({ shipping_cost: childShipping })
+          .eq("id", invoiceId);
+        if (shipErr) throw shipErr;
+      }
+
       for (const oi of items) {
         const raw = shippedQtys[oi.id];
         if (raw === undefined) continue;
-        const qty = Number(raw);
-        if (!isFinite(qty) || qty < 0) continue;
+        // Blank clears back to "not recorded"; anything typed, including 0, is a real value.
+        const qty: number | null = raw === "" ? null : Number(raw);
+        if (qty !== null && (!isFinite(qty) || qty < 0)) continue;
         const { error } = await supabase
           .from("order_items")
           .update({ shipped_quantity: qty })
@@ -195,15 +231,28 @@ const InvoiceShippedEdit = () => {
         if (error) throw error;
       }
 
+      let written = newTotal;
       if (isBlanket) {
-        const { error: invErr } = await supabase
+        // The blanket's subtotal/total are owned by recalc_blanket_invoices_for_order. The item
+        // writes above already fired it; this call by id is the explicit edit that may move the
+        // total either way. No client-side subtotal/total write: the one that used to be here
+        // summed its own formula over the top of the trigger's.
+        const { error: recalcErr } = await supabase.rpc("recalc_blanket_invoices_for_order", {
+          p_order_id: order.id,
+          p_include_closed: false,
+          p_only_invoice_id: invoiceId,
+        });
+        if (recalcErr) throw recalcErr;
+
+        const { data: after } = await supabase
           .from("invoices")
-          .update({ subtotal: newSubtotal, shipping_cost: newShipping, total: newTotal })
-          .eq("id", invoiceId);
-        if (invErr) throw invErr;
+          .select("total")
+          .eq("id", invoiceId)
+          .maybeSingle();
+        written = Number(after?.total ?? newTotal);
       }
 
-      toast({ title: "Saved", description: `Blanket total: ${formatCurrency(newTotal)}` });
+      toast({ title: "Saved", description: `Blanket total: ${formatCurrency(written)}` });
       navigate(`/invoices/${invoiceId}`);
     } catch (err: any) {
       toast({ title: "Error", description: err.message || "Failed to save", variant: "destructive" });
@@ -309,7 +358,8 @@ const InvoiceShippedEdit = () => {
         <CardHeader>
           <CardTitle className="text-base">Line Items — Shipped Quantities</CardTitle>
           <CardDescription>
-            Enter shipped qty per SKU. Total updates as Σ(shipped × price) + child shipping.
+            A line with a shipped quantity bills what shipped. Leave a line blank and it bills as ordered
+            until the blanket is finalised; type 0 to bill nothing for it.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -320,14 +370,16 @@ const InvoiceShippedEdit = () => {
                 <TableHead className="text-right">Ordered</TableHead>
                 <TableHead className="text-right">Unit Price</TableHead>
                 <TableHead className="w-32 text-right">Shipped</TableHead>
+                <TableHead className="text-right">Bills</TableHead>
                 <TableHead className="text-right">Line Total</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {items.map((oi) => {
+              {items.map((oi, idx) => {
                 const raw = shippedQtys[oi.id];
-                const qty = raw !== undefined && raw !== "" ? Number(raw) : 0;
-                const lineTotal = (isFinite(qty) ? qty : 0) * Number(oi.unit_price || 0);
+                const isPlaceholder = raw === undefined || raw === "";
+                const billsQty = previewLines[idx]?.quantity ?? 0;
+                const lineTotal = billsQty * Number(oi.unit_price || 0);
                 return (
                   <TableRow key={oi.id}>
                     <TableCell>
@@ -344,12 +396,17 @@ const InvoiceShippedEdit = () => {
                       <Input
                         type="number"
                         min={0}
-                        className="text-right"
+                        className={`text-right ${isPlaceholder ? "text-muted-foreground/50 italic" : ""}`}
+                        placeholder="not recorded"
+                        title={isPlaceholder ? "Not recorded yet — bills as ordered until finalised. Type 0 to bill nothing." : ""}
                         value={shippedQtys[oi.id] ?? ""}
                         onChange={(e) =>
                           setShippedQtys((prev) => ({ ...prev, [oi.id]: e.target.value }))
                         }
                       />
+                    </TableCell>
+                    <TableCell className={`text-right text-sm ${isPlaceholder ? "text-muted-foreground italic" : ""}`}>
+                      {billsQty.toLocaleString()}{isPlaceholder ? " (as ordered)" : ""}
                     </TableCell>
                     <TableCell className="text-right text-sm font-medium">
                       {formatCurrency(lineTotal)}
@@ -362,11 +419,11 @@ const InvoiceShippedEdit = () => {
 
           <div className="mt-4 border-t pt-4 space-y-1 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Subtotal (Σ shipped × price)</span>
+              <span className="text-muted-foreground">Subtotal</span>
               <span>{formatCurrency(newSubtotal)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Child shipping</span>
+              <span className="text-muted-foreground">{hasChildren && childShipping > 0 ? "Shipping (from shipments)" : "Shipping"}</span>
               <span>{formatCurrency(newShipping)}</span>
             </div>
             <div className="flex justify-between">

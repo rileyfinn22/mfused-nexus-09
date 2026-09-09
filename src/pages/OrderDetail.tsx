@@ -1284,10 +1284,11 @@ const OrderDetail = () => {
         .eq('id', orderId);
 
       // Blanket invoice totals are owned by the DB trigger
-      // (recalc_blanket_invoices_for_order): open blankets track
-      // GREATEST(ordered, shipped) per line; closed, paid, and QB-synced blankets
-      // are protected. The client-side invoice write that used to live here
-      // bypassed all of those guards.
+      // (recalc_blanket_invoices_for_order): an open blanket bills what shipped
+      // (ordered where nothing is recorded yet; max(ordered, shipped) once it has
+      // shipment invoices); closed and fully paid blankets are protected. The
+      // client-side invoice write that used to live here bypassed all of those
+      // guards and restated 10989 to its ordered total after a short shipment.
 
 
       // Vendor PO totals are owned by their DB trigger

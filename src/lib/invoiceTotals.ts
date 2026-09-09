@@ -1,8 +1,11 @@
 /**
  * Shared invoice total calculator.
- * Single source of truth for computing subtotal and total for any invoice type.
  *
- * For blanket (full) invoices: subtotal = Σ(shipped_quantity × unit_price)
+ * For blanket (full) invoices the DATABASE owns subtotal/total
+ * (recalc_blanket_invoices_for_order, fired by every order_items write). What lives here is the
+ * same rule, so the number a page previews while editing is the number the trigger will write.
+ * Pages must not write a blanket's subtotal/total themselves.
+ *
  * For partial/shipment invoices: subtotal = Σ(allocated_quantity × unit_price)
  *
  * total = subtotal + tax + shipping
@@ -32,13 +35,21 @@ export function calculateInvoiceTotals(
   return { subtotal, total };
 }
 
+const isRecorded = (raw: unknown) => !(raw === null || raw === undefined || raw === '');
+
 /**
- * Build InvoiceTotalItem[] from order items for a blanket invoice.
+ * Build InvoiceTotalItem[] from order items for an OPEN blanket invoice. Mirrors
+ * recalc_blanket_invoices_for_order exactly:
  *
- * hasChildInvoices = true  → placeholder mode: per-item max(shipped, ordered)
- * hasChildInvoices = false → direct-edit mode:
- *   • any shipped → only shipped items count (unshipped = 0)
- *   • none shipped → ordered quantities (placeholder)
+ * hasChildInvoices = true  → the blanket is the umbrella the shipments draw down against and
+ *                            never shrinks: per-line max(ordered, shipped)
+ * hasChildInvoices = false → the blanket IS the invoice:
+ *   • a line with a recorded shipped quantity bills what shipped
+ *   • a line nobody has recorded yet (null / blank) bills as ordered — it is still the order
+ *   • a recorded 0 bills zero once anything on the order has shipped; before that it counts as
+ *     "not recorded" too, because new orders are seeded with zeros
+ *
+ * Finalising is a separate step (only what shipped) and is not previewed here.
  */
 export function blanketTotalItems(
   orderItems: any[],
@@ -49,19 +60,19 @@ export function blanketTotalItems(
   );
 
   return orderItems.map((item) => {
-    const shipped = Number(item.shipped_quantity || 0);
+    const recorded = isRecorded(item.shipped_quantity);
+    const shipped = recorded ? Number(item.shipped_quantity) || 0 : 0;
     const ordered = Number(item.quantity || 0);
 
     let quantity: number;
     if (hasChildInvoices) {
-      // Placeholder: per-item max so total never drops below ordered
-      quantity = shipped > 0 ? Math.max(shipped, ordered) : ordered;
-    } else if (anyShipped) {
-      // Direct-edit: only count items that actually shipped
-      quantity = shipped > 0 ? shipped : 0;
-    } else {
-      // Nothing shipped yet: ordered as placeholder
+      quantity = Math.max(shipped, ordered);
+    } else if (!recorded) {
       quantity = ordered;
+    } else if (shipped === 0 && !anyShipped) {
+      quantity = ordered;
+    } else {
+      quantity = shipped;
     }
 
     return { quantity, unit_price: Number(item.unit_price || 0) };

@@ -853,11 +853,17 @@ const InvoiceDetail = () => {
       // Update each EXISTING order item IN PARALLEL
       const existingItems = editedItems.filter((it: any) => !(typeof it.id === 'string' && it.id.startsWith('new-')));
       await Promise.all(existingItems.map(async (item) => {
-        const editedShippedQty = Number(item.shipped_quantity) || 0;
+        // Blank stays null ("not recorded yet"); anything typed, including 0, is a real value.
+        const rawShipped = item.shipped_quantity;
+        const editedShippedQty: number | null =
+          rawShipped === null || rawShipped === undefined || rawShipped === ''
+            ? null
+            : Number(rawShipped) || 0;
         const dbShipped = dbShippedMap[item.id] ?? 0;
-        const newShippedQty = preserveChildShipmentQuantities
-          ? Math.max(editedShippedQty, dbShipped)
+        const newShippedQty: number | null = preserveChildShipmentQuantities
+          ? Math.max(editedShippedQty ?? 0, dbShipped)
           : editedShippedQty;
+        const allocQty = newShippedQty ?? 0;
         const orderedTotal = Number(item.quantity) * Number(item.unit_price);
 
         const { error } = await supabase.from('order_items').update({
@@ -874,7 +880,7 @@ const InvoiceDetail = () => {
         if (error) throw error;
 
         // Only create allocations for shipment/partial invoices, NOT blanket invoices
-        if (!isBlanketInvoice && newShippedQty > 0) {
+        if (!isBlanketInvoice && allocQty > 0) {
           const { data: existingAlloc } = await supabase
             .from('inventory_allocations')
             .select('id, quantity_allocated')
@@ -885,7 +891,7 @@ const InvoiceDetail = () => {
           if (existingAlloc) {
             await supabase
               .from('inventory_allocations')
-              .update({ quantity_allocated: newShippedQty })
+              .update({ quantity_allocated: allocQty })
               .eq('id', existingAlloc.id);
           } else {
             await supabase
@@ -893,7 +899,7 @@ const InvoiceDetail = () => {
               .insert({
                 invoice_id: invoiceId,
                 order_item_id: item.id,
-                quantity_allocated: newShippedQty,
+                quantity_allocated: allocQty,
                 allocated_by: user?.id,
                 status: 'allocated'
               });
@@ -930,30 +936,52 @@ const InvoiceDetail = () => {
         console.error('Vendor PO sync error (non-fatal):', syncErr);
       }
 
-      // Recalculate totals using shared calculator - shipped qty × price
-      // Check if this blanket has child (partial) invoices — if so, keep placeholder
-      const hasChildren = relatedInvoices.some(
-        (ri: any) => ri.parent_invoice_id === invoiceId
-      );
-      const totalItems = blanketTotalItems(editedItems, hasChildren);
       const editedShipping = Number(editShippingCost || 0);
-      let { subtotal: newSubtotal, total: newTotal } = calculateInvoiceTotals(
-        totalItems,
-        Number(invoice.tax || 0),
-        editedShipping
-      );
-
-      // NOTE: Do NOT update order totals from invoice edit - invoice scope only
-      // Update invoice totals
-      const {
-        error: invoiceError
-      } = await supabase.from('invoices').update({
-        subtotal: newSubtotal,
-        total: newTotal,
-        shipping_cost: editedShipping,
-        shipping_note: editShippingNote || null,
-      }).eq('id', invoiceId);
-      if (invoiceError) throw invoiceError;
+      let newSubtotal: number;
+      let newTotal: number;
+      if (isBlanketInvoice && order?.id) {
+        // A blanket's subtotal/total are owned by recalc_blanket_invoices_for_order. The
+        // order_items writes above already fired it; this call by id folds in the freight edited
+        // here and, being an explicit edit of this one invoice, may move the total either way.
+        // The client-side write that used to live here summed its own formula and then lost a
+        // race with the trigger, so what the admin typed was not what the invoice showed.
+        const { error: shipErr } = await supabase.from('invoices').update({
+          shipping_cost: editedShipping,
+          shipping_note: editShippingNote || null,
+        }).eq('id', invoiceId);
+        if (shipErr) throw shipErr;
+        const { error: recalcErr } = await supabase.rpc('recalc_blanket_invoices_for_order', {
+          p_order_id: order.id,
+          p_include_closed: false,
+          p_only_invoice_id: invoiceId,
+        });
+        if (recalcErr) throw recalcErr;
+        const { data: after } = await supabase
+          .from('invoices')
+          .select('subtotal, total')
+          .eq('id', invoiceId)
+          .maybeSingle();
+        newSubtotal = Number(after?.subtotal ?? invoice.subtotal ?? 0);
+        newTotal = Number(after?.total ?? invoice.total ?? 0);
+      } else {
+        // Shipment invoices bill their allocations; the validate trigger stops over-billing.
+        const hasChildren = relatedInvoices.some(
+          (ri: any) => ri.parent_invoice_id === invoiceId
+        );
+        const totalItems = blanketTotalItems(editedItems, hasChildren);
+        ({ subtotal: newSubtotal, total: newTotal } = calculateInvoiceTotals(
+          totalItems,
+          Number(invoice.tax || 0),
+          editedShipping
+        ));
+        const { error: invoiceError } = await supabase.from('invoices').update({
+          subtotal: newSubtotal,
+          total: newTotal,
+          shipping_cost: editedShipping,
+          shipping_note: editShippingNote || null,
+        }).eq('id', invoiceId);
+        if (invoiceError) throw invoiceError;
+      }
       // Update local state instead of refetching
       const remainingExisting = (order?.order_items || []).filter((oi: any) => !deletedItemIds.includes(oi.id));
       const mergedExisting = remainingExisting.map((oi: any) => {
@@ -1365,8 +1393,9 @@ const InvoiceDetail = () => {
       // Persist child-shipment shipping onto the blanket FIRST, so the DB trigger
       // (which owns blanket subtotal/total) folds it into the total it computes
       // when the shipped_quantity writes below fire it. No client-side
-      // subtotal/total write — the trigger applies the draw-down rule
-      // (GREATEST(ordered, shipped) while open) and its settled-invoice guards.
+      // subtotal/total write — the trigger bills what shipped (ordered where nothing
+      // is recorded yet; max(ordered, shipped) once children exist) and applies its
+      // settled-invoice guards.
       const newShipping = (relatedInvoices || [])
         .filter((ri: any) => ri.parent_invoice_id === invoiceId)
         .reduce((sum: number, ri: any) => sum + Number(ri.shipping_cost || 0), 0);
@@ -1713,9 +1742,12 @@ const InvoiceDetail = () => {
                       <DropdownMenuLabel>Edit</DropdownMenuLabel>
                       <DropdownMenuItem onClick={() => {
                         if (invoice?.invoice_type === 'full' && order?.order_items) {
+                          // Keep null as null: it means "not recorded yet" and the trigger bills
+                          // such a line as ordered. Coercing to 0 here turned every untouched
+                          // line into a recorded zero the moment anything was edited.
                           setEditedItems(order.order_items.map((item: any) => ({
                             ...item,
-                            shipped_quantity: item.shipped_quantity || 0
+                            shipped_quantity: item.shipped_quantity ?? null
                           })));
                         }
                         setEditShippingCost(String(invoice?.shipping_cost || 0));

@@ -406,39 +406,55 @@ export const InvoicePackingListSection = ({
         .select('order_item_id, quantity_allocated')
         .eq('invoice_id', invoiceId);
 
-      // Recalculate invoice subtotal using shared calculator
-      // Build final allocation map: start with existing, override with new matches
-      const allocMap = new Map<string, number>();
-      if (allAllocations) {
-        for (const alloc of allAllocations) {
-          allocMap.set(alloc.order_item_id, alloc.quantity_allocated);
+      const isBlanket =
+        (invoice?.invoice_type === 'full' || !invoice?.invoice_type) && !invoice?.parent_invoice_id;
+      const orderIdForRecalc = invoice?.order_id || order?.id;
+
+      if (isBlanket && orderIdForRecalc) {
+        // A blanket's subtotal/total are owned by recalc_blanket_invoices_for_order, which the
+        // shipped_quantity writes above already fired. Calling it by id makes this explicit
+        // packing-list entry able to move the total either way. Summing the allocation map here
+        // and writing it over the top billed every line without an allocation at zero.
+        const { error: recalcErr } = await supabase.rpc('recalc_blanket_invoices_for_order', {
+          p_order_id: orderIdForRecalc,
+          p_include_closed: false,
+          p_only_invoice_id: invoiceId,
+        });
+        if (recalcErr) throw recalcErr;
+      } else {
+        // Shipment invoices bill their allocations: start with existing, override with new matches
+        const allocMap = new Map<string, number>();
+        if (allAllocations) {
+          for (const alloc of allAllocations) {
+            allocMap.set(alloc.order_item_id, alloc.quantity_allocated);
+          }
         }
+        for (const match of matchedItems) {
+          allocMap.set(match.order_item_id, match.shipped_quantity || 0);
+        }
+
+        const allOrderItems = order?.order_items || editedItems;
+        const totalItems = Array.from(allocMap.entries()).map(([itemId, qty]) => {
+          const orderItem = allOrderItems.find((oi: any) => oi.id === itemId);
+          return {
+            quantity: qty,
+            unit_price: Number(orderItem?.unit_price || 0),
+          };
+        });
+
+        const shippingCost = Number(invoice.shipping_cost || 0);
+        const { subtotal: newSubtotal, total: newTotal } = calculateInvoiceTotals(
+          totalItems,
+          Number(invoice.tax || 0),
+          shippingCost
+        );
+
+        // Always persist totals (even if zero)
+        await supabase
+          .from('invoices')
+          .update({ subtotal: newSubtotal, total: newTotal })
+          .eq('id', invoiceId);
       }
-      for (const match of matchedItems) {
-        allocMap.set(match.order_item_id, match.shipped_quantity || 0);
-      }
-
-      const allOrderItems = order?.order_items || editedItems;
-      const totalItems = Array.from(allocMap.entries()).map(([itemId, qty]) => {
-        const orderItem = allOrderItems.find((oi: any) => oi.id === itemId);
-        return {
-          quantity: qty,
-          unit_price: Number(orderItem?.unit_price || 0),
-        };
-      });
-
-      const shippingCost = Number(invoice.shipping_cost || 0);
-      const { subtotal: newSubtotal, total: newTotal } = calculateInvoiceTotals(
-        totalItems,
-        Number(invoice.tax || 0),
-        shippingCost
-      );
-
-      // Always persist totals (even if zero)
-      await supabase
-        .from('invoices')
-        .update({ subtotal: newSubtotal, total: newTotal })
-        .eq('id', invoiceId);
 
       toast({
         title: "Shipped Quantities Updated",
