@@ -105,8 +105,11 @@ try {
     $cum = 0
     for ($k = 0; $k -lt $case.ships.Count; $k++) {
       $cum += $case.ships[$k]
-      Ship $s $cum
+      # Same order as CreateShipmentInvoiceDialog: the child exists BEFORE the shipped_quantity
+      # write fires the trigger, so the blanket is recalculated as an umbrella (never shrinks).
+      # Shipping first would briefly recalc it as a blanket-only invoice (what shipped so far).
       AddChild $s ($k + 2) $case.ships[$k] 1 $case.freight[$k] | Out-Null
+      Ship $s $cum
       Report $s "after shipment $($k+1) (cum $cum)"
     }
     Q "update invoices set blanket_closed_at=now(), status='closed' where id='$($s.blanket)'" | Out-Null
