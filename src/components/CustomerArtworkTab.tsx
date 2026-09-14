@@ -109,6 +109,9 @@ export function CustomerArtworkTab({
   // Template artwork status
   const [templateStatus, setTemplateStatus] = useState<Record<string, ArtworkStatus>>({});
   const [templateDerivedThumbnails, setTemplateDerivedThumbnails] = useState<Record<string, string>>({});
+  // First usable customer-art thumbnail / PDF per SKU, used on product tiles
+  const [skuArtThumbnails, setSkuArtThumbnails] = useState<Record<string, string>>({});
+  const [skuArtPdfUrls, setSkuArtPdfUrls] = useState<Record<string, string>>({});
   
   // Dialogs
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
@@ -255,6 +258,8 @@ export function CustomerArtworkTab({
       
       const counts: Record<string, { total: number; approved: number; pending: number }> = {};
       const skuThumbnails: Record<string, string | null> = {};
+      const skuPdfUrls: Record<string, string> = {};
+
 
       artworkData?.forEach((art) => {
         if (!counts[art.sku]) {
@@ -278,8 +283,18 @@ export function CustomerArtworkTab({
             skuThumbnails[art.sku] = thumbnail.src;
           }
         }
+
+        if (!skuPdfUrls[art.sku] && art.filename && /\.pdf$/i.test(art.filename)) {
+          skuPdfUrls[art.sku] = art.artwork_url;
+        }
       });
       setArtworkCounts(counts);
+      setSkuArtThumbnails(
+        Object.fromEntries(
+          Object.entries(skuThumbnails).filter(([, v]) => !!v) as [string, string][]
+        )
+      );
+      setSkuArtPdfUrls(skuPdfUrls);
       
       // Calculate template status based on product artwork
       const templateStatusMap: Record<string, ArtworkStatus> = {};
@@ -882,6 +897,9 @@ export function CustomerArtworkTab({
             {filteredProducts.map((product) => {
               const artCount = getProductArtworkCount(product.item_id);
               const status = getProductArtworkStatus(product.item_id);
+              const artThumb = product.item_id ? skuArtThumbnails[product.item_id] : undefined;
+              const artPdf = product.item_id ? skuArtPdfUrls[product.item_id] : undefined;
+              const tileImage = artThumb || product.image_url;
               return (
                 <Card
                   key={product.id}
@@ -889,8 +907,10 @@ export function CustomerArtworkTab({
                   onClick={() => setSelectedProduct(product)}
                 >
                   <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative">
-                    {product.image_url ? (
-                      <SignedImage src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                    {tileImage ? (
+                      <SignedImage src={tileImage} alt={product.name} className="w-full h-full object-cover" />
+                    ) : artPdf ? (
+                      <PdfThumbnail pdfUrl={artPdf} className="w-full h-full object-cover" />
                     ) : (
                       <Package className="h-16 w-16 text-muted-foreground/30" />
                     )}
@@ -943,8 +963,12 @@ export function CustomerArtworkTab({
                     onClick={() => setSelectedProduct(product)}
                   >
                     <div className="col-span-1">
-                      {product.image_url ? (
-                        <SignedImage src={product.image_url} alt={product.name} className="w-10 h-10 rounded object-cover" />
+                      {(product.item_id && skuArtThumbnails[product.item_id]) || product.image_url ? (
+                        <SignedImage
+                          src={(product.item_id && skuArtThumbnails[product.item_id]) || product.image_url!}
+                          alt={product.name}
+                          className="w-10 h-10 rounded object-cover"
+                        />
                       ) : (
                         <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
                           <Package className="h-5 w-5 text-muted-foreground/50" />

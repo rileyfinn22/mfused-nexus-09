@@ -126,6 +126,7 @@ const Artwork = () => {
   
   // Artwork counts per product SKU
   const [artworkCounts, setArtworkCounts] = useState<Record<string, { total: number; approved: number; pending: number }>>({});
+  const [customerPendingCount, setCustomerPendingCount] = useState(0);
   
   // Artwork thumbnails per SKU (for product tiles)
   const [skuArtworkThumbnails, setSkuArtworkThumbnails] = useState<Record<string, string | null>>({});
@@ -348,6 +349,14 @@ const Artwork = () => {
         }
       }
 
+      // Customer-supplied art belongs to the Customer Art tab only. Track how
+      // many are still awaiting a VibePKG proof, then drop them entirely from
+      // the Vibe Proofs data set.
+      setCustomerPendingCount(
+        artworkData.filter(a => a.artwork_type === 'customer' && !a.is_approved).length
+      );
+      artworkData = artworkData.filter(a => a.artwork_type !== 'customer');
+
       // Populate the flat artwork list used by the "All Artwork" tab.
       if (!selectedProduct) {
         setArtworkFiles(artworkData);
@@ -500,6 +509,7 @@ const Artwork = () => {
         .from('artwork_files')
         .select('*')
         .eq('sku', product.item_id)
+        .or('artwork_type.is.null,artwork_type.neq.customer')
         .order('created_at', { ascending: false });
       
       if (statusFilter === 'approved') {
@@ -526,6 +536,7 @@ const Artwork = () => {
       let query = supabase
         .from('artwork_files')
         .select('*')
+        .or('artwork_type.is.null,artwork_type.neq.customer')
         .order('created_at', { ascending: false })
         .limit(50000);
 
@@ -1803,6 +1814,12 @@ const Artwork = () => {
           <TabsTrigger value="customer" className="flex items-center gap-2">
             <Upload className="h-4 w-4" />
             Customer Art
+            {customerPendingCount > 0 && (
+              <span
+                className="h-2 w-2 rounded-full bg-blue-600"
+                title={`${customerPendingCount} customer file${customerPendingCount === 1 ? '' : 's'} awaiting proof`}
+              />
+            )}
           </TabsTrigger>
         </TabsList>
 
