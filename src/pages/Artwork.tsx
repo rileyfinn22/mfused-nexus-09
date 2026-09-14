@@ -365,7 +365,8 @@ const Artwork = () => {
         counts[art.sku].total++;
         if (art.is_approved) {
           counts[art.sku].approved++;
-        } else {
+        } else if (art.artwork_type !== 'customer') {
+          // Customer-supplied art isn't a proof awaiting VibePKG approval.
           counts[art.sku].pending++;
         }
 
