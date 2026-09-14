@@ -214,7 +214,7 @@ export function CreateOrderDialog({ open, onOpenChange, onOrderCreated }: Create
       let subtotal = 0;
       for (const item of selectedItems) {
         const product = products.find(p => p.id === item.productId);
-        const price = item.unit_price ?? product?.cost ?? 0;
+        const price = item.unit_price ?? product?.price ?? 0;
         subtotal += price * item.quantity;
       }
 
@@ -278,7 +278,7 @@ export function CreateOrderDialog({ open, onOpenChange, onOrderCreated }: Create
       // Create order items
       const orderItems = selectedItems.map(item => {
         const product = products.find(p => p.id === item.productId);
-        const price = item.unit_price ?? product?.cost ?? 0;
+        const price = item.unit_price ?? product?.price ?? 0;
         const itemTotal = price * item.quantity;
         
         return {
@@ -549,7 +549,7 @@ export function CreateOrderDialog({ open, onOpenChange, onOrderCreated }: Create
                       {selectedItems.map((item) => {
                         const product = products.find(p => p.id === item.productId);
                         if (!product) return null;
-                        const price = item.unit_price ?? product.cost ?? 0;
+                        const price = item.unit_price ?? product.price ?? 0;
                         const amount = price * item.quantity;
                         
                         return (
@@ -652,7 +652,7 @@ export function CreateOrderDialog({ open, onOpenChange, onOrderCreated }: Create
                         ${(() => {
                           const subtotal = selectedItems.reduce((sum, item) => {
                             const product = products.find(p => p.id === item.productId);
-                            const price = item.unit_price ?? product?.cost ?? 0;
+                            const price = item.unit_price ?? product?.price ?? 0;
                             return sum + (price * item.quantity);
                           }, 0);
                           return subtotal.toFixed(2);
@@ -665,7 +665,7 @@ export function CreateOrderDialog({ open, onOpenChange, onOrderCreated }: Create
                         ${(() => {
                           const subtotal = selectedItems.reduce((sum, item) => {
                             const product = products.find(p => p.id === item.productId);
-                            const price = item.unit_price ?? product?.cost ?? 0;
+                            const price = item.unit_price ?? product?.price ?? 0;
                             return sum + (price * item.quantity);
                           }, 0);
                           const tax = subtotal * 0.06;
@@ -680,7 +680,7 @@ export function CreateOrderDialog({ open, onOpenChange, onOrderCreated }: Create
                         ${(() => {
                           const subtotal = selectedItems.reduce((sum, item) => {
                             const product = products.find(p => p.id === item.productId);
-                            const price = item.unit_price ?? product?.cost ?? 0;
+                            const price = item.unit_price ?? product?.price ?? 0;
                             return sum + (price * item.quantity);
                           }, 0);
                           const tax = subtotal * 0.06;
