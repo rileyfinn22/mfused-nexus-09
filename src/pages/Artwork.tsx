@@ -126,6 +126,7 @@ const Artwork = () => {
   
   // Artwork counts per product SKU
   const [artworkCounts, setArtworkCounts] = useState<Record<string, { total: number; approved: number; pending: number }>>({});
+  const [customerPendingCount, setCustomerPendingCount] = useState(0);
   
   // Artwork thumbnails per SKU (for product tiles)
   const [skuArtworkThumbnails, setSkuArtworkThumbnails] = useState<Record<string, string | null>>({});
