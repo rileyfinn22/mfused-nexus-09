@@ -907,8 +907,10 @@ export function CustomerArtworkTab({
                   onClick={() => setSelectedProduct(product)}
                 >
                   <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative">
-                    {product.image_url ? (
-                      <SignedImage src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                    {tileImage ? (
+                      <SignedImage src={tileImage} alt={product.name} className="w-full h-full object-cover" />
+                    ) : artPdf ? (
+                      <PdfThumbnail pdfUrl={artPdf} className="w-full h-full object-cover" />
                     ) : (
                       <Package className="h-16 w-16 text-muted-foreground/30" />
                     )}
