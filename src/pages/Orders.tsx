@@ -217,10 +217,18 @@ const Orders = () => {
   const canEditOrder = (order: any) => {
     // Vibe admins can always edit
     if (isVibeAdmin) return true;
-    
-    // Can't edit if order is in production or later stages, or if vibe_processed
-    const restrictedStatuses = ['in production', 'shipped', 'delivered'];
-    return !restrictedStatuses.includes(order.status) && !order.vibe_processed;
+
+    // Customers may only edit/remove their own drafts, or orders they submitted
+    // that are still waiting for VibePKG approval. Once approved it is a
+    // standard order and becomes read-only for them.
+    const status = (order.status || '').toLowerCase();
+    if (status === 'draft') return true;
+    return (
+      status === 'pending' &&
+      !!order.submitted_by_customer &&
+      !order.vibe_approved &&
+      !order.vibe_processed
+    );
   };
 
   const getProgressForStatus = (status: string) => {
