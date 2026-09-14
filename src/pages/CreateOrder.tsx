@@ -435,7 +435,7 @@ const CreateOrder = () => {
       const companyName = (userRole.companies as any).name;
       setFormData(prev => ({
         ...prev,
-        customerName: companyName,
+        customerName: prev.customerName || companyName,
       }));
       
       // Load company addresses
@@ -450,16 +450,17 @@ const CreateOrder = () => {
                                 data.find(a => a.address_type === 'shipping');
         
         if (defaultShipping) {
+          // Never clobber anything the buyer already typed.
           setFormData(prev => ({
             ...prev,
-            customerName: companyName,
-            customerEmail: defaultShipping.customer_email || "",
-            customerPhone: defaultShipping.customer_phone || "",
-            shippingName: defaultShipping.name,
-            shippingStreet: defaultShipping.street,
-            shippingCity: defaultShipping.city,
-            shippingState: defaultShipping.state,
-            shippingZip: defaultShipping.zip,
+            customerName: prev.customerName || companyName,
+            customerEmail: prev.customerEmail || defaultShipping.customer_email || "",
+            customerPhone: prev.customerPhone || defaultShipping.customer_phone || "",
+            shippingName: prev.shippingName || defaultShipping.name,
+            shippingStreet: prev.shippingStreet || defaultShipping.street,
+            shippingCity: prev.shippingCity || defaultShipping.city,
+            shippingState: prev.shippingState || defaultShipping.state,
+            shippingZip: prev.shippingZip || defaultShipping.zip,
           }));
         }
         setSavedAddresses(data);
@@ -517,6 +518,15 @@ const CreateOrder = () => {
       loadCompanyAddresses();
     }
   }, [selectedCompanyId, roleChecked, initialLoading, orderId]);
+
+  // Customer side: the company switcher often resolves AFTER the first load,
+  // so the initial prefill runs with no company and leaves the customer /
+  // ship-to fields blank. Re-run it once the active company is known.
+  useEffect(() => {
+    if (!roleChecked || isVibeAdmin || orderId) return;
+    if (!activeCompanyId) return;
+    loadUserCompanyInfo();
+  }, [roleChecked, isVibeAdmin, orderId, activeCompanyId]);
 
   // Refetch products scoped to the selected/active company when it changes.
   useEffect(() => {
