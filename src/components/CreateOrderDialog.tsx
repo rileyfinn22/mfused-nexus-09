@@ -135,7 +135,28 @@ export function CreateOrderDialog({ open, onOpenChange, onOrderCreated }: Create
       });
     }
 
-    setProducts((data || []).map((p) => ({ ...p, cost: costMap[p.id] ?? null })));
+    // Fall back to the template price when a product has no price of its own
+    const templateIds = Array.from(
+      new Set(
+        (data || [])
+          .filter((p: any) => p.price == null && p.template_id)
+          .map((p: any) => p.template_id as string)
+      )
+    );
+    const tPriceMap: Record<string, number | null> = {};
+    for (let i = 0; i < templateIds.length; i += 150) {
+      const { data: tRows } = await (supabase as any)
+        .from('product_templates')
+        .select('id, price')
+        .in('id', templateIds.slice(i, i + 150));
+      (tRows || []).forEach((row: any) => { tPriceMap[row.id] = row.price; });
+    }
+
+    setProducts((data || []).map((p: any) => ({
+      ...p,
+      price: p.price ?? (p.template_id ? tPriceMap[p.template_id] ?? null : null),
+      cost: costMap[p.id] ?? null,
+    })));
   };
 
   const handleProductToggle = (productId: string) => {
@@ -143,7 +164,10 @@ export function CreateOrderDialog({ open, onOpenChange, onOrderCreated }: Create
     if (exists) {
       setSelectedItems(selectedItems.filter(item => item.productId !== productId));
     } else {
-      setSelectedItems([...selectedItems, { productId, quantity: 1 }]);
+      // Pre-set the unit price from the product (or its template); still editable
+      const product = products.find((p) => p.id === productId);
+      const presetPrice = (product as any)?.price != null ? Number((product as any).price) : undefined;
+      setSelectedItems([...selectedItems, { productId, quantity: 1, ...(presetPrice != null ? { unit_price: presetPrice } : {}) }]);
     }
   };
 
