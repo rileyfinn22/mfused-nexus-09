@@ -423,49 +423,81 @@ const CreateOrder = () => {
     // calling .single() errors outright for anyone holding more than one seat.
     if (!activeCompanyId) return;
 
-    const { data: userRole } = await supabase
-      .from('user_roles')
-      .select('company_id, companies(name)')
-      .eq('user_id', user.id)
-      .eq('company_id', activeCompanyId)
-      .limit(1)
+    const { data: company } = await supabase
+      .from('companies')
+      .select('*')
+      .eq('id', activeCompanyId)
       .maybeSingle();
 
-    if (userRole?.company_id && userRole.companies) {
-      const companyName = (userRole.companies as any).name;
-      setFormData(prev => ({
-        ...prev,
-        customerName: prev.customerName || companyName,
-      }));
-      
-      // Load company addresses
-      const { data } = await supabase
-        .from('customer_addresses')
-        .select('*')
-        .eq('company_id', userRole.company_id)
-        .order('is_default', { ascending: false });
-      
-      if (data) {
-        const defaultShipping = data.find(a => a.address_type === 'shipping' && a.is_default) || 
-                                data.find(a => a.address_type === 'shipping');
-        
-        if (defaultShipping) {
-          // Never clobber anything the buyer already typed.
-          setFormData(prev => ({
-            ...prev,
-            customerName: prev.customerName || companyName,
-            customerEmail: prev.customerEmail || defaultShipping.customer_email || "",
-            customerPhone: prev.customerPhone || defaultShipping.customer_phone || "",
-            shippingName: prev.shippingName || defaultShipping.name,
-            shippingStreet: prev.shippingStreet || defaultShipping.street,
-            shippingCity: prev.shippingCity || defaultShipping.city,
-            shippingState: prev.shippingState || defaultShipping.state,
-            shippingZip: prev.shippingZip || defaultShipping.zip,
-          }));
+    if (!company) return;
+
+    const companyName = (company as any).name as string;
+    const c = company as any;
+
+    // Load saved addresses for the picker; fall back to the company record's own
+    // ship-to / bill-to when the customer has no saved addresses yet.
+    const { data } = await supabase
+      .from('customer_addresses')
+      .select('*')
+      .eq('company_id', activeCompanyId)
+      .order('is_default', { ascending: false });
+
+    const addresses = data || [];
+    const defaultShipping = addresses.find(a => a.address_type === 'shipping' && a.is_default) ||
+                            addresses.find(a => a.address_type === 'shipping');
+    const defaultBilling = addresses.find(a => a.address_type === 'billing' && a.is_default) ||
+                           addresses.find(a => a.address_type === 'billing');
+
+    const ship = defaultShipping
+      ? {
+          name: defaultShipping.name,
+          street: defaultShipping.street,
+          city: defaultShipping.city,
+          state: defaultShipping.state,
+          zip: defaultShipping.zip,
         }
-        setSavedAddresses(data);
-      }
-    }
+      : {
+          name: c.shipping_name || companyName,
+          street: [c.shipping_street, c.shipping_street2].filter(Boolean).join(', '),
+          city: c.shipping_city || "",
+          state: c.shipping_state || "",
+          zip: c.shipping_zip || "",
+        };
+
+    const bill = defaultBilling
+      ? {
+          name: defaultBilling.name,
+          street: defaultBilling.street,
+          city: defaultBilling.city,
+          state: defaultBilling.state,
+          zip: defaultBilling.zip,
+        }
+      : {
+          name: c.billing_name || companyName,
+          street: [c.billing_street, c.billing_street2].filter(Boolean).join(', '),
+          city: c.billing_city || "",
+          state: c.billing_state || "",
+          zip: c.billing_zip || "",
+        };
+
+    // Never clobber anything the buyer already typed.
+    setFormData(prev => ({
+      ...prev,
+      customerName: prev.customerName || companyName,
+      customerEmail: prev.customerEmail || defaultShipping?.customer_email || c.email || c.billing_email || "",
+      customerPhone: prev.customerPhone || defaultShipping?.customer_phone || c.phone || "",
+      shippingName: prev.shippingName || ship.name,
+      shippingStreet: prev.shippingStreet || ship.street,
+      shippingCity: prev.shippingCity || ship.city,
+      shippingState: prev.shippingState || ship.state,
+      shippingZip: prev.shippingZip || ship.zip,
+      billingName: prev.billingName || bill.name,
+      billingStreet: prev.billingStreet || bill.street,
+      billingCity: prev.billingCity || bill.city,
+      billingState: prev.billingState || bill.state,
+      billingZip: prev.billingZip || bill.zip,
+    }));
+    setSavedAddresses(addresses);
   };
 
 
