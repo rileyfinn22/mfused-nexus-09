@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { generatePdfThumbnailFromArrayBuffer, generatePdfThumbnailFromFile } from "@/lib/pdfThumbnail";
+import { getSignedArtworkUrl } from "@/lib/signedArtworkUrl";
 
 const PDF_PREVIEW_OPTIONS = {
   maxWidth: 1400,
@@ -98,7 +99,9 @@ export async function createFlatArtworkPreviewFromArtwork({
     return artworkUrl;
   }
 
-  const response = await fetch(artworkUrl, { cache: "no-store" });
+  // The artwork bucket is private, so the stored URL must be signed before fetching.
+  const signedUrl = (await getSignedArtworkUrl(artworkUrl)) || artworkUrl;
+  const response = await fetch(signedUrl, { cache: "no-store" });
   if (!response.ok) {
     throw new Error(`Failed to load proof (${response.status})`);
   }
