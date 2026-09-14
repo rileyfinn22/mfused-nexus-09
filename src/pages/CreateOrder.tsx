@@ -873,9 +873,11 @@ const CreateOrder = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Upload to storage
+      // Upload to storage. The po-documents bucket lets a customer write only inside a folder
+      // named after their own user id; a path starting with the order id was refused for every
+      // buyer, so their PO never attached. Admins can read any folder.
       const fileExt = customerPoFile.name.split('.').pop();
-      const fileName = `${orderId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const fileName = `${user.id}/${orderId}-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
       
       const { error: uploadError } = await supabase.storage
         .from('po-documents')
