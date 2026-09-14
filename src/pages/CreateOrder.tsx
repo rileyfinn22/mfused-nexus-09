@@ -1769,10 +1769,16 @@ const CreateOrder = () => {
     const existingProductIds = new Set(selectedItems.map(item => item.productId));
     const newItems = tempSelectedProducts
       .filter(productId => !existingProductIds.has(productId))
-      .map(productId => ({
-        productId,
-        quantity: 1
-      }));
+      .map(productId => {
+        // Pre-set the unit price from the product (or its template) price; still editable
+        const product = products.find(p => p.id === productId);
+        const presetPrice = product?.price != null ? Number(product.price) : undefined;
+        return {
+          productId,
+          quantity: 1,
+          ...(presetPrice != null ? { unit_price: presetPrice } : {}),
+        };
+      });
     setSelectedItems(prev => [...prev, ...newItems]);
     setTempSelectedProducts([]);
     setSearchQuery("");
