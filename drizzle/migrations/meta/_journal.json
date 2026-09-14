@@ -8,6 +8,13 @@
       "when": 1789404851708,
       "tag": "0000_allow_company_users_upload_artwork",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789405211029,
+      "tag": "0001_fix_ambiguous_sku_artwork_upload",
+      "breakpoints": true
     }
   ]
 }
