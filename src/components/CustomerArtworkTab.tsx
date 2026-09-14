@@ -283,8 +283,18 @@ export function CustomerArtworkTab({
             skuThumbnails[art.sku] = thumbnail.src;
           }
         }
+
+        if (!skuPdfUrls[art.sku] && art.filename && /\.pdf$/i.test(art.filename)) {
+          skuPdfUrls[art.sku] = art.artwork_url;
+        }
       });
       setArtworkCounts(counts);
+      setSkuArtThumbnails(
+        Object.fromEntries(
+          Object.entries(skuThumbnails).filter(([, v]) => !!v) as [string, string][]
+        )
+      );
+      setSkuArtPdfUrls(skuPdfUrls);
       
       // Calculate template status based on product artwork
       const templateStatusMap: Record<string, ArtworkStatus> = {};
