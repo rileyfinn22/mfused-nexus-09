@@ -518,6 +518,15 @@ const CreateOrder = () => {
     }
   }, [selectedCompanyId, roleChecked, initialLoading, orderId]);
 
+  // Customer side: the company switcher often resolves AFTER the first load,
+  // so the initial prefill runs with no company and leaves the customer /
+  // ship-to fields blank. Re-run it once the active company is known.
+  useEffect(() => {
+    if (!roleChecked || isVibeAdmin || orderId) return;
+    if (!activeCompanyId) return;
+    loadUserCompanyInfo();
+  }, [roleChecked, isVibeAdmin, orderId, activeCompanyId]);
+
   // Refetch products scoped to the selected/active company when it changes.
   useEffect(() => {
     if (!roleChecked) return;
