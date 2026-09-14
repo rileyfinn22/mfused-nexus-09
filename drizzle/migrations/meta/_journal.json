@@ -15,6 +15,13 @@
       "when": 1789405211029,
       "tag": "0001_fix_ambiguous_sku_artwork_upload",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789405918477,
+      "tag": "0002_customer_edit_only_before_approval",
+      "breakpoints": true
     }
   ]
 }
