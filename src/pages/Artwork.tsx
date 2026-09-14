@@ -349,6 +349,14 @@ const Artwork = () => {
         }
       }
 
+      // Customer-supplied art belongs to the Customer Art tab only. Track how
+      // many are still awaiting a VibePKG proof, then drop them entirely from
+      // the Vibe Proofs data set.
+      setCustomerPendingCount(
+        artworkData.filter(a => a.artwork_type === 'customer' && !a.is_approved).length
+      );
+      artworkData = artworkData.filter(a => a.artwork_type !== 'customer');
+
       // Populate the flat artwork list used by the "All Artwork" tab.
       if (!selectedProduct) {
         setArtworkFiles(artworkData);
