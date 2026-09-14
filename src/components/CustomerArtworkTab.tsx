@@ -258,6 +258,8 @@ export function CustomerArtworkTab({
       
       const counts: Record<string, { total: number; approved: number; pending: number }> = {};
       const skuThumbnails: Record<string, string | null> = {};
+      const skuPdfUrls: Record<string, string> = {};
+
 
       artworkData?.forEach((art) => {
         if (!counts[art.sku]) {
