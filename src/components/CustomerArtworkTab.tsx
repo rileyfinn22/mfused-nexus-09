@@ -897,6 +897,9 @@ export function CustomerArtworkTab({
             {filteredProducts.map((product) => {
               const artCount = getProductArtworkCount(product.item_id);
               const status = getProductArtworkStatus(product.item_id);
+              const artThumb = product.item_id ? skuArtThumbnails[product.item_id] : undefined;
+              const artPdf = product.item_id ? skuArtPdfUrls[product.item_id] : undefined;
+              const tileImage = artThumb || product.image_url;
               return (
                 <Card
                   key={product.id}
