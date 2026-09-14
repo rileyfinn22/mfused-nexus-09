@@ -1768,11 +1768,19 @@ const OrderDetail = () => {
               - Vibe admins can edit pending/in production orders
               - Company admins can only edit draft orders */}
           {(() => {
+            // Customers can edit their own drafts, or orders they submitted that
+            // are still awaiting VibePKG approval. Once approved, read-only.
+            const awaitingApproval =
+              order.status === 'pending' &&
+              !!(order as any).submitted_by_customer &&
+              !(order as any).vibe_approved &&
+              !(order as any).vibe_processed;
             const canEdit = isVibeAdmin 
               ? (order.status === 'pending' || order.status === 'pending_pull' || order.status === 'in production')
-              : (isAdmin && order.status === 'draft');
+              : (isAdmin && (order.status === 'draft' || awaitingApproval));
             
             if (!canEdit) return null;
+            
             
             return isEditMode ? (
               <>
