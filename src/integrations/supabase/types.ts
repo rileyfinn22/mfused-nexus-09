@@ -4305,6 +4305,10 @@ export type Database = {
         Args: { _object_name: string; _user_id: string }
         Returns: boolean
       }
+      can_upload_artwork_storage_file: {
+        Args: { _object_name: string; _user_id: string }
+        Returns: boolean
+      }
       can_view_child_order: {
         Args: { _order_id: string; _user_id: string }
         Returns: boolean
@@ -4443,6 +4447,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      next_order_number: { Args: never; Returns: string }
       recalc_blanket_invoices_for_order: {
         Args: {
           p_include_closed?: boolean
