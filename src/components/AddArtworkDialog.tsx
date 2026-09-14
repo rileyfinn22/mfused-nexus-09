@@ -11,7 +11,7 @@ import { Check, ChevronsUpDown, Plus, FileImage, AlertCircle } from "lucide-reac
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
-import { buildManualArtworkPreviewPath, createFlatArtworkPreviewFromFile } from "@/lib/artworkPreview";
+import { describeArtworkUploadError, uploadArtworkFile } from "@/lib/artworkUpload";
 import { toast } from "sonner";
 
 interface AddArtworkDialogProps {
@@ -121,13 +121,18 @@ const AddArtworkDialog = ({
   };
 
   const fetchProducts = async () => {
+    // PostgREST returns at most 1,000 rows unless told otherwise. Mfused alone has ~880
+    // products, and a member of several companies sees all of them, so without a limit the
+    // list silently stopped partway through the alphabet and the product "wasn't there".
     let query = supabase
       .from('products')
       .select('id, item_id, name, company_id')
-      .order('name');
+      .order('name')
+      .limit(10000);
 
-    if (restrictToCompany) {
-      query = query.eq('company_id', restrictToCompany);
+    const scopeCompany = restrictToCompany || (!isVibeAdmin ? activeCompanyId : null);
+    if (scopeCompany) {
+      query = query.eq('company_id', scopeCompany);
     }
 
     const { data } = await query;
@@ -174,78 +179,24 @@ const AddArtworkDialog = ({
     setUploading(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast.error("Please log in to upload artwork");
-        return;
-      }
-
-      // Upload main artwork file
-      const fileExt = formData.file.name.split('.').pop();
-      const fileName = `${formData.sku}/${Date.now()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('artwork')
-        .upload(fileName, formData.file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl: artworkUrl } } = supabase.storage
-        .from('artwork')
-        .getPublicUrl(fileName);
-
-      // Upload preview if provided, otherwise auto-generate a clean flat preview for PDF proofs
-      let previewUrl: string | null = null;
-      if (formData.previewFile) {
-        const previewExt = formData.previewFile.name.split('.').pop();
-        const previewName = buildManualArtworkPreviewPath(formData.sku, previewExt);
-
-        const { error: previewError } = await supabase.storage
-          .from('artwork')
-          .upload(previewName, formData.previewFile);
-
-        if (!previewError) {
-          const { data: { publicUrl } } = supabase.storage
-            .from('artwork')
-            .getPublicUrl(previewName);
-          previewUrl = publicUrl;
-        }
-      } else {
-        const artworkExt = (formData.file.name.split('.').pop() || '').toLowerCase();
-        if (artworkExt === 'pdf') {
-          try {
-            previewUrl = await createFlatArtworkPreviewFromFile({
-              file: formData.file,
-              sku: formData.sku,
-              contextLabel: formData.file.name,
-            });
-          } catch (e) {
-            console.warn('Failed to auto-generate flat artwork preview', e);
-          }
-        }
-      }
-      // Create database record
-      const { error: insertError } = await supabase
-        .from('artwork_files')
-        .insert({
-          sku: formData.sku.toUpperCase(),
-          artwork_url: artworkUrl,
-          preview_url: previewUrl,
-          filename: formData.file.name,
-          notes: formData.notes,
-          artwork_type: formData.artworkType,
-          is_approved: false,
-          company_id: effectiveCompanyId,
-        });
-
-      if (insertError) throw insertError;
+      // One upload path for the dialog and the per-product "+" button (src/lib/artworkUpload.ts).
+      // The SKU is stored exactly as the product carries it; the old .toUpperCase() here could
+      // detach a file from a product whose item_id has lower-case characters.
+      await uploadArtworkFile({
+        file: formData.file,
+        sku: formData.sku,
+        companyId: effectiveCompanyId,
+        artworkType: formData.artworkType,
+        notes: formData.notes,
+        previewFile: formData.previewFile,
+      });
 
       toast.success("Artwork added successfully");
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
       console.error('Error uploading artwork:', error);
-      toast.error("Failed to upload artwork");
+      toast.error(describeArtworkUploadError(error));
     } finally {
       setUploading(false);
     }

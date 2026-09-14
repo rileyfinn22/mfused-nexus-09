@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import PdfThumbnail from "@/components/PdfThumbnail";
 import SignedImage from "@/components/SignedImage";
 import { useNavigate } from "react-router-dom";
@@ -25,10 +25,13 @@ import {
   ImageIcon,
   FileArchive,
   FileCode,
-  Edit
+  Edit,
+  Loader2,
+  Upload
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { downloadStorageObject } from "@/lib/storageUrl";
+import { describeArtworkUploadError, uploadArtworkFile } from "@/lib/artworkUpload";
 import { useToast } from "@/hooks/use-toast";
 import { buildManualArtworkPreviewPath, createFlatArtworkPreviewFromArtwork, isLegacyGeneratedTemplateMockupUrl } from "@/lib/artworkPreview";
 import AddArtworkDialog from "@/components/AddArtworkDialog";
@@ -117,6 +120,81 @@ export function CustomerArtworkTab({
   const [newThumbnailFile, setNewThumbnailFile] = useState<File | null>(null);
   
   const { toast } = useToast();
+
+  // "+" on a product tile: pick a file and it is attached to that product right there, no
+  // dropdown to find the product in. One hidden input serves every tile; the product whose
+  // "+" was clicked is remembered until the file dialog comes back.
+  const tileFileInputRef = useRef<HTMLInputElement>(null);
+  const [tileUploadTarget, setTileUploadTarget] = useState<Product | null>(null);
+  const [uploadingProductId, setUploadingProductId] = useState<string | null>(null);
+
+  const startTileUpload = (product: Product) => {
+    if (!product.item_id) {
+      toast({
+        title: "No SKU",
+        description: "This product has no SKU, so artwork cannot be attached to it yet.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setTileUploadTarget(product);
+    if (tileFileInputRef.current) {
+      tileFileInputRef.current.value = "";
+      tileFileInputRef.current.click();
+    }
+  };
+
+  const handleTileFileChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const product = tileUploadTarget;
+    if (!file || !product?.item_id) return;
+    setUploadingProductId(product.id);
+    try {
+      await uploadArtworkFile({
+        file,
+        sku: product.item_id,
+        companyId: product.company_id,
+        artworkType: "customer",
+      });
+      toast({ title: "Artwork added", description: `${file.name} attached to ${product.item_id}` });
+      handleUploadSuccess();
+    } catch (err) {
+      console.error("Error uploading artwork:", err);
+      toast({ title: "Upload failed", description: describeArtworkUploadError(err), variant: "destructive" });
+    } finally {
+      setUploadingProductId(null);
+      setTileUploadTarget(null);
+    }
+  };
+
+  const tileFileInput = (
+    <input
+      ref={tileFileInputRef}
+      type="file"
+      className="hidden"
+      onChange={handleTileFileChosen}
+    />
+  );
+
+  const tileAddButton = (product: Product, className = "absolute bottom-2 right-2") => (
+    <Button
+      variant="secondary"
+      size="sm"
+      className={`${className} h-8 w-8 p-0 shadow-md`}
+      title={product.item_id ? "Add customer art to this product" : "This product has no SKU"}
+      disabled={uploadingProductId === product.id}
+      onClick={(e) => {
+        e.stopPropagation();
+        startTileUpload(product);
+      }}
+    >
+      {uploadingProductId === product.id ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : (
+        <Plus className="h-4 w-4" />
+      )}
+    </Button>
+  );
 
   useEffect(() => {
     fetchTemplates();
@@ -519,11 +597,25 @@ export function CustomerArtworkTab({
               </p>
             </div>
           </div>
-          <Button onClick={() => setUploadDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Customer Art
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => startTileUpload(selectedProduct)}
+              disabled={uploadingProductId === selectedProduct.id}
+            >
+              {uploadingProductId === selectedProduct.id ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Upload className="h-4 w-4 mr-2" />
+              )}
+              Upload File
+            </Button>
+            <Button variant="outline" onClick={() => setUploadDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add with Notes
+            </Button>
+          </div>
         </div>
+        {tileFileInput}
 
         {/* Artwork Grid */}
         {artworkFiles.length === 0 ? (
@@ -533,9 +625,9 @@ export function CustomerArtworkTab({
             <p className="text-sm text-muted-foreground mb-4">
               Upload customer-provided artwork for this product
             </p>
-            <Button onClick={() => setUploadDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Customer Art
+            <Button onClick={() => startTileUpload(selectedProduct)} disabled={uploadingProductId === selectedProduct.id}>
+              <Upload className="h-4 w-4 mr-2" />
+              Upload File
             </Button>
           </Card>
         ) : (
@@ -750,6 +842,10 @@ export function CustomerArtworkTab({
             </Button>
           </div>
         </div>
+        {tileFileInput}
+        <p className="text-sm text-muted-foreground -mt-2">
+          Click the <Plus className="inline h-3.5 w-3.5 align-text-bottom" /> on a product to attach a file to it directly.
+        </p>
 
         {/* Search */}
         <div className="flex gap-4">
@@ -813,6 +909,9 @@ export function CustomerArtworkTab({
                         </Badge>
                       </div>
                     )}
+
+                    {/* Attach a file to this product without leaving the grid */}
+                    {tileAddButton(product)}
                   </div>
                   <div className="p-3">
                     <h3 className="font-medium text-sm truncate">{getDisplayName(product.name)}</h3>
@@ -830,7 +929,8 @@ export function CustomerArtworkTab({
                 <div className="col-span-4">Product</div>
                 <div className="col-span-3">SKU</div>
                 <div className="col-span-2">Customer Art</div>
-                <div className="col-span-2">Status</div>
+                <div className="col-span-1">Status</div>
+                <div className="col-span-1 text-right">Add</div>
               </div>
             </div>
             <div className="divide-y">
@@ -860,8 +960,11 @@ export function CustomerArtworkTab({
                         <span className="text-sm text-muted-foreground">-</span>
                       )}
                     </div>
-                    <div className="col-span-2">
+                    <div className="col-span-1">
                       {getStatusBadge(getProductArtworkStatus(product.item_id))}
+                    </div>
+                    <div className="col-span-1 flex justify-end">
+                      {tileAddButton(product, "")}
                     </div>
                   </div>
                 );
