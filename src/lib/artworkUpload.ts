@@ -1,5 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
-import { buildManualArtworkPreviewPath, createFlatArtworkPreviewFromFile } from "@/lib/artworkPreview";
+import {
+  buildManualArtworkPreviewPath,
+  createFlatArtworkPreviewFromArtwork,
+  createFlatArtworkPreviewFromFile,
+} from "@/lib/artworkPreview";
 
 export type ArtworkType = "customer" | "vibe_proof";
 
@@ -46,13 +50,33 @@ export async function uploadArtworkFile(args: UploadArtworkArgs): Promise<void> 
     const { error: previewError } = await supabase.storage.from("artwork").upload(previewName, previewFile);
     if (!previewError) {
       previewUrl = supabase.storage.from("artwork").getPublicUrl(previewName).data.publicUrl;
+    } else {
+      console.warn("Failed to upload provided artwork preview", previewError);
     }
-  } else if ((fileExt || "").toLowerCase() === "pdf") {
+  }
+
+  const isPdf = (fileExt || "").toLowerCase() === "pdf";
+  if (!previewUrl && isPdf) {
     try {
       previewUrl = await createFlatArtworkPreviewFromFile({ file, sku, contextLabel: file.name });
     } catch (e) {
-      console.warn("Failed to auto-generate flat artwork preview", e);
+      console.warn("Failed to auto-generate flat artwork preview from file", e);
+      // Second attempt: render from the file we just stored (handles browsers that
+      // release the local File handle before the thumbnail finishes rendering).
+      try {
+        previewUrl = await createFlatArtworkPreviewFromArtwork({
+          artworkUrl,
+          filename: file.name,
+          sku,
+          contextLabel: file.name,
+        });
+      } catch (e2) {
+        console.warn("Failed to auto-generate flat artwork preview from stored file", e2);
+      }
     }
+  } else if (!previewUrl && !isPdf) {
+    // Images are their own thumbnail.
+    previewUrl = artworkUrl;
   }
 
   const { error: insertError } = await supabase.from("artwork_files").insert({
