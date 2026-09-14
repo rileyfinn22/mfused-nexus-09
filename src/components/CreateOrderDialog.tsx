@@ -40,6 +40,8 @@ interface Product {
   name: string;
   item_id: string | null;
   cost: number | null;
+  price?: number | null;
+  template_id?: string | null;
   description: string | null;
   image_url: string | null;
 }
