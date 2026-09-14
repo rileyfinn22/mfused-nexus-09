@@ -1814,6 +1814,12 @@ const Artwork = () => {
           <TabsTrigger value="customer" className="flex items-center gap-2">
             <Upload className="h-4 w-4" />
             Customer Art
+            {customerPendingCount > 0 && (
+              <span
+                className="h-2 w-2 rounded-full bg-blue-600"
+                title={`${customerPendingCount} customer file${customerPendingCount === 1 ? '' : 's'} awaiting proof`}
+              />
+            )}
           </TabsTrigger>
         </TabsList>
 
