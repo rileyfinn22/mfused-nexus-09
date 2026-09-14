@@ -509,6 +509,7 @@ const Artwork = () => {
         .from('artwork_files')
         .select('*')
         .eq('sku', product.item_id)
+        .or('artwork_type.is.null,artwork_type.neq.customer')
         .order('created_at', { ascending: false });
       
       if (statusFilter === 'approved') {
