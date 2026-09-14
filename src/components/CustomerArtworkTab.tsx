@@ -109,6 +109,9 @@ export function CustomerArtworkTab({
   // Template artwork status
   const [templateStatus, setTemplateStatus] = useState<Record<string, ArtworkStatus>>({});
   const [templateDerivedThumbnails, setTemplateDerivedThumbnails] = useState<Record<string, string>>({});
+  // First usable customer-art thumbnail / PDF per SKU, used on product tiles
+  const [skuArtThumbnails, setSkuArtThumbnails] = useState<Record<string, string>>({});
+  const [skuArtPdfUrls, setSkuArtPdfUrls] = useState<Record<string, string>>({});
   
   // Dialogs
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
