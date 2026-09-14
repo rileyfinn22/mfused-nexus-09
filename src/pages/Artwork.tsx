@@ -84,6 +84,7 @@ interface ArtworkFile {
   notes: string | null;
   created_at: string;
   company_id: string;
+  artwork_type?: string | null;
 }
 
 const Artwork = () => {
@@ -365,7 +366,8 @@ const Artwork = () => {
         counts[art.sku].total++;
         if (art.is_approved) {
           counts[art.sku].approved++;
-        } else {
+        } else if (art.artwork_type !== 'customer') {
+          // Customer-supplied art isn't a proof awaiting VibePKG approval.
           counts[art.sku].pending++;
         }
 
@@ -1034,7 +1036,7 @@ const Artwork = () => {
   // Get all artwork stats
   const totalArtwork = Object.values(artworkCounts).reduce((sum, c) => sum + c.total, 0);
   const approvedArtwork = Object.values(artworkCounts).reduce((sum, c) => sum + c.approved, 0);
-  const pendingArtwork = totalArtwork - approvedArtwork;
+  const pendingArtwork = Object.values(artworkCounts).reduce((sum, c) => sum + c.pending, 0);
 
   if (loading || companyCtxLoading || isVibeAdmin === null) {
     return <div className="p-6">Loading...</div>;
@@ -1203,6 +1205,10 @@ const Artwork = () => {
                       <Badge className="bg-green-600 text-white border-0">
                         <CheckCircle className="h-3 w-3 mr-1" />
                         Approved
+                      </Badge>
+                    ) : file.artwork_type === 'customer' ? (
+                      <Badge variant="secondary" className="bg-blue-600/90 text-white border-0">
+                        Customer Art
                       </Badge>
                     ) : (
                       <Badge variant="secondary" className="bg-yellow-500/90 text-white border-0">
