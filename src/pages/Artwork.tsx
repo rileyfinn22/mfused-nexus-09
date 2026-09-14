@@ -536,6 +536,7 @@ const Artwork = () => {
       let query = supabase
         .from('artwork_files')
         .select('*')
+        .or('artwork_type.is.null,artwork_type.neq.customer')
         .order('created_at', { ascending: false })
         .limit(50000);
 
