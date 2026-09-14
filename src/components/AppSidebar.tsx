@@ -45,7 +45,6 @@ const companyNavigationItems = [
   { title: "Artwork", url: "/artwork", icon: Image },
   { title: "Pull & Ship", url: "/pull-ship", icon: Truck },
   { title: "My POs", url: "/my-pos", icon: FolderOpen },
-  { title: "Print Workshop", url: "/print-workshop", icon: Printer },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 
@@ -67,7 +66,6 @@ const vibeAdminNavigationItems = [
   { title: "Artwork", url: "/artwork", icon: Image },
   { title: "Reports", url: "/reports", icon: BarChart3 },
   { title: "Message Hub", url: "/chat", icon: MessageSquare },
-  { title: "Print Workshop", url: "/print-workshop", icon: Printer },
   { title: "Financing", url: "/financing", icon: Landmark },
   { title: "Shipment Orders", url: "/forwarder/orders", icon: Ship },
   { title: "Settings", url: "/settings", icon: Settings },

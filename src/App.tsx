@@ -52,8 +52,6 @@ import CreateQuote from "./pages/CreateQuote";
 import NotFound from "./pages/NotFound";
 import ShipmentUpdate from "./pages/ShipmentUpdate";
 import Chat from "./pages/Chat";
-import PrintWorkshop from "./pages/PrintWorkshop";
-import WorkshopOrderDetail from "./pages/WorkshopOrderDetail";
 import Financing from "./pages/Financing";
 import FinanceView from "./pages/FinanceView";
 import FinancedInvoiceDetail from "./pages/FinancedInvoiceDetail";
@@ -112,8 +110,6 @@ const App = () => (
           <Route path="/settings" element={<DashboardLayout><Settings /></DashboardLayout>} />
           <Route path="/reports" element={<DashboardLayout><Reports /></DashboardLayout>} />
            <Route path="/chat" element={<DashboardLayout><Chat /></DashboardLayout>} />
-           <Route path="/print-workshop" element={<DashboardLayout><PrintWorkshop /></DashboardLayout>} />
-           <Route path="/print-workshop/orders/:orderId" element={<DashboardLayout><WorkshopOrderDetail /></DashboardLayout>} />
            <Route path="/financing" element={<DashboardLayout><Financing /></DashboardLayout>} />
            <Route path="/financing/:id" element={<DashboardLayout><FinancedInvoiceDetail /></DashboardLayout>} />
           <Route path="/projects" element={<DashboardLayout><Projects /></DashboardLayout>} />
