@@ -84,6 +84,7 @@ interface ArtworkFile {
   notes: string | null;
   created_at: string;
   company_id: string;
+  artwork_type?: string | null;
 }
 
 const Artwork = () => {
