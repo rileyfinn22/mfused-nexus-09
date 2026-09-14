@@ -241,7 +241,7 @@ const AddArtworkDialog = ({
           {/* Product Selection - REQUIRED */}
           <div className="space-y-2">
             <Label>Select Product *</Label>
-            <Popover open={productComboOpen} onOpenChange={setProductComboOpen}>
+            <Popover modal open={productComboOpen} onOpenChange={setProductComboOpen}>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
