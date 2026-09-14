@@ -963,8 +963,12 @@ export function CustomerArtworkTab({
                     onClick={() => setSelectedProduct(product)}
                   >
                     <div className="col-span-1">
-                      {product.image_url ? (
-                        <SignedImage src={product.image_url} alt={product.name} className="w-10 h-10 rounded object-cover" />
+                      {(product.item_id && skuArtThumbnails[product.item_id]) || product.image_url ? (
+                        <SignedImage
+                          src={(product.item_id && skuArtThumbnails[product.item_id]) || product.image_url!}
+                          alt={product.name}
+                          className="w-10 h-10 rounded object-cover"
+                        />
                       ) : (
                         <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
                           <Package className="h-5 w-5 text-muted-foreground/50" />
