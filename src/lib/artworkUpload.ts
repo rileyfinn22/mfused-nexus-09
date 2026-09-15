@@ -56,40 +56,73 @@ export async function uploadArtworkFile(args: UploadArtworkArgs): Promise<void> 
   }
 
   const isPdf = (fileExt || "").toLowerCase() === "pdf";
-  if (!previewUrl && isPdf) {
-    try {
-      previewUrl = await createFlatArtworkPreviewFromFile({ file, sku, contextLabel: file.name });
-    } catch (e) {
-      console.warn("Failed to auto-generate flat artwork preview from file", e);
-      // Second attempt: render from the file we just stored (handles browsers that
-      // release the local File handle before the thumbnail finishes rendering).
-      try {
-        previewUrl = await createFlatArtworkPreviewFromArtwork({
-          artworkUrl,
-          filename: file.name,
-          sku,
-          contextLabel: file.name,
-        });
-      } catch (e2) {
-        console.warn("Failed to auto-generate flat artwork preview from stored file", e2);
-      }
-    }
-  } else if (!previewUrl && !isPdf) {
+  if (!previewUrl && !isPdf) {
     // Images are their own thumbnail.
     previewUrl = artworkUrl;
   }
 
-  const { error: insertError } = await supabase.from("artwork_files").insert({
-    sku,
-    artwork_url: artworkUrl,
-    preview_url: previewUrl,
-    filename: file.name,
-    notes: notes || "",
-    artwork_type: artworkType,
-    is_approved: false,
-    company_id: companyId,
-  });
+  // Save the record first so the upload always finishes promptly. PDF thumbnail
+  // rendering can stall on large files; it runs after the insert and only fills in
+  // preview_url when it succeeds.
+  const { data: inserted, error: insertError } = await supabase
+    .from("artwork_files")
+    .insert({
+      sku,
+      artwork_url: artworkUrl,
+      preview_url: previewUrl,
+      filename: file.name,
+      notes: notes || "",
+      artwork_type: artworkType,
+      is_approved: false,
+      company_id: companyId,
+    })
+    .select("id")
+    .single();
   if (insertError) throw insertError;
+
+  if (!previewUrl && isPdf && inserted?.id) {
+    try {
+      const generated = await withTimeout(
+        (async () => {
+          try {
+            return await createFlatArtworkPreviewFromFile({ file, sku, contextLabel: file.name });
+          } catch (e) {
+            console.warn("Failed to auto-generate flat artwork preview from file", e);
+            // Second attempt: render from the file we just stored (handles browsers that
+            // release the local File handle before the thumbnail finishes rendering).
+            return await createFlatArtworkPreviewFromArtwork({
+              artworkUrl,
+              filename: file.name,
+              sku,
+              contextLabel: file.name,
+            });
+          }
+        })(),
+        45000,
+      );
+
+      if (generated) {
+        await supabase.from("artwork_files").update({ preview_url: generated }).eq("id", inserted.id);
+      }
+    } catch (e) {
+      console.warn("Skipped artwork preview generation", e);
+    }
+  }
+}
+
+/** Resolves to null if the work takes longer than `ms`, so uploads never hang. */
+async function withTimeout<T>(work: Promise<T>, ms: number): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      work,
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 /** A readable reason for the customer when an upload is refused. */
