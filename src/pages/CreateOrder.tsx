@@ -21,6 +21,8 @@ import { cn } from "@/lib/utils";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { useBrandFilter } from "@/hooks/useBrandFilter";
 import { BrandSelect } from "@/components/BrandSelect";
+import { GroupedProductPicker, type PickedItem } from "@/components/GroupedProductPicker";
+import { useCompanyPortalFeatures } from "@/hooks/useCompanyPortalFeatures";
 
 const orderSchema = z.object({
   customerName: z.string().trim().min(1, "Customer name is required").max(200),
@@ -48,6 +50,7 @@ interface Product {
   company_id: string;
   state: string | null;
   brand_id?: string | null;
+  product_type?: string | null;
 }
 
 interface Company {
@@ -73,7 +76,7 @@ const fetchAllOrderProducts = async (companyId?: string | null): Promise<Product
     const to = from + PRODUCT_PAGE_SIZE - 1;
     let query = supabase
       .from('products')
-      .select('id, name, item_id, price, description, image_url, company_id, state, template_id, brand_id')
+      .select('id, name, item_id, price, description, image_url, company_id, state, template_id, brand_id, product_type')
       .order('name')
       .range(from, to);
     if (companyId) {
@@ -274,6 +277,8 @@ const CreateOrder = () => {
   // Brand filter in the item picker follows the one chosen on Products (persisted per company).
   const brandCompanyId = isVibeAdmin ? (selectedCompanyId || null) : (activeCompanyId || null);
   const { brands, brandFilter, setBrandFilter, matches: matchesBrand, brandName } = useBrandFilter(brandCompanyId);
+  // Companies with portal_features.order_picker (Nutrastrips) get the brand + kind picker.
+  const { orderPicker: groupedPickerConfig } = useCompanyPortalFeatures(brandCompanyId);
   const [uploading, setUploading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -1792,6 +1797,20 @@ const CreateOrder = () => {
     setShowAddItemsDialog(false);
   };
 
+  // Grouped picker: quantities were entered on the rows, so they arrive with the items.
+  const handleAddPickedItems = (items: PickedItem[]) => {
+    const existingProductIds = new Set(selectedItems.map(item => item.productId));
+    const newItems = items
+      .filter(item => !existingProductIds.has(item.productId))
+      .map(item => ({
+        productId: item.productId,
+        quantity: Math.max(1, item.quantity),
+        ...(item.unit_price != null ? { unit_price: item.unit_price } : {}),
+      }));
+    setSelectedItems(prev => [...prev, ...newItems]);
+    setShowAddItemsDialog(false);
+  };
+
   const toggleProductSelection = (productId: string) => {
     setTempSelectedProducts(prev => 
       prev.includes(productId) 
@@ -3233,14 +3252,32 @@ const CreateOrder = () => {
                     {isVibeAdmin && !selectedCompanyId ? "Select a company first" : "Add Items"}
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+                <DialogContent
+                  className={cn(
+                    "flex flex-col",
+                    groupedPickerConfig ? "max-w-5xl w-[95vw] h-[85vh]" : "max-w-3xl max-h-[80vh]"
+                  )}
+                >
+                  {groupedPickerConfig ? (
+                    <GroupedProductPicker
+                      key={showAddItemsDialog ? "open" : "closed"}
+                      products={availableProducts.filter(p => !selectedItems.some(item => item.productId === p.id))}
+                      brands={brands}
+                      config={groupedPickerConfig}
+                      brandFilter={brandFilter}
+                      onBrandFilterChange={setBrandFilter}
+                      onAdd={handleAddPickedItems}
+                      onCancel={() => setShowAddItemsDialog(false)}
+                    />
+                  ) : (
+                  <>
                   <DialogHeader>
                     <DialogTitle>Add Items to Order</DialogTitle>
                     <DialogDescription>
                       Search and select multiple items to add to your order
                     </DialogDescription>
                   </DialogHeader>
-                  
+
                   {/* Search + brand filter (brand only shows for companies that use brands) */}
                   <div className="flex flex-col sm:flex-row gap-2">
                     <div className="relative flex-1">
@@ -3341,6 +3378,8 @@ const CreateOrder = () => {
                       </Button>
                     </div>
                   </div>
+                  </>
+                  )}
                 </DialogContent>
               </Dialog>
             </div>

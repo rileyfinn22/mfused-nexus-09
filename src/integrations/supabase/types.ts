@@ -292,6 +292,7 @@ export type Database = {
           notes: string | null
           payment_terms: string | null
           phone: string | null
+          portal_features: Json
           quickbooks_id: string | null
           shipping_city: string | null
           shipping_name: string | null
@@ -317,6 +318,7 @@ export type Database = {
           notes?: string | null
           payment_terms?: string | null
           phone?: string | null
+          portal_features?: Json
           quickbooks_id?: string | null
           shipping_city?: string | null
           shipping_name?: string | null
@@ -342,6 +344,7 @@ export type Database = {
           notes?: string | null
           payment_terms?: string | null
           phone?: string | null
+          portal_features?: Json
           quickbooks_id?: string | null
           shipping_city?: string | null
           shipping_name?: string | null
