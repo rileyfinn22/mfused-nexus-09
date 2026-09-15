@@ -30,7 +30,9 @@ import { fetchChildPdfInputs } from "@/lib/invoiceBalance";
 import { EditableDescription } from "@/components/EditableDescription";
 import { CustomerStatementTab } from "@/components/CustomerStatementTab";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
-import { brandNamesForItems, fetchBrandNamesByProductId } from "@/lib/productBrands";
+import { brandsForItems, fetchBrandsByProductId, recordMatchesBrandFilter } from "@/lib/productBrands";
+import { useBrandFilter } from "@/hooks/useBrandFilter";
+import { BrandSelect } from "@/components/BrandSelect";
 import { ExpandToggleButton, ExpandDetailsPanel, useInvoiceItems, useInvoicePayments } from "@/components/RowExpandPanel";
 import InvoiceReconciliationBanner from "@/components/InvoiceReconciliationBanner";
 import { formatDocDate } from "@/lib/utils";
@@ -141,13 +143,13 @@ const Invoices = () => {
 
     if (data) {
       // Brand per line item of the invoiced order, so invoices can be labelled by brand.
-      const brandByProduct = await fetchBrandNamesByProductId(
+      const brandByProduct = await fetchBrandsByProductId(
         data.flatMap((inv: any) => (inv.orders?.order_items || []).map((i: any) => i.product_id))
       );
-      const withBrands = data.map((inv: any) => ({
-        ...inv,
-        brandNames: brandNamesForItems(inv.orders?.order_items, brandByProduct),
-      }));
+      const withBrands = data.map((inv: any) => {
+        const invoiceBrands = brandsForItems(inv.orders?.order_items, brandByProduct);
+        return { ...inv, brands: invoiceBrands, brandNames: invoiceBrands.map((b) => b.name) };
+      });
       setInvoices(withBrands);
       setHasBrands(withBrands.some((inv: any) => inv.brandNames.length > 0));
     }
@@ -360,6 +362,10 @@ const Invoices = () => {
     }).format(amount);
   };
 
+  // Brand filter (persisted per company, shared with Products / Artwork / ordering).
+  const brandCompanyId = isVibeAdmin ? (companyFilter !== 'all' ? companyFilter : null) : activeCompanyId;
+  const { brands, brandFilter, setBrandFilter } = useBrandFilter(brandCompanyId);
+
   const filteredInvoices = invoices.filter(invoice => {
     const matchesSearch = invoice.invoice_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          invoice.orders?.order_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -381,7 +387,8 @@ const Invoices = () => {
     }
     
     const matchesCompany = companyFilter === "all" || invoice.company_id === companyFilter;
-    return matchesSearch && matchesStatus && matchesCompany;
+    const matchesBrand = brands.length === 0 || recordMatchesBrandFilter(invoice.brands, brandFilter);
+    return matchesSearch && matchesStatus && matchesCompany && matchesBrand;
   });
 
   // Group related invoices (blanket + partials)
@@ -555,6 +562,8 @@ const Invoices = () => {
             </SelectContent>
           </Select>
         )}
+        {/* Brand filter: only companies that use brands see this */}
+        <BrandSelect brands={brands} value={brandFilter} onChange={setBrandFilter} className="sm:w-48" />
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-full sm:w-48">
             <SelectValue placeholder="Status" />

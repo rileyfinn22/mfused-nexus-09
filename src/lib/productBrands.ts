@@ -1,11 +1,16 @@
 import { supabase } from "@/integrations/supabase/client";
 
+export interface BrandRef {
+  id: string;
+  name: string;
+}
+
 /**
- * Brand name per product id, for labelling orders and invoices by the brands they contain.
- * Products with no brand are simply absent from the map. Any failure yields an empty map so
- * the calling page renders without brand labels rather than breaking.
+ * Brand per product id, for labelling and filtering orders and invoices by the brands they
+ * contain. Products with no brand are simply absent from the map. Any failure yields an empty
+ * map so the calling page renders without brand labels rather than breaking.
  */
-export async function fetchBrandNamesByProductId(productIds: Array<string | null | undefined>): Promise<Record<string, string>> {
+export async function fetchBrandsByProductId(productIds: Array<string | null | undefined>): Promise<Record<string, BrandRef>> {
   const ids = Array.from(new Set(productIds.filter((id): id is string => !!id)));
   if (ids.length === 0) return {};
 
@@ -38,27 +43,35 @@ export async function fetchBrandNamesByProductId(productIds: Array<string | null
       });
     }
 
-    const out: Record<string, string> = {};
+    const out: Record<string, BrandRef> = {};
     Object.entries(brandIdByProduct).forEach(([productId, brandId]) => {
       const name = nameByBrand[brandId];
-      if (name) out[productId] = name;
+      if (name) out[productId] = { id: brandId, name };
     });
     return out;
   } catch (error) {
-    console.error("Error fetching brand names for products:", error);
+    console.error("Error fetching brands for products:", error);
     return {};
   }
 }
 
-/** Distinct brand names across a set of line items, in alphabetical order. */
-export function brandNamesForItems(
+/** Distinct brands across a set of line items, alphabetical by name. */
+export function brandsForItems(
   items: Array<{ product_id?: string | null }> | null | undefined,
-  brandByProduct: Record<string, string>
-): string[] {
-  const names = new Set<string>();
+  brandByProduct: Record<string, BrandRef>
+): BrandRef[] {
+  const seen = new Map<string, BrandRef>();
   (items || []).forEach((item) => {
-    const name = item.product_id ? brandByProduct[item.product_id] : undefined;
-    if (name) names.add(name);
+    const brand = item.product_id ? brandByProduct[item.product_id] : undefined;
+    if (brand) seen.set(brand.id, brand);
   });
-  return Array.from(names).sort((a, b) => a.localeCompare(b));
+  return Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Does a record with these brands pass the brand filter ("all" | "none" | brand id)? */
+export function recordMatchesBrandFilter(brands: BrandRef[] | undefined, brandFilter: string): boolean {
+  if (brandFilter === "all") return true;
+  const list = brands || [];
+  if (brandFilter === "none") return list.length === 0;
+  return list.some((b) => b.id === brandFilter);
 }

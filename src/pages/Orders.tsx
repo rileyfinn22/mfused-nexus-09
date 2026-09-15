@@ -6,7 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
-import { brandNamesForItems, fetchBrandNamesByProductId } from "@/lib/productBrands";
+import { brandsForItems, fetchBrandsByProductId, recordMatchesBrandFilter } from "@/lib/productBrands";
+import { useBrandFilter } from "@/hooks/useBrandFilter";
+import { BrandSelect } from "@/components/BrandSelect";
 import { toast } from "@/hooks/use-toast";
 
 // Helper to parse date-only strings (YYYY-MM-DD) as local time, not UTC
@@ -153,7 +155,7 @@ const Orders = () => {
       }
 
       // Brand per line item, so each order can be labelled by the brands it contains.
-      const brandByProduct = await fetchBrandNamesByProductId(
+      const brandByProduct = await fetchBrandsByProductId(
         filteredData.flatMap((o: any) => (o.order_items || []).map((i: any) => i.product_id))
       );
 
@@ -171,7 +173,8 @@ const Orders = () => {
           artApproved: allApproved,
           checklistComplete: allApproved && order.order_finalized && order.vibe_processed,
           productionProgress,
-          brandNames: brandNamesForItems(items, brandByProduct),
+          brands: brandsForItems(items, brandByProduct),
+          brandNames: brandsForItems(items, brandByProduct).map((b) => b.name),
         };
       });
 
@@ -291,12 +294,17 @@ const Orders = () => {
     };
   };
 
+  // Brand filter (persisted per company, shared with Products / Artwork / ordering).
+  const brandCompanyId = isVibeAdmin ? (companyFilter !== 'all' ? companyFilter : null) : activeCompanyId;
+  const { brands, brandFilter, setBrandFilter } = useBrandFilter(brandCompanyId);
+
   const filteredOrders = orders.filter(order => {
     const matchesSearch = order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          (order.customer_name && order.customer_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
                          (order.companies?.name && order.companies.name.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesStatus = statusFilter === "all" || order.status.toLowerCase() === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesBrand = brands.length === 0 || recordMatchesBrandFilter(order.brands, brandFilter);
+    return matchesSearch && matchesStatus && matchesBrand;
   });
 
   useEffect(() => {
@@ -390,6 +398,8 @@ const Orders = () => {
             </SelectContent>
           </Select>
         )}
+        {/* Brand filter: only companies that use brands see this */}
+        <BrandSelect brands={brands} value={brandFilter} onChange={setBrandFilter} className="sm:w-48" />
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-full sm:w-48">
             <SelectValue placeholder="Status" />
