@@ -47,6 +47,7 @@ export const LEG_TYPE_LABELS: Record<string, string> = {
 export const LEG_STATUS_OPTIONS = [
   { value: 'pending', label: 'Pending' },
   { value: 'in_transit', label: 'In Transit' },
+  { value: 'arrived_at_port', label: 'Arrived at Port' },
   { value: 'customs_hold', label: 'Customs Hold' },
   { value: 'cleared', label: 'Cleared' },
   { value: 'out_for_delivery', label: 'Out for Delivery' },
@@ -57,6 +58,7 @@ export function getLegStatusColor(status: string) {
   switch (status) {
     case 'delivered':
     case 'cleared':
+    case 'arrived_at_port':
       return 'bg-green-500/10 text-green-600 border-green-500/30';
     case 'in_transit':
     case 'out_for_delivery':

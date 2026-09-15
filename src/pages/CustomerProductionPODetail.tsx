@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, ArrowLeft, Package, Paperclip } from "lucide-react";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { cn } from "@/lib/utils";
+import { PoShipmentTracking } from "@/components/PoShipmentTracking";
 
 interface SheetRow {
   po_id: string;
@@ -164,6 +165,11 @@ export default function CustomerProductionPODetail() {
           </CardContent>
         )}
       </Card>
+
+      {/* Where the shipment is: parcel tracking, or vessel -> customs -> truck for ocean freight */}
+      {poId && activeCompanyId && (
+        <PoShipmentTracking poId={poId} companyId={activeCompanyId} editable={false} />
+      )}
 
       {/* Production progress + updates from the Vibe team */}
       <Card>

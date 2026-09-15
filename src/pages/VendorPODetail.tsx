@@ -19,6 +19,7 @@ import { Switch } from "@/components/ui/switch";
 import { VendorBillsSection } from "@/components/VendorBillsSection";
 import { getTrackingUrl, CARRIERS } from "@/lib/trackingUtils";
 import { InlineTrackingEditor } from "@/components/InlineTrackingEditor";
+import { PoShipmentTracking } from "@/components/PoShipmentTracking";
 import { normalizeStorageObjectPath, openStorageObjectInNewTab } from "@/lib/storageUrl";
 import VendorProductionPanel from "@/components/vendor/VendorProductionPanel";
 import { formatDocDate } from "@/lib/utils";
@@ -763,6 +764,20 @@ Thank you for your business.`;
       {vendorViewFirst && (
         <div className="mb-6">
           <VendorProductionPanel poId={po.id} />
+        </div>
+      )}
+
+      {/* Shipment tracking: parcel (UPS/DHL) or ocean (vessel -> customs -> truck PRO).
+          The customer sees the same card read-only on their production Details page. */}
+      {po.company_id && (
+        <div className="mb-6">
+          <PoShipmentTracking
+            poId={po.id}
+            companyId={po.company_id}
+            orderId={po.order_id}
+            editable
+            onChanged={fetchPODetails}
+          />
         </div>
       )}
 

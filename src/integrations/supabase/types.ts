@@ -3314,7 +3314,7 @@ export type Database = {
           leg_number: number
           leg_type: string
           notes: string | null
-          order_id: string
+          order_id: string | null
           origin: string | null
           pcs_per_ctn: number | null
           qty_pcs: number | null
@@ -3322,6 +3322,7 @@ export type Database = {
           status: string
           tracking_number: string | null
           tracking_url: string | null
+          vendor_po_id: string | null
           vessel_voyage: string | null
         }
         Insert: {
@@ -3343,7 +3344,7 @@ export type Database = {
           leg_number?: number
           leg_type?: string
           notes?: string | null
-          order_id: string
+          order_id?: string | null
           origin?: string | null
           pcs_per_ctn?: number | null
           qty_pcs?: number | null
@@ -3351,6 +3352,7 @@ export type Database = {
           status?: string
           tracking_number?: string | null
           tracking_url?: string | null
+          vendor_po_id?: string | null
           vessel_voyage?: string | null
         }
         Update: {
@@ -3380,6 +3382,7 @@ export type Database = {
           status?: string
           tracking_number?: string | null
           tracking_url?: string | null
+          vendor_po_id?: string | null
           vessel_voyage?: string | null
         }
         Relationships: [
