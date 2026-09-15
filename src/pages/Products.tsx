@@ -56,6 +56,7 @@ import { useBrandFilter } from "@/hooks/useBrandFilter";
 import { BrandSelect } from "@/components/BrandSelect";
 import { ManageBrandsDialog } from "@/components/ManageBrandsDialog";
 import { KindSelect } from "@/components/KindSelect";
+import { CustomerAddProductDialog } from "@/components/CustomerAddProductDialog";
 import { useCompanyPortalFeatures } from "@/hooks/useCompanyPortalFeatures";
 import { useKindFilter } from "@/hooks/useKindFilter";
 
@@ -131,6 +132,9 @@ const Products = () => {
   // Kind filter (Boxes / Foils / Other) only for companies with order_picker groups configured.
   const { orderPicker: kindConfig } = useCompanyPortalFeatures(brandCompanyId);
   const { kindFilter, setKindFilter, matches: matchesKind, matchesAny: matchesAnyKind } = useKindFilter(brandCompanyId, kindConfig);
+  // Buyers of brand-organised catalogs may add their own products (name, brand, kind, description).
+  const [customerAddOpen, setCustomerAddOpen] = useState(false);
+  const canCustomerAddProduct = !isVibeAdmin && !!kindConfig && !!brandCompanyId;
 
   // Template edit dialog (for vibe admins)
   const [templateEditOpen, setTemplateEditOpen] = useState(false);
@@ -916,11 +920,17 @@ const Products = () => {
                 onProductsAdded={fetchProducts}
                 selectedCompanyId={isVibeAdmin && companyFilter !== 'all' ? companyFilter : undefined}
               />
-              <AddProductDialog 
-                onProductAdded={fetchProducts} 
+              <AddProductDialog
+                onProductAdded={fetchProducts}
                 selectedCompanyId={isVibeAdmin && companyFilter !== 'all' ? companyFilter : undefined}
               />
             </>
+          )}
+          {canCustomerAddProduct && (
+            <Button onClick={() => setCustomerAddOpen(true)}>
+              <Plus className="h-4 w-4 mr-1.5" />
+              Add Product
+            </Button>
           )}
         </div>
       </div>
@@ -1622,6 +1632,21 @@ const Products = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {canCustomerAddProduct && kindConfig && brandCompanyId && (
+        <CustomerAddProductDialog
+          open={customerAddOpen}
+          onOpenChange={setCustomerAddOpen}
+          companyId={brandCompanyId}
+          brands={brands}
+          config={kindConfig}
+          onCreated={() => {
+            refreshBrands();
+            fetchProducts();
+            fetchTemplates();
+          }}
+        />
+      )}
 
       {/* Brands */}
       {brandCompanyId && (

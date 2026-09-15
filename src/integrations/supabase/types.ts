@@ -4526,6 +4526,16 @@ export type Database = {
         }
         Returns: string
       }
+      create_customer_product: {
+        Args: {
+          p_brand_id: string
+          p_company_id: string
+          p_description?: string | null
+          p_name: string
+          p_product_type?: string | null
+        }
+        Returns: string
+      }
       set_product_brand: {
         Args: { p_brand_id?: string | null; p_product_id: string }
         Returns: undefined
