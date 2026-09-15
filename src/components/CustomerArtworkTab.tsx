@@ -38,12 +38,15 @@ import AddArtworkDialog from "@/components/AddArtworkDialog";
 import BulkArtworkUploadDialog from "@/components/BulkArtworkUploadDialog";
 import ArtworkViewerDialog, { getArtworkThumbnail } from "@/components/ArtworkViewerDialog";
 import { cn } from "@/lib/utils";
+import { useBrandFilter } from "@/hooks/useBrandFilter";
+import { BrandFilterBar } from "@/components/BrandFilterBar";
 
 interface ProductTemplate {
   id: string;
   name: string;
   description: string | null;
   thumbnail_url: string | null;
+  brand_id?: string | null;
 }
 
 interface Product {
@@ -53,6 +56,7 @@ interface Product {
   template_id: string | null;
   company_id: string;
   image_url: string | null;
+  brand_id?: string | null;
 }
 
 interface ArtworkFile {
@@ -123,6 +127,10 @@ export function CustomerArtworkTab({
   const [newThumbnailFile, setNewThumbnailFile] = useState<File | null>(null);
   
   const { toast } = useToast();
+
+  // Brand filter follows the one chosen on Products (persisted per company).
+  const brandCompanyId = isVibeAdmin ? (companyFilter !== 'all' ? companyFilter : null) : userCompanyId;
+  const { brands, brandFilter, setBrandFilter, matches: matchesBrand } = useBrandFilter(brandCompanyId);
 
   // "+" on a product tile: pick a file and it is attached to that product right there, no
   // dropdown to find the product in. One hidden input serves every tile; the product whose
@@ -1010,8 +1018,8 @@ export function CustomerArtworkTab({
   }
 
   // TEMPLATE GRID VIEW (default)
-  const filteredTemplates = templates.filter(t => 
-    t.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredTemplates = templates.filter(t =>
+    matchesBrand(t.brand_id) && t.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -1053,6 +1061,9 @@ export function CustomerArtworkTab({
           <p className="text-3xl font-bold mt-2">{templates.length}</p>
         </Card>
       </div>
+
+      {/* Brand chips: only companies that use brands see this row */}
+      <BrandFilterBar brands={brands} value={brandFilter} onChange={setBrandFilter} />
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">

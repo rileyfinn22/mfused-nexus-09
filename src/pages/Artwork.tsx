@@ -39,6 +39,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { downloadStorageObject, normalizeStorageObjectPath } from "@/lib/storageUrl";
 import { useToast } from "@/hooks/use-toast";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
+import { useBrandFilter } from "@/hooks/useBrandFilter";
+import { BrandFilterBar } from "@/components/BrandFilterBar";
 import {
   buildManualArtworkPreviewPath,
   createFlatArtworkPreviewFromArtwork,
@@ -59,6 +61,7 @@ interface ProductTemplate {
   name: string;
   description: string | null;
   thumbnail_url: string | null;
+  brand_id?: string | null;
 }
 
 interface Product {
@@ -68,6 +71,7 @@ interface Product {
   template_id: string | null;
   company_id: string;
   image_url: string | null;
+  brand_id?: string | null;
 }
 
 // Artwork status types
@@ -107,6 +111,10 @@ const Artwork = () => {
   const [isVibeAdmin, setIsVibeAdmin] = useState<boolean | null>(null);
   const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Brand filter follows the one chosen on Products (persisted per company).
+  const brandCompanyId = isVibeAdmin ? (companyFilter !== 'all' ? companyFilter : null) : userCompanyId;
+  const { brands, brandFilter, setBrandFilter, matches: matchesBrand } = useBrandFilter(brandCompanyId);
   
   // Template/Product hierarchy
   const [templates, setTemplates] = useState<ProductTemplate[]>([]);
@@ -280,17 +288,17 @@ const Artwork = () => {
       // Get all products
       let productsQuery = supabase
         .from('products')
-        .select('id, name, item_id, template_id, company_id, image_url')
+        .select('id, name, item_id, template_id, company_id, image_url, brand_id')
         .limit(50000);
-      
+
       if (!isVibeAdmin && userCompanyId) {
         productsQuery = productsQuery.eq('company_id', userCompanyId);
       } else if (isVibeAdmin && companyFilter !== 'all') {
         productsQuery = productsQuery.eq('company_id', companyFilter);
       }
-      
+
       const { data: productsData } = await productsQuery;
-      
+
       // If state filter is active, get product IDs for that state and filter
       let filteredProductsData = productsData || [];
       if (stateFilter !== 'all') {
@@ -1858,6 +1866,9 @@ const Artwork = () => {
         </Card>
       </div>
 
+      {/* Brand chips: only companies that use brands see this row */}
+      <BrandFilterBar brands={brands} value={brandFilter} onChange={setBrandFilter} />
+
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1 max-w-md">
@@ -1926,8 +1937,10 @@ const Artwork = () => {
           {/* Single Products (no template) - rendered inline like templates */}
           {singleProducts
             .filter(p =>
-              p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-              (p.item_id && p.item_id.toLowerCase().includes(searchQuery.toLowerCase()))
+              matchesBrand(p.brand_id) && (
+                p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                (p.item_id && p.item_id.toLowerCase().includes(searchQuery.toLowerCase()))
+              )
             )
             .map((product) => {
               const artCount = getProductArtworkCount(product.item_id);
@@ -1987,7 +2000,7 @@ const Artwork = () => {
           
           {/* Template Cards */}
           {templates
-            .filter(t => t.name.toLowerCase().includes(searchQuery.toLowerCase()))
+            .filter(t => matchesBrand(t.brand_id) && t.name.toLowerCase().includes(searchQuery.toLowerCase()))
             .map((template) => {
               const templateThumbnail = getTemplateDisplayThumbnail(template);
 

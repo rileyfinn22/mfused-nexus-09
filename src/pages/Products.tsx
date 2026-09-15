@@ -52,6 +52,9 @@ import { useToast } from "@/hooks/use-toast";
 import { isLegacyGeneratedTemplateMockupUrl, isUsableArtworkPreviewUrl } from "@/lib/artworkPreview";
 import { cn } from "@/lib/utils";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
+import { useBrandFilter } from "@/hooks/useBrandFilter";
+import { BrandFilterBar } from "@/components/BrandFilterBar";
+import { ManageBrandsDialog } from "@/components/ManageBrandsDialog";
 
 interface Product {
   id: string;
@@ -66,6 +69,7 @@ interface Product {
   sku?: string;
   states: ProductState[];
   template_id?: string | null;
+  brand_id?: string | null;
 }
 
 interface ProductState {
@@ -85,6 +89,7 @@ interface ProductTemplate {
   company_id: string | null;
   thumbnail_url: string | null;
   state: string | null;
+  brand_id?: string | null;
   product_count?: number;
 }
 
@@ -108,9 +113,22 @@ const Products = () => {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [selectedTemplate, setSelectedTemplate] = useState<ProductTemplate | null>(null);
 
+  // Brands are per company: a customer's active company, or the company a vibe admin filtered to.
+  const brandCompanyId = isVibeAdmin ? (companyFilter !== 'all' ? companyFilter : null) : activeCompanyId;
+  const {
+    brands,
+    refresh: refreshBrands,
+    brandFilter,
+    setBrandFilter,
+    matches: matchesBrand,
+    brandName,
+  } = useBrandFilter(brandCompanyId);
+  const [manageBrandsOpen, setManageBrandsOpen] = useState(false);
+
   // Template edit dialog (for vibe admins)
   const [templateEditOpen, setTemplateEditOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<ProductTemplate | null>(null);
+  const [templateEditBrandId, setTemplateEditBrandId] = useState("");
   const [templateEditName, setTemplateEditName] = useState("");
   const [templateEditDescription, setTemplateEditDescription] = useState("");
   const [templateEditPrice, setTemplateEditPrice] = useState("");
@@ -261,6 +279,7 @@ const Products = () => {
         sku: skuByProduct.get(product.id),
         states: statesByProduct.get(product.id) || [],
         template_id: product.template_id,
+        brand_id: product.brand_id ?? null,
       }));
 
       setProducts(productsWithStates);
@@ -539,8 +558,13 @@ const Products = () => {
     setTemplateEditPrice(template.price != null ? template.price.toString() : "");
     setTemplateEditCost(template.cost != null ? template.cost.toString() : "");
     setTemplateEditState(template.state || "");
+    setTemplateEditBrandId(template.brand_id || "");
     setTemplateEditOpen(true);
   };
+
+  // The brand picker in the template dialog only knows the brands of `brandCompanyId`, so it is
+  // offered only when that is the template's own company (customer view, or admin filtered to it).
+  const canEditTemplateBrand = !!editingTemplate && !!brandCompanyId && editingTemplate.company_id === brandCompanyId;
 
   const handleSaveTemplate = async () => {
     if (!editingTemplate) return;
@@ -560,13 +584,15 @@ const Products = () => {
         description: templateEditDescription.trim() || null,
         price: templateEditPrice ? parseFloat(templateEditPrice) : null,
         state: templateEditState.trim() || null,
+        // Products in the template follow this via the cascade trigger.
+        ...(canEditTemplateBrand ? { brand_id: templateEditBrandId || null } : {}),
       };
 
       const { data, error } = await supabase
         .from("product_templates")
         .update(updates)
         .eq("id", editingTemplate.id)
-        .select("id, name, description, price, company_id, thumbnail_url, state")
+        .select("id, name, description, price, company_id, thumbnail_url, state, brand_id")
         .single();
 
       if (error) throw error;
@@ -587,6 +613,7 @@ const Products = () => {
       setTemplateEditOpen(false);
       setEditingTemplate(null);
       fetchTemplates();
+      if (canEditTemplateBrand) fetchProducts();
     } catch (error) {
       console.error("Error updating template:", error);
       toast({
@@ -760,16 +787,34 @@ const Products = () => {
   };
 
   const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    product.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (product.item_id && product.item_id.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (product.customer_item_id && product.customer_item_id.toLowerCase().includes(searchQuery.toLowerCase()))
+    matchesBrand(product.brand_id) && (
+      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      product.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (product.item_id && product.item_id.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (product.customer_item_id && product.customer_item_id.toLowerCase().includes(searchQuery.toLowerCase()))
+    )
   );
 
   const filteredTemplates = templates.filter(template =>
-    template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (template.description && template.description.toLowerCase().includes(searchQuery.toLowerCase()))
+    matchesBrand(template.brand_id) && (
+      template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (template.description && template.description.toLowerCase().includes(searchQuery.toLowerCase()))
+    )
   );
+
+  // SKUs per brand for the chip counts (every product carries its brand, template or not).
+  const brandCounts = products.reduce<Record<string, number>>((acc, p) => {
+    const key = p.brand_id || 'none';
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+
+  const isFiltering = !!searchQuery || brandFilter !== 'all';
+  const emptyHint = isFiltering
+    ? 'Try adjusting your search or brand filter.'
+    : isVibeAdmin
+      ? 'Add your first product to get started.'
+      : 'Products VibePKG sets up for you will appear here.';
 
   const getTemplateDisplayThumbnail = (template: ProductTemplate) => {
     const templateProducts = products.filter((product) => product.template_id === template.id);
@@ -870,6 +915,16 @@ const Products = () => {
         </div>
       </div>
 
+      {/* Brand chips: only companies that use brands see this row */}
+      <BrandFilterBar
+        brands={brands}
+        value={brandFilter}
+        onChange={setBrandFilter}
+        counts={brandCounts}
+        onManage={brandCompanyId ? () => setManageBrandsOpen(true) : undefined}
+        showWhenEmpty={isVibeAdmin}
+      />
+
       {/* Filters and View Toggle */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -929,7 +984,7 @@ const Products = () => {
             <div className="empty-state py-16">
               <Package className="h-12 w-12 mb-4 text-muted-foreground/50" />
               <p className="font-medium">No products found</p>
-              <p className="text-sm">{searchQuery ? 'Try adjusting your search.' : 'Add your first product to get started.'}</p>
+              <p className="text-sm">{emptyHint}</p>
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
@@ -999,6 +1054,9 @@ const Products = () => {
                   {/* Template Info */}
                   <div className="p-3 space-y-1">
                     <h3 className="font-medium text-sm leading-snug truncate">{template.name}</h3>
+                    {brandName(template.brand_id) && (
+                      <p className="text-xs text-muted-foreground truncate">{brandName(template.brand_id)}</p>
+                    )}
                     {template.state && (
                       <Badge variant="outline" className="text-xs">{template.state}</Badge>
                     )}
@@ -1079,6 +1137,9 @@ const Products = () => {
                         CID: {product.customer_item_id}
                       </p>
                     )}
+                    {brandName(product.brand_id) && (
+                      <p className="text-xs text-muted-foreground truncate">{brandName(product.brand_id)}</p>
+                    )}
                     <p className="text-sm font-medium">
                       {isVibeAdmin
                         ? (product.cost ? `$${product.cost.toFixed(3)}` : '—')
@@ -1123,7 +1184,7 @@ const Products = () => {
               <div className="empty-state py-16">
                 <Package className="h-12 w-12 mb-4 text-muted-foreground/50" />
                 <p className="font-medium">No products found</p>
-                <p className="text-sm">Add your first product to get started.</p>
+                <p className="text-sm">{emptyHint}</p>
               </div>
             ) : (
               filteredProducts.map((product) => {
@@ -1184,8 +1245,11 @@ const Products = () => {
                           </div>
                         )}
                       </div>
-                      <div className="col-span-4">
+                      <div className="col-span-4 min-w-0">
                         <span className="text-sm font-medium truncate block">{product.name}</span>
+                        {brandName(product.brand_id) && (
+                          <span className="text-xs text-muted-foreground truncate block">{brandName(product.brand_id)}</span>
+                        )}
                       </div>
                       <div className="col-span-2">
                         <Badge variant="outline" className="text-xs">{product.state}</Badge>
@@ -1326,6 +1390,27 @@ const Products = () => {
                 onChange={(e) => setTemplateEditState(e.target.value)}
               />
             </div>
+
+            {canEditTemplateBrand && brands.length > 0 && (
+              <div className="space-y-2">
+                <Label>Brand</Label>
+                <Select
+                  value={templateEditBrandId || "__none__"}
+                  onValueChange={(v) => setTemplateEditBrandId(v === "__none__" ? "" : v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="No brand" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">No brand</SelectItem>
+                    {brands.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">Products in this template move with it.</p>
+              </div>
+            )}
           </div>
 
           <DialogFooter>
@@ -1527,6 +1612,27 @@ const Products = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Brands */}
+      {brandCompanyId && (
+        <ManageBrandsDialog
+          open={manageBrandsOpen}
+          onOpenChange={setManageBrandsOpen}
+          companyId={brandCompanyId}
+          brands={brands}
+          templates={templates
+            .filter((t) => t.company_id === brandCompanyId)
+            .map((t) => ({ id: t.id, name: t.name, brand_id: t.brand_id ?? null }))}
+          looseProducts={products
+            .filter((p) => !p.template_id)
+            .map((p) => ({ id: p.id, name: p.name, item_id: p.item_id ?? null, brand_id: p.brand_id ?? null }))}
+          onChanged={() => {
+            refreshBrands();
+            fetchProducts();
+            fetchTemplates();
+          }}
+        />
+      )}
 
       {/* Delete Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

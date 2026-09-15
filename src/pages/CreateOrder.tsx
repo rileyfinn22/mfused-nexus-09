@@ -19,6 +19,8 @@ import { toast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
+import { useBrandFilter } from "@/hooks/useBrandFilter";
+import { BrandFilterBar } from "@/components/BrandFilterBar";
 
 const orderSchema = z.object({
   customerName: z.string().trim().min(1, "Customer name is required").max(200),
@@ -45,6 +47,7 @@ interface Product {
   image_url: string | null;
   company_id: string;
   state: string | null;
+  brand_id?: string | null;
 }
 
 interface Company {
@@ -70,7 +73,7 @@ const fetchAllOrderProducts = async (companyId?: string | null): Promise<Product
     const to = from + PRODUCT_PAGE_SIZE - 1;
     let query = supabase
       .from('products')
-      .select('id, name, item_id, price, description, image_url, company_id, state, template_id')
+      .select('id, name, item_id, price, description, image_url, company_id, state, template_id, brand_id')
       .order('name')
       .range(from, to);
     if (companyId) {
@@ -267,6 +270,10 @@ const CreateOrder = () => {
   const [companies, setCompanies] = useState<any[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
   const [productTemplates, setProductTemplates] = useState<ProductTemplateOption[]>([]);
+
+  // Brand filter in the item picker follows the one chosen on Products (persisted per company).
+  const brandCompanyId = isVibeAdmin ? (selectedCompanyId || null) : (activeCompanyId || null);
+  const { brands, brandFilter, setBrandFilter, matches: matchesBrand, brandName } = useBrandFilter(brandCompanyId);
   const [uploading, setUploading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -1796,7 +1803,8 @@ const CreateOrder = () => {
   const filteredProducts = availableProducts.filter(p => {
     const alreadySelected = selectedItems.find(item => item.productId === p.id);
     if (alreadySelected) return false;
-    
+    if (!matchesBrand(p.brand_id)) return false;
+
     if (!searchQuery) return true;
     
     const search = searchQuery.toLowerCase();
@@ -3233,6 +3241,9 @@ const CreateOrder = () => {
                     </DialogDescription>
                   </DialogHeader>
                   
+                  {/* Brand chips: only companies that use brands see this row */}
+                  <BrandFilterBar brands={brands} value={brandFilter} onChange={setBrandFilter} />
+
                   {/* Search Bar */}
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -3263,7 +3274,7 @@ const CreateOrder = () => {
                           </TableHead>
                           <TableHead>Item ID</TableHead>
                           <TableHead>Product</TableHead>
-                          <TableHead>Category</TableHead>
+                          <TableHead>Brand</TableHead>
                           <TableHead className="text-right">Price</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -3295,6 +3306,7 @@ const CreateOrder = () => {
                               <TableCell className="font-medium">
                                 {product.state ? `${product.state} - ${product.name}` : product.name}
                               </TableCell>
+                              <TableCell className="text-muted-foreground text-sm">{brandName(product.brand_id) || '-'}</TableCell>
                               <TableCell className="text-right">${product.price?.toFixed(2) || '0.00'}</TableCell>
                             </TableRow>
                           ))

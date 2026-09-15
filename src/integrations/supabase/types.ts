@@ -2323,6 +2323,41 @@ export type Database = {
           },
         ]
       }
+      product_brands: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_brands_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_costs: {
         Row: {
           cost: number | null
@@ -2421,6 +2456,7 @@ export type Database = {
       }
       product_templates: {
         Row: {
+          brand_id: string | null
           company_id: string | null
           cost: number | null
           created_at: string
@@ -2433,6 +2469,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          brand_id?: string | null
           company_id?: string | null
           cost?: number | null
           created_at?: string
@@ -2445,6 +2482,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          brand_id?: string | null
           company_id?: string | null
           cost?: number | null
           created_at?: string
@@ -2457,6 +2495,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "product_templates_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "product_brands"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "product_templates_company_id_fkey"
             columns: ["company_id"]
@@ -2631,6 +2676,7 @@ export type Database = {
       }
       products: {
         Row: {
+          brand_id: string | null
           cases_per_pallet: number | null
           company_id: string
           cost: number | null
@@ -2656,6 +2702,7 @@ export type Database = {
           weight_per_case: number | null
         }
         Insert: {
+          brand_id?: string | null
           cases_per_pallet?: number | null
           company_id: string
           cost?: number | null
@@ -2681,6 +2728,7 @@ export type Database = {
           weight_per_case?: number | null
         }
         Update: {
+          brand_id?: string | null
           cases_per_pallet?: number | null
           company_id?: string
           cost?: number | null
@@ -2706,6 +2754,13 @@ export type Database = {
           weight_per_case?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "products_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "product_brands"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "products_company_id_fkey"
             columns: ["company_id"]
@@ -4467,6 +4522,14 @@ export type Database = {
           p_token_value: string
         }
         Returns: string
+      }
+      set_product_brand: {
+        Args: { p_brand_id?: string | null; p_product_id: string }
+        Returns: undefined
+      }
+      set_template_brand: {
+        Args: { p_brand_id?: string | null; p_template_id: string }
+        Returns: undefined
       }
       submit_customer_order: {
         Args: {
