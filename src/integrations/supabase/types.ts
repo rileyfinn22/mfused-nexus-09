@@ -3374,7 +3374,7 @@ export type Database = {
           leg_number?: number
           leg_type?: string
           notes?: string | null
-          order_id?: string
+          order_id?: string | null
           origin?: string | null
           pcs_per_ctn?: number | null
           qty_pcs?: number | null
@@ -3398,6 +3398,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipment_legs_vendor_po_id_fkey"
+            columns: ["vendor_po_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_pos"
             referencedColumns: ["id"]
           },
         ]
@@ -4398,6 +4405,16 @@ export type Database = {
         Args: { p_company_id: string; p_email: string }
         Returns: Json
       }
+      create_customer_product: {
+        Args: {
+          p_brand_id: string
+          p_company_id: string
+          p_description?: string
+          p_name: string
+          p_product_type?: string
+        }
+        Returns: string
+      }
       customer_po_production_detail: {
         Args: { p_po_id: string }
         Returns: Json
@@ -4521,6 +4538,14 @@ export type Database = {
         Args: { p_direction: string; p_leg_id: string; p_token: string }
         Returns: Json
       }
+      set_product_brand: {
+        Args: { p_brand_id: string; p_product_id: string }
+        Returns: undefined
+      }
+      set_template_brand: {
+        Args: { p_brand_id: string; p_template_id: string }
+        Returns: undefined
+      }
       store_qb_token_encrypted: {
         Args: {
           p_company_id: string
@@ -4528,24 +4553,6 @@ export type Database = {
           p_token_value: string
         }
         Returns: string
-      }
-      create_customer_product: {
-        Args: {
-          p_brand_id: string
-          p_company_id: string
-          p_description?: string | null
-          p_name: string
-          p_product_type?: string | null
-        }
-        Returns: string
-      }
-      set_product_brand: {
-        Args: { p_brand_id?: string | null; p_product_id: string }
-        Returns: undefined
-      }
-      set_template_brand: {
-        Args: { p_brand_id?: string | null; p_template_id: string }
-        Returns: undefined
       }
       submit_customer_order: {
         Args: {
