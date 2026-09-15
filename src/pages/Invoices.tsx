@@ -30,6 +30,7 @@ import { fetchChildPdfInputs } from "@/lib/invoiceBalance";
 import { EditableDescription } from "@/components/EditableDescription";
 import { CustomerStatementTab } from "@/components/CustomerStatementTab";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
+import { brandNamesForItems, fetchBrandNamesByProductId } from "@/lib/productBrands";
 import { ExpandToggleButton, ExpandDetailsPanel, useInvoiceItems, useInvoicePayments } from "@/components/RowExpandPanel";
 import InvoiceReconciliationBanner from "@/components/InvoiceReconciliationBanner";
 import { formatDocDate } from "@/lib/utils";
@@ -47,6 +48,9 @@ const Invoices = () => {
   const [userCompanyName, setUserCompanyName] = useState<string>("");
   const [companies, setCompanies] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
+  // True when any listed invoice's order contains branded products; customers then see a
+  // Brand column where the PO column was (the PO still shows on the invoice itself).
+  const [hasBrands, setHasBrands] = useState(false);
   const [loading, setLoading] = useState(true);
   const [expandedInvoices, setExpandedInvoices] = useState<Set<string>>(new Set());
   const [expandedDetailRows, setExpandedDetailRows] = useState<Set<string>>(new Set());
@@ -114,7 +118,7 @@ const Invoices = () => {
       .from('invoices')
       .select(`
         *,
-        orders(order_number, customer_name, po_number, description),
+        orders(order_number, customer_name, po_number, description, order_items(product_id)),
         companies(name)
       `)
       .is('deleted_at', null)
@@ -134,9 +138,18 @@ const Invoices = () => {
     if (error) {
       console.error('Invoice fetch error:', error);
     }
-    
+
     if (data) {
-      setInvoices(data);
+      // Brand per line item of the invoiced order, so invoices can be labelled by brand.
+      const brandByProduct = await fetchBrandNamesByProductId(
+        data.flatMap((inv: any) => (inv.orders?.order_items || []).map((i: any) => i.product_id))
+      );
+      const withBrands = data.map((inv: any) => ({
+        ...inv,
+        brandNames: brandNamesForItems(inv.orders?.order_items, brandByProduct),
+      }));
+      setInvoices(withBrands);
+      setHasBrands(withBrands.some((inv: any) => inv.brandNames.length > 0));
     }
     setLoading(false);
   };
@@ -603,7 +616,7 @@ const Invoices = () => {
           <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             <div className="col-span-2">Invoice ID</div>
             <div className="col-span-1">Due / Shipped</div>
-            <div className="col-span-2">{isVibeAdmin ? 'Company' : 'PO'}</div>
+            <div className="col-span-2">{isVibeAdmin ? 'Company' : hasBrands ? 'Brand' : 'PO'}</div>
             <div className={isVibeAdmin ? 'col-span-2' : 'col-span-3'}>Description</div>
             <div className="col-span-1">Amount</div>
             <div className="col-span-1">Status</div>
@@ -762,8 +775,21 @@ const Invoices = () => {
                   </div>
                   <div className="col-span-2 min-w-0">
                     {isVibeAdmin ? (
-                      <div className="font-medium text-sm truncate">
-                        {invoice.companies?.name || 'N/A'}
+                      <>
+                        <div className="font-medium text-sm truncate">
+                          {invoice.companies?.name || 'N/A'}
+                        </div>
+                        {invoice.brandNames?.length > 0 && (
+                          <div className="text-xs text-muted-foreground truncate" title={invoice.brandNames.join(', ')}>
+                            {invoice.brandNames.join(', ')}
+                          </div>
+                        )}
+                      </>
+                    ) : hasBrands ? (
+                      <div className="font-medium text-sm truncate" title={invoice.brandNames?.join(', ')}>
+                        {invoice.brandNames?.length
+                          ? invoice.brandNames.join(', ')
+                          : <span className="text-muted-foreground font-normal">-</span>}
                       </div>
                     ) : (
                       <div className="font-medium text-sm font-mono whitespace-normal break-words min-w-0">

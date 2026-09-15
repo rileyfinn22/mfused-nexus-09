@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
+import { brandNamesForItems, fetchBrandNamesByProductId } from "@/lib/productBrands";
 import { toast } from "@/hooks/use-toast";
 
 // Helper to parse date-only strings (YYYY-MM-DD) as local time, not UTC
@@ -52,6 +53,8 @@ const Orders = () => {
   // Read company filter from URL, default to "all" (only for vibe admins)
   const companyFilter = searchParams.get("company") || "all";
   const [orders, setOrders] = useState<any[]>([]);
+  // True when any listed order contains branded products; customers then get a Brand column.
+  const [hasBrands, setHasBrands] = useState(false);
   const [loading, setLoading] = useState(true);
   const [companies, setCompanies] = useState<any[]>([]);
   const [deleteOrderId, setDeleteOrderId] = useState<string | null>(null);
@@ -149,6 +152,11 @@ const Orders = () => {
         approvedSkus = new Set((artworkData || []).map((a: any) => a.sku));
       }
 
+      // Brand per line item, so each order can be labelled by the brands it contains.
+      const brandByProduct = await fetchBrandNamesByProductId(
+        filteredData.flatMap((o: any) => (o.order_items || []).map((i: any) => i.product_id))
+      );
+
       const completedStatuses = ['completed', 'shipped', 'delivered'];
       const ordersWithChecklist = filteredData.map((order: any) => {
         const productionProgress = completedStatuses.includes(order.status?.toLowerCase())
@@ -163,10 +171,12 @@ const Orders = () => {
           artApproved: allApproved,
           checklistComplete: allApproved && order.order_finalized && order.vibe_processed,
           productionProgress,
+          brandNames: brandNamesForItems(items, brandByProduct),
         };
       });
 
       setOrders(ordersWithChecklist);
+      setHasBrands(ordersWithChecklist.some((o: any) => o.brandNames.length > 0));
 
     }
     setLoading(false);
@@ -526,7 +536,8 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
                   <div className="col-span-2">Order # / Type</div>
                   <div className="col-span-1">Submitted</div>
                   {isVibeAdmin && <div className="col-span-2">Company</div>}
-                  <div className={isVibeAdmin ? "col-span-2" : "col-span-4"}>Description</div>
+                  {!isVibeAdmin && hasBrands && <div className="col-span-2">Brand</div>}
+                  <div className={isVibeAdmin || hasBrands ? "col-span-2" : "col-span-4"}>Description</div>
                   <div className="col-span-1">Total</div>
                   <div className="col-span-2">Status</div>
                   <div className="col-span-2">Actions</div>
@@ -552,9 +563,21 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
                       {order.order_date ? formatDocDate(order.order_date, 'numeric') : '-'}
                     </div>
                     {isVibeAdmin && (
-                      <div className="col-span-2 text-sm font-medium">{order.companies?.name || '-'}</div>
+                      <div className="col-span-2 text-sm font-medium min-w-0">
+                        <div className="truncate">{order.companies?.name || '-'}</div>
+                        {order.brandNames?.length > 0 && (
+                          <div className="text-xs text-muted-foreground font-normal truncate" title={order.brandNames.join(', ')}>
+                            {order.brandNames.join(', ')}
+                          </div>
+                        )}
+                      </div>
                     )}
-                    <div className={isVibeAdmin ? "col-span-2" : "col-span-4"}>
+                    {!isVibeAdmin && hasBrands && (
+                      <div className="col-span-2 text-sm min-w-0 truncate" title={order.brandNames?.join(', ')}>
+                        {order.brandNames?.length ? order.brandNames.join(', ') : <span className="text-muted-foreground">-</span>}
+                      </div>
+                    )}
+                    <div className={isVibeAdmin || hasBrands ? "col-span-2" : "col-span-4"}>
                       <EditableDescription
                         value={order.description}
                         onSave={(text) => handleDescriptionChange(order.id, text)}
@@ -608,11 +631,12 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
                 <div className="col-span-2">Order # / Type</div>
                 <div className="col-span-1">Date</div>
                 {isVibeAdmin && <div className="col-span-1">Company</div>}
-                <div className={isVibeAdmin ? "col-span-2" : "col-span-3"}>Description</div>
+                {!isVibeAdmin && hasBrands && <div className="col-span-2">Brand</div>}
+                <div className={isVibeAdmin ? "col-span-2" : hasBrands ? "col-span-2" : "col-span-3"}>Description</div>
                 <div className="col-span-1">Total</div>
                 <div className="col-span-2">Status / Progress</div>
                 <div className="col-span-1">Est. Delivery</div>
-                <div className="col-span-2">Actions</div>
+                <div className={!isVibeAdmin && hasBrands ? "col-span-1" : "col-span-2"}>Actions</div>
               </div>
             </div>
             <div className="divide-y divide-border">
@@ -667,12 +691,24 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
                       {order.order_date ? formatDocDate(order.order_date, 'numeric') : '-'}
                     </div>
                     {isVibeAdmin && (
-                      <div className="col-span-1 text-sm font-medium truncate">{order.companies?.name || '-'}</div>
+                      <div className="col-span-1 text-sm font-medium min-w-0">
+                        <div className="truncate">{order.companies?.name || '-'}</div>
+                        {order.brandNames?.length > 0 && (
+                          <div className="text-xs text-muted-foreground font-normal truncate" title={order.brandNames.join(', ')}>
+                            {order.brandNames.join(', ')}
+                          </div>
+                        )}
+                      </div>
                     )}
-                    <div className={isVibeAdmin ? "col-span-2" : "col-span-3"}>
-                      <EditableDescription 
-                        value={order.description} 
-                        onSave={(text) => handleDescriptionChange(order.id, text)} 
+                    {!isVibeAdmin && hasBrands && (
+                      <div className="col-span-2 text-sm min-w-0 truncate" title={order.brandNames?.join(', ')}>
+                        {order.brandNames?.length ? order.brandNames.join(', ') : <span className="text-muted-foreground">-</span>}
+                      </div>
+                    )}
+                    <div className={isVibeAdmin ? "col-span-2" : hasBrands ? "col-span-2" : "col-span-3"}>
+                      <EditableDescription
+                        value={order.description}
+                        onSave={(text) => handleDescriptionChange(order.id, text)}
                       />
                     </div>
                     <div className="col-span-1 text-sm">${order.total?.toFixed(2)}</div>
@@ -729,7 +765,7 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
                         <span className="text-xs text-muted-foreground">Not set</span>
                       )}
                     </div>
-                    <div className="col-span-2 flex gap-1 items-center justify-end">
+                    <div className={`${!isVibeAdmin && hasBrands ? "col-span-1" : "col-span-2"} flex flex-wrap gap-1 items-center justify-end`}>
                       <ExpandToggleButton
                         expanded={isExpanded}
                         onToggle={() => toggleExpandedRow(order.id)}
@@ -772,6 +808,7 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
                       details={[
                         { label: "Order Type", value: order.order_type || "standard" },
                         { label: "PO #", value: order.po_number || "—" },
+                        ...(order.brandNames?.length ? [{ label: "Brand", value: order.brandNames.join(", ") }] : []),
                         { label: "Customer", value: order.customer_name || "—" },
                         { label: "Ship To", value: [order.shipping_city, order.shipping_state].filter(Boolean).join(", ") || "—" },
                         { label: "Items", value: order.order_items?.length ?? 0 },
