@@ -41,6 +41,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { useBrandFilter } from "@/hooks/useBrandFilter";
 import { BrandSelect } from "@/components/BrandSelect";
+import { ManageBrandsDialog } from "@/components/ManageBrandsDialog";
 import {
   buildManualArtworkPreviewPath,
   createFlatArtworkPreviewFromArtwork,
@@ -114,7 +115,10 @@ const Artwork = () => {
 
   // Brand filter follows the one chosen on Products (persisted per company).
   const brandCompanyId = isVibeAdmin ? (companyFilter !== 'all' ? companyFilter : null) : userCompanyId;
-  const { brands, brandFilter, setBrandFilter, matches: matchesBrand } = useBrandFilter(brandCompanyId);
+  const { brands, brandFilter, setBrandFilter, matches: matchesBrand, brandName, refresh: refreshBrands } = useBrandFilter(brandCompanyId);
+  const [manageBrandsOpen, setManageBrandsOpen] = useState(false);
+  // SKUs per brand for the dropdown counts (same numbers as the Products page).
+  const [brandCounts, setBrandCounts] = useState<Record<string, number>>({});
   
   // Template/Product hierarchy
   const [templates, setTemplates] = useState<ProductTemplate[]>([]);
@@ -298,6 +302,14 @@ const Artwork = () => {
       }
 
       const { data: productsData } = await productsQuery;
+
+      setBrandCounts(
+        (productsData || []).reduce<Record<string, number>>((acc, p) => {
+          const key = p.brand_id || 'none';
+          acc[key] = (acc[key] || 0) + 1;
+          return acc;
+        }, {})
+      );
 
       // If state filter is active, get product IDs for that state and filter
       let filteredProductsData = productsData || [];
@@ -1878,7 +1890,14 @@ const Artwork = () => {
           />
         </div>
         {/* Brand filter: only companies that use brands see this */}
-        <BrandSelect brands={brands} value={brandFilter} onChange={setBrandFilter} />
+        <BrandSelect
+          brands={brands}
+          value={brandFilter}
+          onChange={setBrandFilter}
+          counts={brandCounts}
+          onManage={brandCompanyId ? () => setManageBrandsOpen(true) : undefined}
+          showWhenEmpty={!!isVibeAdmin}
+        />
         {isVibeAdmin && (
           <Select value={companyFilter} onValueChange={setCompanyFilter}>
             <SelectTrigger className="w-full sm:w-48">
@@ -1921,6 +1940,19 @@ const Artwork = () => {
           </PopoverContent>
         </Popover>
       </div>
+
+      {brandCompanyId && (
+        <ManageBrandsDialog
+          open={manageBrandsOpen}
+          onOpenChange={setManageBrandsOpen}
+          companyId={brandCompanyId}
+          brands={brands}
+          onChanged={() => {
+            refreshBrands();
+            fetchTemplates();
+          }}
+        />
+      )}
 
       {/* Templates Grid */}
       {templates.length === 0 && singleProducts.length === 0 ? (
@@ -2079,6 +2111,9 @@ const Artwork = () => {
               </div>
               <div className="p-3 space-y-1">
                 <h3 className="font-medium text-sm leading-snug">{template.name}</h3>
+                {brandName(template.brand_id) && (
+                  <p className="text-xs text-muted-foreground truncate">{brandName(template.brand_id)}</p>
+                )}
                 {template.description && (
                   <p className="text-xs text-muted-foreground line-clamp-2">
                     {template.description.split('\n')[0]}

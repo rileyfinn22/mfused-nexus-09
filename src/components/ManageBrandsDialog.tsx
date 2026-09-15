@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Plus, Trash2, Loader2, Search, Layers, Package } from "lucide-react";
 import {
   Dialog,
@@ -43,10 +43,6 @@ interface ManageBrandsDialogProps {
   onOpenChange: (open: boolean) => void;
   companyId: string;
   brands: ProductBrand[];
-  /** Templates belonging to `companyId`. Their products follow the template's brand. */
-  templates: BrandAssignableTemplate[];
-  /** Products with no template; they carry a brand of their own. */
-  looseProducts: BrandAssignableProduct[];
   /** Called after any brand row or assignment changes so the caller can refetch. */
   onChanged: () => void;
 }
@@ -61,14 +57,15 @@ const isUniqueViolation = (error: unknown) =>
  * the same controls here. Creating, renaming and deleting go straight to product_brands under
  * RLS; assigning goes through the set_template_brand / set_product_brand RPCs because buyers
  * have no update grant on products or templates.
+ *
+ * Self-contained: loads the company's templates and loose products itself, so any page
+ * (Products, Artwork, ...) can open it without owning that data.
  */
 export function ManageBrandsDialog({
   open,
   onOpenChange,
   companyId,
   brands,
-  templates,
-  looseProducts,
   onChanged,
 }: ManageBrandsDialogProps) {
   const { toast } = useToast();
@@ -78,14 +75,48 @@ export function ManageBrandsDialog({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [brandToDelete, setBrandToDelete] = useState<ProductBrand | null>(null);
   const [search, setSearch] = useState("");
+  const [templates, setTemplates] = useState<BrandAssignableTemplate[]>([]);
+  const [looseProducts, setLooseProducts] = useState<BrandAssignableProduct[]>([]);
+  const [loadingItems, setLoadingItems] = useState(false);
+
+  const loadItems = useCallback(async () => {
+    setLoadingItems(true);
+    try {
+      const [{ data: t, error: tErr }, { data: p, error: pErr }] = await Promise.all([
+        supabase.from("product_templates").select("id, name, brand_id").eq("company_id", companyId).order("name"),
+        supabase
+          .from("products")
+          .select("id, name, item_id, brand_id")
+          .eq("company_id", companyId)
+          .is("template_id", null)
+          .order("name")
+          .limit(5000),
+      ]);
+      if (tErr) throw tErr;
+      if (pErr) throw pErr;
+      setTemplates((t as BrandAssignableTemplate[]) || []);
+      setLooseProducts((p as BrandAssignableProduct[]) || []);
+    } catch (error) {
+      console.error("Error loading items for brand assignment:", error);
+    } finally {
+      setLoadingItems(false);
+    }
+  }, [companyId]);
 
   useEffect(() => {
-    if (!open) {
+    if (open) {
+      loadItems();
+    } else {
       setNewBrandName("");
       setSearch("");
       setDraftNames({});
     }
-  }, [open]);
+  }, [open, loadItems]);
+
+  const changed = () => {
+    loadItems();
+    onChanged();
+  };
 
   const describeError = (error: unknown, fallback: string) => {
     if (isUniqueViolation(error)) return "A brand with that name already exists.";
@@ -110,7 +141,7 @@ export function ManageBrandsDialog({
         .insert({ company_id: companyId, name, sort_order: brands.length + 1 });
       if (error) throw error;
       setNewBrandName("");
-      onChanged();
+      changed();
     } catch (error) {
       toast({ title: "Could not add brand", description: describeError(error, "Please try again."), variant: "destructive" });
     } finally {
@@ -129,7 +160,7 @@ export function ManageBrandsDialog({
       const { error } = await supabase.from("product_brands").update({ name: draft }).eq("id", brand.id);
       if (error) throw error;
       clearDraft(brand.id);
-      onChanged();
+      changed();
     } catch (error) {
       toast({ title: "Could not rename brand", description: describeError(error, "Please try again."), variant: "destructive" });
     } finally {
@@ -145,7 +176,7 @@ export function ManageBrandsDialog({
       if (error) throw error;
       toast({ title: "Brand removed", description: `Products that were in ${brandToDelete.name} are now unbranded.` });
       setBrandToDelete(null);
-      onChanged();
+      changed();
     } catch (error) {
       toast({ title: "Could not remove brand", description: describeError(error, "Please try again."), variant: "destructive" });
     } finally {
@@ -162,7 +193,7 @@ export function ManageBrandsDialog({
           ? await supabase.rpc("set_template_brand", { p_template_id: id, p_brand_id: brandId })
           : await supabase.rpc("set_product_brand", { p_product_id: id, p_brand_id: brandId });
       if (error) throw error;
-      onChanged();
+      changed();
     } catch (error) {
       toast({ title: "Could not assign brand", description: describeError(error, "Please try again."), variant: "destructive" });
     } finally {
@@ -291,7 +322,9 @@ export function ManageBrandsDialog({
             </TabsContent>
 
             <TabsContent value="assign" className="flex-1 min-h-0 overflow-y-auto mt-3 space-y-3">
-              {visibleTemplates.length === 0 && visibleProducts.length === 0 ? (
+              {loadingItems && templates.length === 0 && looseProducts.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-6 text-center">Loading...</p>
+              ) : visibleTemplates.length === 0 && visibleProducts.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-6 text-center">
                   {q ? "Nothing matches that search." : "No templates or products to assign yet."}
                 </p>

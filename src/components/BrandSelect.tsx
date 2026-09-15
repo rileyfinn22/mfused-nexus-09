@@ -24,6 +24,12 @@ interface BrandSelectProps {
   onManage?: () => void;
   /** Render a "Set up brands" button when the company has no brands yet (needs onManage). */
   showWhenEmpty?: boolean;
+  /**
+   * Set when the control sits inside a Dialog. A non-modal Popover inside a modal Dialog
+   * cannot receive clicks (the dialog's pointer-events lock swallows them), so the list
+   * opens but nothing can be picked.
+   */
+  inDialog?: boolean;
   className?: string;
 }
 
@@ -39,6 +45,7 @@ export function BrandSelect({
   counts,
   onManage,
   showWhenEmpty = false,
+  inDialog = false,
   className,
 }: BrandSelectProps) {
   const [open, setOpen] = useState(false);
@@ -72,7 +79,7 @@ export function BrandSelect({
   );
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal={inDialog}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"

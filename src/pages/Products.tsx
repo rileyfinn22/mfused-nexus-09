@@ -1619,12 +1619,6 @@ const Products = () => {
           onOpenChange={setManageBrandsOpen}
           companyId={brandCompanyId}
           brands={brands}
-          templates={templates
-            .filter((t) => t.company_id === brandCompanyId)
-            .map((t) => ({ id: t.id, name: t.name, brand_id: t.brand_id ?? null }))}
-          looseProducts={products
-            .filter((p) => !p.template_id)
-            .map((p) => ({ id: p.id, name: p.name, item_id: p.item_id ?? null, brand_id: p.brand_id ?? null }))}
           onChanged={() => {
             refreshBrands();
             fetchProducts();

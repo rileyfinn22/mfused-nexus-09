@@ -3252,7 +3252,7 @@ const CreateOrder = () => {
                         className="pl-10"
                       />
                     </div>
-                    <BrandSelect brands={brands} value={brandFilter} onChange={setBrandFilter} />
+                    <BrandSelect brands={brands} value={brandFilter} onChange={setBrandFilter} inDialog />
                   </div>
 
                   {/* Products List */}

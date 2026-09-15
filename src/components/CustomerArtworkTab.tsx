@@ -40,6 +40,7 @@ import ArtworkViewerDialog, { getArtworkThumbnail } from "@/components/ArtworkVi
 import { cn } from "@/lib/utils";
 import { useBrandFilter } from "@/hooks/useBrandFilter";
 import { BrandSelect } from "@/components/BrandSelect";
+import { ManageBrandsDialog } from "@/components/ManageBrandsDialog";
 
 interface ProductTemplate {
   id: string;
@@ -130,7 +131,10 @@ export function CustomerArtworkTab({
 
   // Brand filter follows the one chosen on Products (persisted per company).
   const brandCompanyId = isVibeAdmin ? (companyFilter !== 'all' ? companyFilter : null) : userCompanyId;
-  const { brands, brandFilter, setBrandFilter, matches: matchesBrand } = useBrandFilter(brandCompanyId);
+  const { brands, brandFilter, setBrandFilter, matches: matchesBrand, brandName, refresh: refreshBrands } = useBrandFilter(brandCompanyId);
+  const [manageBrandsOpen, setManageBrandsOpen] = useState(false);
+  // SKUs per brand for the dropdown counts (same numbers as the Products page).
+  const [brandCounts, setBrandCounts] = useState<Record<string, number>>({});
 
   // "+" on a product tile: pick a file and it is attached to that product right there, no
   // dropdown to find the product in. One hidden input serves every tile; the product whose
@@ -230,7 +234,7 @@ export function CustomerArtworkTab({
       // Get templates that have products
       let productsQuery = supabase
         .from('products')
-        .select('template_id, item_id, image_url')
+        .select('template_id, item_id, image_url, brand_id')
         .limit(50000);
       
       if (!isVibeAdmin && userCompanyId) {
@@ -240,6 +244,13 @@ export function CustomerArtworkTab({
       }
       
       const { data: productsData } = await productsQuery;
+      setBrandCounts(
+        (productsData || []).reduce<Record<string, number>>((acc, p) => {
+          const key = p.brand_id || 'none';
+          acc[key] = (acc[key] || 0) + 1;
+          return acc;
+        }, {})
+      );
       const templateIds = [...new Set(productsData?.filter(p => p.template_id).map(p => p.template_id))];
       
       // Fetch templates
@@ -1074,7 +1085,14 @@ export function CustomerArtworkTab({
           />
         </div>
         {/* Brand filter: only companies that use brands see this */}
-        <BrandSelect brands={brands} value={brandFilter} onChange={setBrandFilter} />
+        <BrandSelect
+          brands={brands}
+          value={brandFilter}
+          onChange={setBrandFilter}
+          counts={brandCounts}
+          onManage={brandCompanyId ? () => setManageBrandsOpen(true) : undefined}
+          showWhenEmpty={isVibeAdmin}
+        />
         {isVibeAdmin && (
           <Select value={companyFilter} onValueChange={onCompanyFilterChange}>
             <SelectTrigger className="w-full sm:w-48">
@@ -1127,6 +1145,9 @@ export function CustomerArtworkTab({
               </div>
               <div className="p-3 space-y-1">
                 <h3 className="font-medium text-sm leading-snug">{template.name}</h3>
+                {brandName(template.brand_id) && (
+                  <p className="text-xs text-muted-foreground truncate">{brandName(template.brand_id)}</p>
+                )}
                 {template.description && (
                   <p className="text-xs text-muted-foreground line-clamp-2">
                     {template.description.split('\n')[0]}
@@ -1137,6 +1158,19 @@ export function CustomerArtworkTab({
             );
           })}
         </div>
+      )}
+
+      {brandCompanyId && (
+        <ManageBrandsDialog
+          open={manageBrandsOpen}
+          onOpenChange={setManageBrandsOpen}
+          companyId={brandCompanyId}
+          brands={brands}
+          onChanged={() => {
+            refreshBrands();
+            fetchTemplates();
+          }}
+        />
       )}
 
       {/* Add Artwork Dialog */}
