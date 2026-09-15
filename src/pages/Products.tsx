@@ -55,6 +55,9 @@ import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { useBrandFilter } from "@/hooks/useBrandFilter";
 import { BrandSelect } from "@/components/BrandSelect";
 import { ManageBrandsDialog } from "@/components/ManageBrandsDialog";
+import { KindSelect } from "@/components/KindSelect";
+import { useCompanyPortalFeatures } from "@/hooks/useCompanyPortalFeatures";
+import { useKindFilter } from "@/hooks/useKindFilter";
 
 interface Product {
   id: string;
@@ -70,6 +73,7 @@ interface Product {
   states: ProductState[];
   template_id?: string | null;
   brand_id?: string | null;
+  product_type?: string | null;
 }
 
 interface ProductState {
@@ -124,6 +128,9 @@ const Products = () => {
     brandName,
   } = useBrandFilter(brandCompanyId);
   const [manageBrandsOpen, setManageBrandsOpen] = useState(false);
+  // Kind filter (Boxes / Foils / Other) only for companies with order_picker groups configured.
+  const { orderPicker: kindConfig } = useCompanyPortalFeatures(brandCompanyId);
+  const { kindFilter, setKindFilter, matches: matchesKind, matchesAny: matchesAnyKind } = useKindFilter(brandCompanyId, kindConfig);
 
   // Template edit dialog (for vibe admins)
   const [templateEditOpen, setTemplateEditOpen] = useState(false);
@@ -280,6 +287,7 @@ const Products = () => {
         states: statesByProduct.get(product.id) || [],
         template_id: product.template_id,
         brand_id: product.brand_id ?? null,
+        product_type: product.product_type ?? null,
       }));
 
       setProducts(productsWithStates);
@@ -787,7 +795,7 @@ const Products = () => {
   };
 
   const filteredProducts = products.filter(product =>
-    matchesBrand(product.brand_id) && (
+    matchesBrand(product.brand_id) && matchesKind(product.product_type) && (
       product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       product.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (product.item_id && product.item_id.toLowerCase().includes(searchQuery.toLowerCase())) ||
@@ -795,8 +803,10 @@ const Products = () => {
     )
   );
 
+  // A template (folder) matches a kind when any product inside it does.
   const filteredTemplates = templates.filter(template =>
-    matchesBrand(template.brand_id) && (
+    matchesBrand(template.brand_id) &&
+    matchesAnyKind(products.filter(p => p.template_id === template.id).map(p => p.product_type)) && (
       template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (template.description && template.description.toLowerCase().includes(searchQuery.toLowerCase()))
     )
@@ -809,9 +819,9 @@ const Products = () => {
     return acc;
   }, {});
 
-  const isFiltering = !!searchQuery || brandFilter !== 'all';
+  const isFiltering = !!searchQuery || brandFilter !== 'all' || kindFilter !== 'all';
   const emptyHint = isFiltering
-    ? 'Try adjusting your search or brand filter.'
+    ? 'Try adjusting your search or filters.'
     : isVibeAdmin
       ? 'Add your first product to get started.'
       : 'Products VibePKG sets up for you will appear here.';
@@ -951,6 +961,7 @@ const Products = () => {
             onManage={brandCompanyId ? () => setManageBrandsOpen(true) : undefined}
             showWhenEmpty={isVibeAdmin}
           />
+          <KindSelect config={kindConfig} value={kindFilter} onChange={setKindFilter} />
         </div>
 
         {/* View Toggle */}

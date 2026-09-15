@@ -41,6 +41,9 @@ import { cn } from "@/lib/utils";
 import { useBrandFilter } from "@/hooks/useBrandFilter";
 import { BrandSelect } from "@/components/BrandSelect";
 import { ManageBrandsDialog } from "@/components/ManageBrandsDialog";
+import { KindSelect } from "@/components/KindSelect";
+import { useCompanyPortalFeatures } from "@/hooks/useCompanyPortalFeatures";
+import { useKindFilter } from "@/hooks/useKindFilter";
 
 interface ProductTemplate {
   id: string;
@@ -135,6 +138,10 @@ export function CustomerArtworkTab({
   const [manageBrandsOpen, setManageBrandsOpen] = useState(false);
   // SKUs per brand for the dropdown counts (same numbers as the Products page).
   const [brandCounts, setBrandCounts] = useState<Record<string, number>>({});
+  // Kind filter (Boxes / Foils / Other) only for companies with order_picker groups configured.
+  const { orderPicker: kindConfig } = useCompanyPortalFeatures(brandCompanyId);
+  const { kindFilter, setKindFilter, matchesAny: matchesAnyKind } = useKindFilter(brandCompanyId, kindConfig);
+  const [templateProductTypes, setTemplateProductTypes] = useState<Record<string, (string | null)[]>>({});
 
   // "+" on a product tile: pick a file and it is attached to that product right there, no
   // dropdown to find the product in. One hidden input serves every tile; the product whose
@@ -234,7 +241,7 @@ export function CustomerArtworkTab({
       // Get templates that have products
       let productsQuery = supabase
         .from('products')
-        .select('template_id, item_id, image_url, brand_id')
+        .select('template_id, item_id, image_url, brand_id, product_type')
         .limit(50000);
       
       if (!isVibeAdmin && userCompanyId) {
@@ -244,6 +251,12 @@ export function CustomerArtworkTab({
       }
       
       const { data: productsData } = await productsQuery;
+      setTemplateProductTypes(
+        (productsData || []).reduce<Record<string, (string | null)[]>>((acc, p) => {
+          if (p.template_id) (acc[p.template_id] ||= []).push(p.product_type ?? null);
+          return acc;
+        }, {})
+      );
       setBrandCounts(
         (productsData || []).reduce<Record<string, number>>((acc, p) => {
           const key = p.brand_id || 'none';
@@ -1030,7 +1043,9 @@ export function CustomerArtworkTab({
 
   // TEMPLATE GRID VIEW (default)
   const filteredTemplates = templates.filter(t =>
-    matchesBrand(t.brand_id) && t.name.toLowerCase().includes(searchQuery.toLowerCase())
+    matchesBrand(t.brand_id) &&
+    matchesAnyKind(templateProductTypes[t.id] || []) &&
+    t.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -1093,6 +1108,7 @@ export function CustomerArtworkTab({
           onManage={brandCompanyId ? () => setManageBrandsOpen(true) : undefined}
           showWhenEmpty={isVibeAdmin}
         />
+        <KindSelect config={kindConfig} value={kindFilter} onChange={setKindFilter} />
         {isVibeAdmin && (
           <Select value={companyFilter} onValueChange={onCompanyFilterChange}>
             <SelectTrigger className="w-full sm:w-48">

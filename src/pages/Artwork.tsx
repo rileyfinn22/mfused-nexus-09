@@ -42,6 +42,9 @@ import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { useBrandFilter } from "@/hooks/useBrandFilter";
 import { BrandSelect } from "@/components/BrandSelect";
 import { ManageBrandsDialog } from "@/components/ManageBrandsDialog";
+import { KindSelect } from "@/components/KindSelect";
+import { useCompanyPortalFeatures } from "@/hooks/useCompanyPortalFeatures";
+import { useKindFilter } from "@/hooks/useKindFilter";
 import {
   buildManualArtworkPreviewPath,
   createFlatArtworkPreviewFromArtwork,
@@ -73,6 +76,7 @@ interface Product {
   company_id: string;
   image_url: string | null;
   brand_id?: string | null;
+  product_type?: string | null;
 }
 
 // Artwork status types
@@ -119,6 +123,11 @@ const Artwork = () => {
   const [manageBrandsOpen, setManageBrandsOpen] = useState(false);
   // SKUs per brand for the dropdown counts (same numbers as the Products page).
   const [brandCounts, setBrandCounts] = useState<Record<string, number>>({});
+  // Kind filter (Boxes / Foils / Other) only for companies with order_picker groups configured.
+  const { orderPicker: kindConfig } = useCompanyPortalFeatures(brandCompanyId);
+  const { kindFilter, setKindFilter, matches: matchesKind, matchesAny: matchesAnyKind } = useKindFilter(brandCompanyId, kindConfig);
+  // product_type of every product in each template, so a folder can be matched against a kind.
+  const [templateProductTypes, setTemplateProductTypes] = useState<Record<string, (string | null)[]>>({});
   
   // Template/Product hierarchy
   const [templates, setTemplates] = useState<ProductTemplate[]>([]);
@@ -292,7 +301,7 @@ const Artwork = () => {
       // Get all products
       let productsQuery = supabase
         .from('products')
-        .select('id, name, item_id, template_id, company_id, image_url, brand_id')
+        .select('id, name, item_id, template_id, company_id, image_url, brand_id, product_type')
         .limit(50000);
 
       if (!isVibeAdmin && userCompanyId) {
@@ -303,6 +312,12 @@ const Artwork = () => {
 
       const { data: productsData } = await productsQuery;
 
+      setTemplateProductTypes(
+        (productsData || []).reduce<Record<string, (string | null)[]>>((acc, p) => {
+          if (p.template_id) (acc[p.template_id] ||= []).push(p.product_type ?? null);
+          return acc;
+        }, {})
+      );
       setBrandCounts(
         (productsData || []).reduce<Record<string, number>>((acc, p) => {
           const key = p.brand_id || 'none';
@@ -1898,6 +1913,7 @@ const Artwork = () => {
           onManage={brandCompanyId ? () => setManageBrandsOpen(true) : undefined}
           showWhenEmpty={!!isVibeAdmin}
         />
+        <KindSelect config={kindConfig} value={kindFilter} onChange={setKindFilter} />
         {isVibeAdmin && (
           <Select value={companyFilter} onValueChange={setCompanyFilter}>
             <SelectTrigger className="w-full sm:w-48">
@@ -1968,7 +1984,7 @@ const Artwork = () => {
           {/* Single Products (no template) - rendered inline like templates */}
           {singleProducts
             .filter(p =>
-              matchesBrand(p.brand_id) && (
+              matchesBrand(p.brand_id) && matchesKind(p.product_type) && (
                 p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 (p.item_id && p.item_id.toLowerCase().includes(searchQuery.toLowerCase()))
               )
@@ -2031,7 +2047,11 @@ const Artwork = () => {
           
           {/* Template Cards */}
           {templates
-            .filter(t => matchesBrand(t.brand_id) && t.name.toLowerCase().includes(searchQuery.toLowerCase()))
+            .filter(t =>
+              matchesBrand(t.brand_id) &&
+              matchesAnyKind(templateProductTypes[t.id] || []) &&
+              t.name.toLowerCase().includes(searchQuery.toLowerCase())
+            )
             .map((template) => {
               const templateThumbnail = getTemplateDisplayThumbnail(template);
 
