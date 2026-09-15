@@ -3093,8 +3093,12 @@ const CreateOrder = () => {
                   const itemKey = getItemKey(item);
 
                   const displayItemId = product?.item_id ?? item.item_id ?? '-';
+                  // Brand-organised catalogs (grouped picker on) drop the catalog-wide "General"
+                  // state prefix; it is on every one of their SKUs and says nothing.
+                  const showStatePrefix =
+                    !!product?.state && !(groupedPickerConfig && product.state.toLowerCase() === 'general');
                   const displayName = product
-                    ? (product.state ? `${product.state} - ${product.name}` : product.name)
+                    ? (showStatePrefix ? `${product.state} - ${product.name}` : product.name)
                     : (item.name || `Product ${item.productId.substring(0, 8)}`);
                   const displayDescription = product?.description ?? item.description ?? null;
                   
@@ -3255,7 +3259,7 @@ const CreateOrder = () => {
                 <DialogContent
                   className={cn(
                     "flex flex-col",
-                    groupedPickerConfig ? "max-w-5xl w-[95vw] h-[85vh]" : "max-w-3xl max-h-[80vh]"
+                    groupedPickerConfig ? "max-w-6xl w-[96vw] h-[92vh]" : "max-w-3xl max-h-[80vh]"
                   )}
                 >
                   {groupedPickerConfig ? (

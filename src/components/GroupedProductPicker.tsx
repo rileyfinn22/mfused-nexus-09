@@ -37,6 +37,13 @@ interface GroupedProductPickerProps {
 const NONE = "none";
 
 /**
+ * Name as shown in the picker. The catalog-wide "General" state is noise for a brand-organised
+ * catalog (every Nutrastrips SKU carries it), so only a real state prefix survives.
+ */
+const displayName = (p: PickerProduct) =>
+  p.state && p.state.toLowerCase() !== "general" ? `${p.state} - ${p.name}` : p.name;
+
+/**
  * "Add items" for companies whose catalog is organised by brand and kind (switched on per
  * company via portal_features.order_picker). Brands down the left, products grouped by
  * kind on the right, quantity entered on the row itself so picking and counting is one step.
@@ -156,7 +163,7 @@ export function GroupedProductPicker({
     <>
       <DialogHeader>
         <DialogTitle>Add items</DialogTitle>
-        <DialogDescription>Pick a brand, then set quantities on the products you need.</DialogDescription>
+        <DialogDescription>Pick a brand, then type a quantity on each product you need.</DialogDescription>
       </DialogHeader>
 
       <div className="relative">
@@ -208,17 +215,12 @@ export function GroupedProductPicker({
                               n > 0 && "bg-primary/5"
                             )}
                           >
-                            <button
-                              type="button"
-                              className="flex-1 min-w-0 text-left"
-                              onClick={() => setQuantity(product.id, n > 0 ? 0 : 1)}
-                              title={n > 0 ? "Remove from order" : "Add to order"}
-                            >
-                              <p className="text-sm font-medium truncate">
-                                {product.state ? `${product.state} - ${product.name}` : product.name}
-                              </p>
+                            {/* Plain text on purpose: a row is only picked by entering a quantity,
+                                so scrolling or a stray click never adds anything. */}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{displayName(product)}</p>
                               <p className="text-xs text-muted-foreground font-mono">{product.item_id || "No SKU"}</p>
-                            </button>
+                            </div>
                             <span className="w-20 text-right text-sm tabular-nums shrink-0">
                               {product.price != null ? `$${Number(product.price).toFixed(3)}` : "—"}
                             </span>
