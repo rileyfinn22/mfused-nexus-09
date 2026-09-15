@@ -687,7 +687,8 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
                           {orderTypeInfo.label}
                         </Badge>
                       )}
-                      {order.submitted_by_customer && (
+                      {/* "Customer order" only matters until VibePKG has approved it. */}
+                      {order.submitted_by_customer && !order.vibe_approved && (
                         <Badge
                           variant="secondary"
                           className="bg-amber-500/15 text-amber-700 dark:text-amber-400 flex items-center gap-0.5 w-fit font-normal"
