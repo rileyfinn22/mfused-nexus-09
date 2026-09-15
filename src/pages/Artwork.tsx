@@ -40,7 +40,7 @@ import { downloadStorageObject, normalizeStorageObjectPath } from "@/lib/storage
 import { useToast } from "@/hooks/use-toast";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { useBrandFilter } from "@/hooks/useBrandFilter";
-import { BrandFilterBar } from "@/components/BrandFilterBar";
+import { BrandSelect } from "@/components/BrandSelect";
 import {
   buildManualArtworkPreviewPath,
   createFlatArtworkPreviewFromArtwork,
@@ -1866,9 +1866,6 @@ const Artwork = () => {
         </Card>
       </div>
 
-      {/* Brand chips: only companies that use brands see this row */}
-      <BrandFilterBar brands={brands} value={brandFilter} onChange={setBrandFilter} />
-
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1 max-w-md">
@@ -1880,6 +1877,8 @@ const Artwork = () => {
             className="pl-10"
           />
         </div>
+        {/* Brand filter: only companies that use brands see this */}
+        <BrandSelect brands={brands} value={brandFilter} onChange={setBrandFilter} />
         {isVibeAdmin && (
           <Select value={companyFilter} onValueChange={setCompanyFilter}>
             <SelectTrigger className="w-full sm:w-48">

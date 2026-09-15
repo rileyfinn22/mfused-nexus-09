@@ -20,7 +20,7 @@ import { z } from "zod";
 import { cn } from "@/lib/utils";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { useBrandFilter } from "@/hooks/useBrandFilter";
-import { BrandFilterBar } from "@/components/BrandFilterBar";
+import { BrandSelect } from "@/components/BrandSelect";
 
 const orderSchema = z.object({
   customerName: z.string().trim().min(1, "Customer name is required").max(200),
@@ -3241,18 +3241,18 @@ const CreateOrder = () => {
                     </DialogDescription>
                   </DialogHeader>
                   
-                  {/* Brand chips: only companies that use brands see this row */}
-                  <BrandFilterBar brands={brands} value={brandFilter} onChange={setBrandFilter} />
-
-                  {/* Search Bar */}
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search by name, item ID, or category..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10"
-                    />
+                  {/* Search + brand filter (brand only shows for companies that use brands) */}
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search by name or item ID..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                    <BrandSelect brands={brands} value={brandFilter} onChange={setBrandFilter} />
                   </div>
 
                   {/* Products List */}

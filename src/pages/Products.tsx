@@ -53,7 +53,7 @@ import { isLegacyGeneratedTemplateMockupUrl, isUsableArtworkPreviewUrl } from "@
 import { cn } from "@/lib/utils";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { useBrandFilter } from "@/hooks/useBrandFilter";
-import { BrandFilterBar } from "@/components/BrandFilterBar";
+import { BrandSelect } from "@/components/BrandSelect";
 import { ManageBrandsDialog } from "@/components/ManageBrandsDialog";
 
 interface Product {
@@ -915,16 +915,6 @@ const Products = () => {
         </div>
       </div>
 
-      {/* Brand chips: only companies that use brands see this row */}
-      <BrandFilterBar
-        brands={brands}
-        value={brandFilter}
-        onChange={setBrandFilter}
-        counts={brandCounts}
-        onManage={brandCompanyId ? () => setManageBrandsOpen(true) : undefined}
-        showWhenEmpty={isVibeAdmin}
-      />
-
       {/* Filters and View Toggle */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -952,6 +942,15 @@ const Products = () => {
               </SelectContent>
             </Select>
           )}
+          {/* Brand filter: only companies that use brands see this */}
+          <BrandSelect
+            brands={brands}
+            value={brandFilter}
+            onChange={setBrandFilter}
+            counts={brandCounts}
+            onManage={brandCompanyId ? () => setManageBrandsOpen(true) : undefined}
+            showWhenEmpty={isVibeAdmin}
+          />
         </div>
 
         {/* View Toggle */}
