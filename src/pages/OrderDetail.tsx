@@ -68,6 +68,10 @@ const OrderDetail = () => {
   const [orderFinalized, setOrderFinalized] = useState(false);
   const [vibeProcessed, setVibeProcessed] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  // Mirrors isEditMode for callbacks (fetchOrder) that would otherwise capture a stale value
+  // and wipe in-progress edits from under the user.
+  const isEditModeRef = useRef(false);
+  useEffect(() => { isEditModeRef.current = isEditMode; }, [isEditMode]);
   const [editedOrder, setEditedOrder] = useState<any>({});
   const [editedItems, setEditedItems] = useState<any[]>([]);
   const [productionStages, setProductionStages] = useState<any[]>([]);
@@ -208,8 +212,12 @@ const OrderDetail = () => {
       .single();
     if (!error && data) {
       setOrder(data);
-      setEditedOrder(data);
-      setEditedItems(data.order_items || []);
+      // Never clobber the user's in-progress edits with a background refetch —
+      // that used to silently drop added lines (and make them look "deleted" on save).
+      if (!isEditModeRef.current) {
+        setEditedOrder(data);
+        setEditedItems(data.order_items || []);
+      }
       setVibeProcessed(data.vibe_processed || false);
       setOrderFinalized(data.order_finalized || false);
       setArtApprovedManually(data.art_approved_manually || false);
