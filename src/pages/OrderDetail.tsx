@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -68,6 +68,10 @@ const OrderDetail = () => {
   const [orderFinalized, setOrderFinalized] = useState(false);
   const [vibeProcessed, setVibeProcessed] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  // Mirrors isEditMode for callbacks (fetchOrder) that would otherwise capture a stale value
+  // and wipe in-progress edits from under the user.
+  const isEditModeRef = useRef(false);
+  useEffect(() => { isEditModeRef.current = isEditMode; }, [isEditMode]);
   const [editedOrder, setEditedOrder] = useState<any>({});
   const [editedItems, setEditedItems] = useState<any[]>([]);
   const [productionStages, setProductionStages] = useState<any[]>([]);
@@ -208,8 +212,12 @@ const OrderDetail = () => {
       .single();
     if (!error && data) {
       setOrder(data);
-      setEditedOrder(data);
-      setEditedItems(data.order_items || []);
+      // Never clobber the user's in-progress edits with a background refetch —
+      // that used to silently drop added lines (and make them look "deleted" on save).
+      if (!isEditModeRef.current) {
+        setEditedOrder(data);
+        setEditedItems(data.order_items || []);
+      }
       setVibeProcessed(data.vibe_processed || false);
       setOrderFinalized(data.order_finalized || false);
       setArtApprovedManually(data.art_approved_manually || false);
@@ -1133,6 +1141,22 @@ const OrderDetail = () => {
       const existingItems = editedItems.filter(item => !item.isNew);
       const newItems = editedItems.filter(item => item.isNew);
 
+      // Safety net: a save must never silently empty an order. If every existing line
+      // would be removed and nothing replaces it, confirm before touching the data.
+      if (
+        originalItemIds.length > 0 &&
+        itemsToDelete.length === originalItemIds.length &&
+        newItems.length === 0
+      ) {
+        const ok = window.confirm(
+          `This will remove all ${originalItemIds.length} line items from the order. Continue?`
+        );
+        if (!ok) {
+          setIsSaving(false);
+          return;
+        }
+      }
+
       // PHASE 1: Delete, Insert, and fetch vendor PO items in parallel
       const phase1Promises: Promise<any>[] = [];
 
@@ -1144,7 +1168,8 @@ const OrderDetail = () => {
               .from('vendor_po_items')
               .update({ order_item_id: null })
               .in('order_item_id', itemsToDelete);
-            await supabase.from('order_items').delete().in('id', itemsToDelete);
+            const { error } = await supabase.from('order_items').delete().in('id', itemsToDelete);
+            if (error) throw new Error(`Could not remove line items: ${error.message}`);
           })()
         );
       }
@@ -1154,17 +1179,26 @@ const OrderDetail = () => {
         const itemsToInsert = newItems.map(item => ({
           order_id: orderId,
           product_id: item.product_id,
-          sku: item.sku,
+          sku: item.sku || item.item_id || item.name,
           item_id: item.item_id,
           name: item.name,
           description: item.description,
-          quantity: item.quantity,
-          unit_price: item.unit_price,
-          total: Number(item.quantity) * Number(item.unit_price),
+          quantity: Number(item.quantity) || 0,
+          unit_price: Number(item.unit_price) || 0,
+          total: Number(item.quantity) * Number(item.unit_price) || 0,
           shipped_quantity: null
         }));
         phase1Promises.push(
-          (async () => { await supabase.from('order_items').insert(itemsToInsert); })()
+          (async () => {
+            const { data, error } = await supabase
+              .from('order_items')
+              .insert(itemsToInsert)
+              .select('id');
+            if (error) throw new Error(`Could not add line items: ${error.message}`);
+            if ((data?.length || 0) !== itemsToInsert.length) {
+              throw new Error('Some line items were not saved — nothing was added. Please retry.');
+            }
+          })()
         );
       }
 
@@ -1198,7 +1232,7 @@ const OrderDetail = () => {
         const newItemTotal = Number(item.quantity) * Number(item.unit_price);
         phase2Promises.push(
           (async () => {
-            await supabase
+            const { error } = await supabase
               .from('order_items')
               .update({
                 quantity: item.quantity,
@@ -1211,6 +1245,7 @@ const OrderDetail = () => {
                 product_id: item.product_id
               })
               .eq('id', item.id);
+            if (error) throw new Error(`Could not update "${item.name}": ${error.message}`);
           })()
         );
 
