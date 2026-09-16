@@ -2467,6 +2467,7 @@ export type Database = {
           id: string
           name: string
           price: number | null
+          product_type: string | null
           state: string | null
           thumbnail_url: string | null
           updated_at: string
@@ -2480,6 +2481,7 @@ export type Database = {
           id?: string
           name: string
           price?: number | null
+          product_type?: string | null
           state?: string | null
           thumbnail_url?: string | null
           updated_at?: string
@@ -2493,6 +2495,7 @@ export type Database = {
           id?: string
           name?: string
           price?: number | null
+          product_type?: string | null
           state?: string | null
           thumbnail_url?: string | null
           updated_at?: string
@@ -4413,6 +4416,16 @@ export type Database = {
           p_name: string
           p_product_type?: string
           p_template_id?: string
+        }
+        Returns: string
+      }
+      create_customer_template: {
+        Args: {
+          p_brand_id: string
+          p_company_id: string
+          p_description?: string | null
+          p_name: string
+          p_product_type?: string | null
         }
         Returns: string
       }

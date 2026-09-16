@@ -66,6 +66,7 @@ interface ProductTemplate {
   description: string | null;
   thumbnail_url: string | null;
   brand_id?: string | null;
+  product_type?: string | null;
 }
 
 interface Product {
@@ -2049,7 +2050,7 @@ const Artwork = () => {
           {templates
             .filter(t =>
               matchesBrand(t.brand_id) &&
-              matchesAnyKind(templateProductTypes[t.id] || []) &&
+              matchesAnyKind(t.product_type ? [t.product_type] : templateProductTypes[t.id] || []) &&
               t.name.toLowerCase().includes(searchQuery.toLowerCase())
             )
             .map((template) => {

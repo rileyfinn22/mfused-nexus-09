@@ -58,6 +58,7 @@ import { ManageBrandsDialog } from "@/components/ManageBrandsDialog";
 import { KindSelect } from "@/components/KindSelect";
 import { CustomerAddProductDialog, type CustomerAddProductTemplate } from "@/components/CustomerAddProductDialog";
 import { CustomerQuickAddDialog } from "@/components/CustomerQuickAddDialog";
+import { CustomerAddFolderDialog } from "@/components/CustomerAddFolderDialog";
 import { useCompanyPortalFeatures } from "@/hooks/useCompanyPortalFeatures";
 import { useKindFilter } from "@/hooks/useKindFilter";
 
@@ -96,6 +97,7 @@ interface ProductTemplate {
   thumbnail_url: string | null;
   state: string | null;
   brand_id?: string | null;
+  product_type?: string | null;
   product_count?: number;
 }
 
@@ -139,13 +141,16 @@ const Products = () => {
   const [customerAddTemplate, setCustomerAddTemplate] = useState<CustomerAddProductTemplate | null>(null);
   const [templateRefreshToken, setTemplateRefreshToken] = useState(0);
   const [customerQuickAddOpen, setCustomerQuickAddOpen] = useState(false);
+  // Top-level "Add products": brand + category -> folder (created or reused) -> SKUs.
+  const [customerFolderOpen, setCustomerFolderOpen] = useState(false);
   const canCustomerAddProduct = !isVibeAdmin && !!kindConfig && !!brandCompanyId;
 
-  // The kind a folder's products already have (most common product_type), for pre-filling.
-  const templateProductType = (templateId: string): string | null => {
+  // A folder's kind: its own product_type, else the most common type of what it holds.
+  const templateProductType = (template: ProductTemplate): string | null => {
+    if (template.product_type) return template.product_type;
     const counts: Record<string, number> = {};
     products.forEach((p) => {
-      if (p.template_id === templateId && p.product_type) {
+      if (p.template_id === template.id && p.product_type) {
         counts[p.product_type] = (counts[p.product_type] || 0) + 1;
       }
     });
@@ -157,7 +162,7 @@ const Products = () => {
     id: template.id,
     name: template.name,
     brand_id: template.brand_id ?? null,
-    product_type: templateProductType(template.id),
+    product_type: templateProductType(template),
   });
 
   const openCustomerAdd = (template: ProductTemplate | null) => {
@@ -843,10 +848,14 @@ const Products = () => {
     )
   );
 
-  // A template (folder) matches a kind when any product inside it does.
+  // A folder matches a kind by its own product_type, else when any product inside it does.
   const filteredTemplates = templates.filter(template =>
     matchesBrand(template.brand_id) &&
-    matchesAnyKind(products.filter(p => p.template_id === template.id).map(p => p.product_type)) && (
+    matchesAnyKind(
+      template.product_type
+        ? [template.product_type]
+        : products.filter(p => p.template_id === template.id).map(p => p.product_type)
+    ) && (
       template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (template.description && template.description.toLowerCase().includes(searchQuery.toLowerCase()))
     )
@@ -992,9 +1001,9 @@ const Products = () => {
             </>
           )}
           {canCustomerAddProduct && (
-            <Button onClick={() => openCustomerAdd(null)}>
+            <Button onClick={() => setCustomerFolderOpen(true)}>
               <Plus className="h-4 w-4 mr-1.5" />
-              Add Product
+              Add Products
             </Button>
           )}
         </div>
@@ -1713,6 +1722,24 @@ const Products = () => {
       </Dialog>
 
       {customerAddDialog}
+      {canCustomerAddProduct && kindConfig && brandCompanyId && (
+        <CustomerAddFolderDialog
+          open={customerFolderOpen}
+          onOpenChange={setCustomerFolderOpen}
+          companyId={brandCompanyId}
+          brands={brands}
+          config={kindConfig}
+          folders={templates
+            .filter((t) => t.company_id === brandCompanyId)
+            .map((t) => ({ id: t.id, name: t.name, brand_id: t.brand_id ?? null, product_type: templateProductType(t) }))}
+          onCreated={(folderId) => {
+            afterCustomerCreate();
+            // Open the folder once the refreshed template list arrives (handled by the ?template= effect).
+            searchParams.set('template', folderId);
+            setSearchParams(searchParams, { replace: true });
+          }}
+        />
+      )}
 
       {/* Brands */}
       {brandCompanyId && (

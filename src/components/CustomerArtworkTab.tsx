@@ -51,6 +51,7 @@ interface ProductTemplate {
   description: string | null;
   thumbnail_url: string | null;
   brand_id?: string | null;
+  product_type?: string | null;
 }
 
 interface Product {
@@ -1044,7 +1045,7 @@ export function CustomerArtworkTab({
   // TEMPLATE GRID VIEW (default)
   const filteredTemplates = templates.filter(t =>
     matchesBrand(t.brand_id) &&
-    matchesAnyKind(templateProductTypes[t.id] || []) &&
+    matchesAnyKind(t.product_type ? [t.product_type] : templateProductTypes[t.id] || []) &&
     t.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
