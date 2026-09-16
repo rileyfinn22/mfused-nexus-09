@@ -72,9 +72,17 @@ const AddArtworkDialog = ({
   useEffect(() => {
     if (open) {
       fetchCompanies();
-      fetchProducts();
     }
   }, [open]);
+
+  // Products are fetched scoped to the chosen company. The server caps result sets
+  // at 1,000 rows, so fetching every product and filtering client-side silently
+  // dropped everything past the alphabetical cut-off (e.g. "ZILIS ...").
+  useEffect(() => {
+    if (open) {
+      fetchProducts();
+    }
+  }, [open, formData.companyId, restrictToCompany, isVibeAdmin, activeCompanyId]);
 
   // Reset form with proper defaults when opening - determine artwork type based on role
   useEffect(() => {
