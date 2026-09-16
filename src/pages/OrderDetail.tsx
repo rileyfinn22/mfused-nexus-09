@@ -1141,6 +1141,22 @@ const OrderDetail = () => {
       const existingItems = editedItems.filter(item => !item.isNew);
       const newItems = editedItems.filter(item => item.isNew);
 
+      // Safety net: a save must never silently empty an order. If every existing line
+      // would be removed and nothing replaces it, confirm before touching the data.
+      if (
+        originalItemIds.length > 0 &&
+        itemsToDelete.length === originalItemIds.length &&
+        newItems.length === 0
+      ) {
+        const ok = window.confirm(
+          `This will remove all ${originalItemIds.length} line items from the order. Continue?`
+        );
+        if (!ok) {
+          setIsSaving(false);
+          return;
+        }
+      }
+
       // PHASE 1: Delete, Insert, and fetch vendor PO items in parallel
       const phase1Promises: Promise<any>[] = [];
 
@@ -1152,7 +1168,8 @@ const OrderDetail = () => {
               .from('vendor_po_items')
               .update({ order_item_id: null })
               .in('order_item_id', itemsToDelete);
-            await supabase.from('order_items').delete().in('id', itemsToDelete);
+            const { error } = await supabase.from('order_items').delete().in('id', itemsToDelete);
+            if (error) throw new Error(`Could not remove line items: ${error.message}`);
           })()
         );
       }
@@ -1162,17 +1179,26 @@ const OrderDetail = () => {
         const itemsToInsert = newItems.map(item => ({
           order_id: orderId,
           product_id: item.product_id,
-          sku: item.sku,
+          sku: item.sku || item.item_id || item.name,
           item_id: item.item_id,
           name: item.name,
           description: item.description,
-          quantity: item.quantity,
-          unit_price: item.unit_price,
-          total: Number(item.quantity) * Number(item.unit_price),
+          quantity: Number(item.quantity) || 0,
+          unit_price: Number(item.unit_price) || 0,
+          total: Number(item.quantity) * Number(item.unit_price) || 0,
           shipped_quantity: null
         }));
         phase1Promises.push(
-          (async () => { await supabase.from('order_items').insert(itemsToInsert); })()
+          (async () => {
+            const { data, error } = await supabase
+              .from('order_items')
+              .insert(itemsToInsert)
+              .select('id');
+            if (error) throw new Error(`Could not add line items: ${error.message}`);
+            if ((data?.length || 0) !== itemsToInsert.length) {
+              throw new Error('Some line items were not saved — nothing was added. Please retry.');
+            }
+          })()
         );
       }
 
