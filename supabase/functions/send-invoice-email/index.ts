@@ -28,6 +28,10 @@ interface SendInvoiceRequest {
   totalAmount: number;
   customerName: string;
   additionalAttachments?: Attachment[];
+  /** Optional overrides so non-invoice documents (e.g. order confirmations)
+   *  don't get sent with invoice wording / "Amount Due". */
+  subject?: string;
+  html?: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
