@@ -4409,9 +4409,10 @@ export type Database = {
         Args: {
           p_brand_id: string
           p_company_id: string
-          p_description?: string
+          p_description?: string | null
           p_name: string
-          p_product_type?: string
+          p_product_type?: string | null
+          p_template_id?: string | null
         }
         Returns: string
       }
@@ -4539,11 +4540,11 @@ export type Database = {
         Returns: Json
       }
       set_product_brand: {
-        Args: { p_brand_id: string; p_product_id: string }
+        Args: { p_brand_id?: string | null; p_product_id: string }
         Returns: undefined
       }
       set_template_brand: {
-        Args: { p_brand_id: string; p_template_id: string }
+        Args: { p_brand_id?: string | null; p_template_id: string }
         Returns: undefined
       }
       store_qb_token_encrypted: {

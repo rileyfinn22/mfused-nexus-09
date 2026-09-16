@@ -56,7 +56,8 @@ import { useBrandFilter } from "@/hooks/useBrandFilter";
 import { BrandSelect } from "@/components/BrandSelect";
 import { ManageBrandsDialog } from "@/components/ManageBrandsDialog";
 import { KindSelect } from "@/components/KindSelect";
-import { CustomerAddProductDialog } from "@/components/CustomerAddProductDialog";
+import { CustomerAddProductDialog, type CustomerAddProductTemplate } from "@/components/CustomerAddProductDialog";
+import { CustomerQuickAddDialog } from "@/components/CustomerQuickAddDialog";
 import { useCompanyPortalFeatures } from "@/hooks/useCompanyPortalFeatures";
 import { useKindFilter } from "@/hooks/useKindFilter";
 
@@ -134,7 +135,42 @@ const Products = () => {
   const { kindFilter, setKindFilter, matches: matchesKind, matchesAny: matchesAnyKind } = useKindFilter(brandCompanyId, kindConfig);
   // Buyers of brand-organised catalogs may add their own products (name, brand, kind, description).
   const [customerAddOpen, setCustomerAddOpen] = useState(false);
+  // Set when "Add product" was opened from a folder, so brand/kind are pre-filled and it files there.
+  const [customerAddTemplate, setCustomerAddTemplate] = useState<CustomerAddProductTemplate | null>(null);
+  const [templateRefreshToken, setTemplateRefreshToken] = useState(0);
+  const [customerQuickAddOpen, setCustomerQuickAddOpen] = useState(false);
   const canCustomerAddProduct = !isVibeAdmin && !!kindConfig && !!brandCompanyId;
+
+  // The kind a folder's products already have (most common product_type), for pre-filling.
+  const templateProductType = (templateId: string): string | null => {
+    const counts: Record<string, number> = {};
+    products.forEach((p) => {
+      if (p.template_id === templateId && p.product_type) {
+        counts[p.product_type] = (counts[p.product_type] || 0) + 1;
+      }
+    });
+    const best = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+    return best ? best[0] : null;
+  };
+
+  const templateForCustomerAdd = (template: ProductTemplate): CustomerAddProductTemplate => ({
+    id: template.id,
+    name: template.name,
+    brand_id: template.brand_id ?? null,
+    product_type: templateProductType(template.id),
+  });
+
+  const openCustomerAdd = (template: ProductTemplate | null) => {
+    setCustomerAddTemplate(template ? templateForCustomerAdd(template) : null);
+    setCustomerAddOpen(true);
+  };
+
+  const afterCustomerCreate = () => {
+    refreshBrands();
+    fetchProducts();
+    fetchTemplates();
+    setTemplateRefreshToken((n) => n + 1);
+  };
 
   // Template edit dialog (for vibe admins)
   const [templateEditOpen, setTemplateEditOpen] = useState(false);
@@ -858,6 +894,22 @@ const Products = () => {
     );
   }
 
+  // Buyer "Add product" dialog; rendered in both the folder view and the catalog view below.
+  const customerAddDialog = canCustomerAddProduct && kindConfig && brandCompanyId ? (
+    <CustomerAddProductDialog
+      open={customerAddOpen}
+      onOpenChange={(open) => {
+        setCustomerAddOpen(open);
+        if (!open) setCustomerAddTemplate(null);
+      }}
+      companyId={brandCompanyId}
+      brands={brands}
+      config={kindConfig}
+      template={customerAddTemplate}
+      onCreated={afterCustomerCreate}
+    />
+  ) : null;
+
   // If a template is selected, show the template products view
   if (selectedTemplate) {
     return (
@@ -869,7 +921,20 @@ const Products = () => {
           onBack={() => setSelectedTemplate(null)}
           artworkThumbnails={artworkThumbnails}
           artworkStatus={artworkStatus}
+          onCustomerAddProduct={canCustomerAddProduct ? () => openCustomerAdd(selectedTemplate) : undefined}
+          onCustomerQuickAdd={canCustomerAddProduct ? () => setCustomerQuickAddOpen(true) : undefined}
+          refreshToken={templateRefreshToken}
         />
+        {customerAddDialog}
+        {canCustomerAddProduct && brandCompanyId && (
+          <CustomerQuickAddDialog
+            open={customerQuickAddOpen}
+            onOpenChange={setCustomerQuickAddOpen}
+            companyId={brandCompanyId}
+            template={templateForCustomerAdd(selectedTemplate)}
+            onCreated={afterCustomerCreate}
+          />
+        )}
       </div>
     );
   }
@@ -927,7 +992,7 @@ const Products = () => {
             </>
           )}
           {canCustomerAddProduct && (
-            <Button onClick={() => setCustomerAddOpen(true)}>
+            <Button onClick={() => openCustomerAdd(null)}>
               <Plus className="h-4 w-4 mr-1.5" />
               Add Product
             </Button>
@@ -1024,6 +1089,20 @@ const Products = () => {
                     <Layers className="h-3 w-3 mr-1" />
                     {template.product_count}
                   </Badge>
+
+                  {/* Buyer: add a product straight into this folder */}
+                  {canCustomerAddProduct && (
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="absolute top-2 right-2 z-10 h-7 w-7 bg-background/90 backdrop-blur-sm shadow-sm opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+                      onClick={(e) => { e.stopPropagation(); openCustomerAdd(template); }}
+                      title={`Add a product to ${template.name}`}
+                      aria-label={`Add a product to ${template.name}`}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
 
                   {/* Admin action buttons (top-right) */}
                   {isVibeAdmin && (
@@ -1633,20 +1712,7 @@ const Products = () => {
         </DialogContent>
       </Dialog>
 
-      {canCustomerAddProduct && kindConfig && brandCompanyId && (
-        <CustomerAddProductDialog
-          open={customerAddOpen}
-          onOpenChange={setCustomerAddOpen}
-          companyId={brandCompanyId}
-          brands={brands}
-          config={kindConfig}
-          onCreated={() => {
-            refreshBrands();
-            fetchProducts();
-            fetchTemplates();
-          }}
-        />
-      )}
+      {customerAddDialog}
 
       {/* Brands */}
       {brandCompanyId && (

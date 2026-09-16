@@ -71,15 +71,24 @@ interface TemplateProductsViewProps {
   onBack: () => void;
   artworkThumbnails: Record<string, string>;
   artworkStatus: Record<string, boolean>;
+  /** Buyers of brand-organised catalogs: opens their own "Add product" for this folder. */
+  onCustomerAddProduct?: () => void;
+  /** Buyers: opens the names-only Quick Add for this folder. */
+  onCustomerQuickAdd?: () => void;
+  /** Bump to refetch the folder's products (e.g. after the buyer added one). */
+  refreshToken?: number;
 }
 
-export function TemplateProductsView({ 
-  template, 
-  companyFilter, 
-  isVibeAdmin, 
+export function TemplateProductsView({
+  template,
+  companyFilter,
+  isVibeAdmin,
   onBack,
   artworkThumbnails,
-  artworkStatus
+  artworkStatus,
+  onCustomerAddProduct,
+  onCustomerQuickAdd,
+  refreshToken = 0,
 }: TemplateProductsViewProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -108,7 +117,7 @@ export function TemplateProductsView({
 
   useEffect(() => {
     fetchProducts();
-  }, [template.id, companyFilter]);
+  }, [template.id, companyFilter, refreshToken]);
 
   const fetchProducts = async () => {
     try {
@@ -427,6 +436,18 @@ export function TemplateProductsView({
               {isEditMode ? "Done" : "Select"}
             </Button>
           )}
+          {onCustomerQuickAdd && (
+            <Button size="sm" variant="outline" onClick={onCustomerQuickAdd}>
+              <Plus className="h-4 w-4 mr-1.5" />
+              Quick Add
+            </Button>
+          )}
+          {onCustomerAddProduct && (
+            <Button size="sm" onClick={onCustomerAddProduct}>
+              <Plus className="h-4 w-4 mr-1.5" />
+              Add Product
+            </Button>
+          )}
           {isVibeAdmin && (
             <>
               {/* Quick Add Button */}
@@ -490,11 +511,18 @@ export function TemplateProductsView({
             <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
             <p className="font-medium">No products in this template</p>
             <p className="text-sm text-muted-foreground mb-4">Add products to get started.</p>
-            <AddProductToTemplateDialog 
-              template={template}
-              companyId={companyFilter !== 'all' ? companyFilter : (template.company_id || undefined)}
-              onProductsAdded={fetchProducts}
-            />
+            {onCustomerAddProduct ? (
+              <Button size="sm" onClick={onCustomerAddProduct}>
+                <Plus className="h-4 w-4 mr-1.5" />
+                Add Product
+              </Button>
+            ) : isVibeAdmin ? (
+              <AddProductToTemplateDialog
+                template={template}
+                companyId={companyFilter !== 'all' ? companyFilter : (template.company_id || undefined)}
+                onProductsAdded={fetchProducts}
+              />
+            ) : null}
           </div>
         </Card>
       ) : viewMode === "grid" ? (

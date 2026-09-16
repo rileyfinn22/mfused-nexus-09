@@ -18,6 +18,14 @@ import { useToast } from "@/hooks/use-toast";
 import type { ProductBrand } from "@/hooks/useBrandFilter";
 import type { OrderPickerConfig } from "@/hooks/useCompanyPortalFeatures";
 
+export interface CustomerAddProductTemplate {
+  id: string;
+  name: string;
+  brand_id: string | null;
+  /** The kind the folder's products already have (products.product_type), if known. */
+  product_type: string | null;
+}
+
 interface CustomerAddProductDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -25,6 +33,11 @@ interface CustomerAddProductDialogProps {
   brands: ProductBrand[];
   /** Kinds (Boxes / Foils / Other) come from the company's order_picker config. */
   config: OrderPickerConfig;
+  /**
+   * When adding from inside a folder: brand and category are taken from the folder and the
+   * product is filed straight into it.
+   */
+  template?: CustomerAddProductTemplate | null;
   /** Called after a product (and any new brand) is created so the caller can refetch. */
   onCreated: () => void;
 }
@@ -43,6 +56,7 @@ export function CustomerAddProductDialog({
   companyId,
   brands,
   config,
+  template,
   onCreated,
 }: CustomerAddProductDialogProps) {
   const { toast } = useToast();
@@ -53,6 +67,13 @@ export function CustomerAddProductDialog({
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const kindForType = (productType: string | null | undefined) => {
+    const t = (productType || "").toLowerCase();
+    if (!t) return "";
+    const group = config.groups.find((g) => g.product_types.includes(t));
+    return group ? group.key : OTHER;
+  };
+
   useEffect(() => {
     if (!open) {
       setName("");
@@ -60,9 +81,16 @@ export function CustomerAddProductDialog({
       setNewBrandName("");
       setKind("");
       setDescription("");
+      return;
     }
-  }, [open]);
+    // Opened from inside a folder: brand and category are the folder's.
+    if (template) {
+      setBrandId(template.brand_id || "");
+      setKind(kindForType(template.product_type));
+    }
+  }, [open, template]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const lockedToTemplate = !!template;
   const wantsNewBrand = brandId === NEW_BRAND;
   const canSave =
     name.trim().length > 0 &&
@@ -98,6 +126,7 @@ export function CustomerAddProductDialog({
         p_brand_id: resolvedBrandId,
         p_product_type: productType,
         p_description: description.trim() || null,
+        p_template_id: template?.id ?? null,
       });
       if (error) throw error;
 
@@ -122,9 +151,11 @@ export function CustomerAddProductDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Add product</DialogTitle>
+          <DialogTitle>{template ? `Add product to ${template.name}` : "Add product"}</DialogTitle>
           <DialogDescription>
-            Tell us what it is and which brand it belongs to. VibePKG adds pricing and specs afterwards.
+            {template
+              ? "One product per design, so each can be ordered in its own quantity. VibePKG adds pricing and specs afterwards."
+              : "Tell us what it is and which brand it belongs to. VibePKG adds pricing and specs afterwards."}
           </DialogDescription>
         </DialogHeader>
 
@@ -146,7 +177,7 @@ export function CustomerAddProductDialog({
             <Label>
               Brand <span className="text-destructive">*</span>
             </Label>
-            <Select value={brandId} onValueChange={setBrandId}>
+            <Select value={brandId} onValueChange={setBrandId} disabled={lockedToTemplate && !!template?.brand_id}>
               <SelectTrigger>
                 <SelectValue placeholder="Choose a brand" />
               </SelectTrigger>
