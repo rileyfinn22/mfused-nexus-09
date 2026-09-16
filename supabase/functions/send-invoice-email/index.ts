@@ -28,6 +28,10 @@ interface SendInvoiceRequest {
   totalAmount: number;
   customerName: string;
   additionalAttachments?: Attachment[];
+  /** Optional overrides so non-invoice documents (e.g. order confirmations)
+   *  don't get sent with invoice wording / "Amount Due". */
+  subject?: string;
+  html?: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -52,6 +56,8 @@ const handler = async (req: Request): Promise<Response> => {
       totalAmount,
       customerName,
       additionalAttachments,
+      subject: subjectOverride,
+      html: htmlOverride,
     }: SendInvoiceRequest = await req.json();
 
     // Validate required fields
@@ -269,8 +275,8 @@ const handler = async (req: Request): Promise<Response> => {
       to: recipientEmails,
       cc: ccRecipients.length > 0 ? ccRecipients : undefined,
       bcc: internalBccRecipients.filter(e => e.toLowerCase() !== (senderEmail || '').toLowerCase()),
-      subject: `Invoice ${invoiceNumber} from VibePKG - ${formattedAmount} Due ${formattedDueDate}`,
-      html: emailHtml,
+      subject: subjectOverride || `Invoice ${invoiceNumber} from VibePKG - ${formattedAmount} Due ${formattedDueDate}`,
+      html: htmlOverride || emailHtml,
       attachments,
     });
 
