@@ -138,7 +138,7 @@ const AddArtworkDialog = ({
       .order('name')
       .limit(10000);
 
-    const scopeCompany = restrictToCompany || (!isVibeAdmin ? activeCompanyId : null);
+    const scopeCompany = restrictToCompany || (!isVibeAdmin ? activeCompanyId : null) || formData.companyId || null;
     if (scopeCompany) {
       query = query.eq('company_id', scopeCompany);
     }
