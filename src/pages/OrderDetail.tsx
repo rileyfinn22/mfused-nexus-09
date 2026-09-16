@@ -1232,7 +1232,7 @@ const OrderDetail = () => {
         const newItemTotal = Number(item.quantity) * Number(item.unit_price);
         phase2Promises.push(
           (async () => {
-            await supabase
+            const { error } = await supabase
               .from('order_items')
               .update({
                 quantity: item.quantity,
@@ -1245,6 +1245,7 @@ const OrderDetail = () => {
                 product_id: item.product_id
               })
               .eq('id', item.id);
+            if (error) throw new Error(`Could not update "${item.name}": ${error.message}`);
           })()
         );
 
