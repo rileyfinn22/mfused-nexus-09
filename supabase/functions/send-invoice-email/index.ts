@@ -275,8 +275,8 @@ const handler = async (req: Request): Promise<Response> => {
       to: recipientEmails,
       cc: ccRecipients.length > 0 ? ccRecipients : undefined,
       bcc: internalBccRecipients.filter(e => e.toLowerCase() !== (senderEmail || '').toLowerCase()),
-      subject: `Invoice ${invoiceNumber} from VibePKG - ${formattedAmount} Due ${formattedDueDate}`,
-      html: emailHtml,
+      subject: subjectOverride || `Invoice ${invoiceNumber} from VibePKG - ${formattedAmount} Due ${formattedDueDate}`,
+      html: htmlOverride || emailHtml,
       attachments,
     });
 
