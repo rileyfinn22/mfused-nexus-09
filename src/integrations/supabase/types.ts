@@ -4423,9 +4423,9 @@ export type Database = {
         Args: {
           p_brand_id: string
           p_company_id: string
-          p_description?: string | null
+          p_description?: string
           p_name: string
-          p_product_type?: string | null
+          p_product_type?: string
         }
         Returns: string
       }
