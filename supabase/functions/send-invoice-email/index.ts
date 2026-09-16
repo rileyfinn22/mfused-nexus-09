@@ -56,6 +56,8 @@ const handler = async (req: Request): Promise<Response> => {
       totalAmount,
       customerName,
       additionalAttachments,
+      subject: subjectOverride,
+      html: htmlOverride,
     }: SendInvoiceRequest = await req.json();
 
     // Validate required fields
