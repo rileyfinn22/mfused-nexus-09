@@ -936,6 +936,7 @@ const Products = () => {
           onCustomerAddProduct={canCustomerAddProduct ? () => openCustomerAdd(selectedTemplate) : undefined}
           onCustomerQuickAdd={canCustomerAddProduct ? () => setCustomerQuickAddOpen(true) : undefined}
           refreshToken={templateRefreshToken}
+          onArtworkAdded={fetchArtworkMetadata}
         />
         {customerAddDialog}
         {canCustomerAddProduct && brandCompanyId && (

@@ -491,18 +491,17 @@ const EditProduct = () => {
               Artwork Files {formData.item_id && `(${artworkFiles.length})`}
             </h2>
             <div className="flex gap-2">
-              {isVibeAdmin && (
-                <Button
-                  type="button"
-                  variant="default"
-                  size="sm"
-                  onClick={() => setAddArtworkOpen(true)}
-                  disabled={!formData.item_id}
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  Add Artwork
-                </Button>
-              )}
+              {/* Buyers add their own art here too (stored as customer art, proofed by VibePKG). */}
+              <Button
+                type="button"
+                variant="default"
+                size="sm"
+                onClick={() => setAddArtworkOpen(true)}
+                disabled={!formData.item_id}
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                {isVibeAdmin ? "Add Artwork" : "Add Art"}
+              </Button>
               {formData.item_id && (
                 <Button
                   type="button"
@@ -526,17 +525,15 @@ const EditProduct = () => {
               <p className="text-sm text-muted-foreground mb-3">
                 No artwork files found for SKU: {formData.item_id}
               </p>
-              {isVibeAdmin && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setAddArtworkOpen(true)}
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload First Artwork
-                </Button>
-              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setAddArtworkOpen(true)}
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                {isVibeAdmin ? "Upload First Artwork" : "Add Art"}
+              </Button>
             </div>
           ) : (
             <div className="space-y-3">

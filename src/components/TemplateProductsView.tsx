@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { describeArtworkUploadError, uploadArtworkFile } from "@/lib/artworkUpload";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -37,7 +38,9 @@ import {
   Clock,
   LayoutGrid,
   List,
-  Loader2
+  Loader2,
+  Upload,
+  Eye
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -62,6 +65,7 @@ interface Product {
   cost: number | null;
   image_url: string | null;
   state: string | null;
+  company_id?: string | null;
 }
 
 interface TemplateProductsViewProps {
@@ -77,6 +81,8 @@ interface TemplateProductsViewProps {
   onCustomerQuickAdd?: () => void;
   /** Bump to refetch the folder's products (e.g. after the buyer added one). */
   refreshToken?: number;
+  /** Called after a buyer attaches art from a tile, so thumbnails / art status can refresh. */
+  onArtworkAdded?: () => void;
 }
 
 export function TemplateProductsView({
@@ -89,10 +95,48 @@ export function TemplateProductsView({
   onCustomerAddProduct,
   onCustomerQuickAdd,
   refreshToken = 0,
+  onArtworkAdded,
 }: TemplateProductsViewProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
+
+  // Buyer "Add art" on a tile: pick a file and it is attached to that SKU as customer art,
+  // the same path the Customer Art tab uses. One hidden input serves every tile.
+  const tileFileInputRef = useRef<HTMLInputElement>(null);
+  const [tileUploadTarget, setTileUploadTarget] = useState<Product | null>(null);
+  const [uploadingProductId, setUploadingProductId] = useState<string | null>(null);
+
+  const startTileUpload = (product: Product) => {
+    if (!product.item_id) {
+      toast({ title: "No SKU", description: "This product has no SKU yet, so art cannot be attached to it.", variant: "destructive" });
+      return;
+    }
+    setTileUploadTarget(product);
+    if (tileFileInputRef.current) {
+      tileFileInputRef.current.value = "";
+      tileFileInputRef.current.click();
+    }
+  };
+
+  const handleTileFileChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const product = tileUploadTarget;
+    const companyId = product?.company_id || template.company_id;
+    if (!file || !product?.item_id || !companyId) return;
+    setUploadingProductId(product.id);
+    try {
+      await uploadArtworkFile({ file, sku: product.item_id, companyId, artworkType: "customer" });
+      toast({ title: "Art added", description: `${file.name} attached to ${product.item_id}. VibePKG will proof it.` });
+      onArtworkAdded?.();
+    } catch (err) {
+      console.error("Error uploading artwork:", err);
+      toast({ title: "Upload failed", description: describeArtworkUploadError(err), variant: "destructive" });
+    } finally {
+      setUploadingProductId(null);
+      setTileUploadTarget(null);
+    }
+  };
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
@@ -123,7 +167,7 @@ export function TemplateProductsView({
     try {
       let query = supabase
         .from('products')
-        .select('id, name, description, item_id, price, image_url, state')
+        .select('id, name, description, item_id, price, image_url, state, company_id')
         .eq('template_id', template.id)
         .order('name');
 
@@ -403,6 +447,10 @@ export function TemplateProductsView({
 
   return (
     <div className="space-y-6">
+      {!isVibeAdmin && (
+        <input ref={tileFileInputRef} type="file" className="hidden" onChange={handleTileFileChosen} />
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -602,35 +650,64 @@ export function TemplateProductsView({
               </div>
 
               {/* Action Buttons */}
-              <div className="flex border-t border-border">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="flex-1 rounded-none h-9 text-xs"
-                  onClick={() => openEditDialog(product)}
-                >
-                  <Edit className="h-3.5 w-3.5 mr-1" />
-                  Edit
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="flex-1 rounded-none h-9 text-xs border-l border-border"
-                  onClick={() => handleDuplicate(product)}
-                >
-                  <Copy className="h-3.5 w-3.5 mr-1" />
-                  Duplicate
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="flex-1 rounded-none h-9 text-xs text-destructive hover:text-destructive border-l border-border"
-                  onClick={() => handleDeleteClick(product.id)}
-                >
-                  <Trash2 className="h-3.5 w-3.5 mr-1" />
-                  Trash
-                </Button>
-              </div>
+              {isVibeAdmin ? (
+                <div className="flex border-t border-border">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="flex-1 rounded-none h-9 text-xs"
+                    onClick={() => openEditDialog(product)}
+                  >
+                    <Edit className="h-3.5 w-3.5 mr-1" />
+                    Edit
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="flex-1 rounded-none h-9 text-xs border-l border-border"
+                    onClick={() => handleDuplicate(product)}
+                  >
+                    <Copy className="h-3.5 w-3.5 mr-1" />
+                    Duplicate
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="flex-1 rounded-none h-9 text-xs text-destructive hover:text-destructive border-l border-border"
+                    onClick={() => handleDeleteClick(product.id)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-1" />
+                    Trash
+                  </Button>
+                </div>
+              ) : (
+                /* Buyer: attach art right here, or open the read-only product page */
+                <div className="flex border-t border-border">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="flex-1 rounded-none h-9 text-xs"
+                    onClick={() => startTileUpload(product)}
+                    disabled={uploadingProductId === product.id}
+                  >
+                    {uploadingProductId === product.id ? (
+                      <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                    ) : (
+                      <Upload className="h-3.5 w-3.5 mr-1" />
+                    )}
+                    Add art
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="flex-1 rounded-none h-9 text-xs border-l border-border"
+                    onClick={() => navigate(`/products/edit/${product.id}?template=${template.id}`)}
+                  >
+                    <Eye className="h-3.5 w-3.5 mr-1" />
+                    View
+                  </Button>
+                </div>
+              )}
             </Card>
           ))}
         </div>
@@ -664,15 +741,28 @@ export function TemplateProductsView({
                 </div>
                 <div className="col-span-2 text-sm">${product.price?.toFixed(2) || '0.00'}</div>
                 <div className={cn("flex gap-1", isEditMode ? "col-span-2" : "col-span-3")}>
-                  <Button variant="ghost" size="sm" onClick={() => openEditDialog(product)}>
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => handleDuplicate(product)}>
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteClick(product.id)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {isVibeAdmin ? (
+                    <>
+                      <Button variant="ghost" size="sm" onClick={() => openEditDialog(product)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDuplicate(product)}>
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteClick(product.id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button variant="ghost" size="sm" onClick={() => startTileUpload(product)} disabled={uploadingProductId === product.id} title="Add art">
+                        {uploadingProductId === product.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => navigate(`/products/edit/${product.id}?template=${template.id}`)} title="View">
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
             ))}
