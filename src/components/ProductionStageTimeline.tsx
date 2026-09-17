@@ -713,13 +713,13 @@ export function ProductionStageTimeline({
                   {onQuickStatusChange && (
                     <div className="flex items-center gap-2">
                       <Button size="sm" variant="outline"
-                        className={cn("h-9 text-xs font-medium", stage.status === 'in_progress' ? "bg-info text-white hover:bg-info border-info" : "border-info/50 text-info hover:bg-blue-50 dark:hover:bg-info/10")}
+                        className={cn("h-9 text-xs font-medium", stage.status === 'in_progress' ? "bg-info text-info-foreground hover:bg-info border-info" : "border-info/50 text-info hover:bg-blue-50 dark:hover:bg-info/10")}
                         disabled={isUpdating}
                         onClick={() => handleQuickStatus(stage.id, stage.status === 'in_progress' ? 'pending' : 'in_progress')}>
                         {isUpdating ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Clock className="h-3.5 w-3.5 mr-1.5" />} In Progress
                       </Button>
                       <Button size="sm" variant="outline"
-                        className={cn("h-9 text-xs font-medium", stage.status === 'completed' ? "bg-success text-white hover:bg-success border-success" : "border-success/50 text-success hover:bg-green-50 dark:hover:bg-success/10")}
+                        className={cn("h-9 text-xs font-medium", stage.status === 'completed' ? "bg-success text-success-foreground hover:bg-success border-success" : "border-success/50 text-success hover:bg-green-50 dark:hover:bg-success/10")}
                         disabled={isUpdating}
                         onClick={() => handleQuickStatus(stage.id, stage.status === 'completed' ? 'pending' : 'completed')}>
                         {isUpdating ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />} Complete
@@ -799,7 +799,7 @@ export function ProductionStageTimeline({
                           <div className="flex-1 min-w-0">
                             {update.update_type === 'status_change' && <p className="text-sm">Status changed to <span className="font-medium capitalize">{update.new_status?.replace('_', ' ')}</span></p>}
                             {noteText && !isCustomSub && <p className="text-sm whitespace-pre-wrap">{noteText}</p>}
-                            {isCustomSub && <p className="text-sm font-medium text-success">âœ“ {customLabel}</p>}
+                            {isCustomSub && <p className="text-sm font-medium text-success">Ã¢Å“â€œ {customLabel}</p>}
                             {imageUrl && <a href={imageUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1"><ImageIcon className="h-3 w-3" /> View Image</a>}
                             {update.file_url && <a href={update.file_url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1"><Download className="h-3 w-3" /> {update.file_name || 'Download File'}</a>}
                             <div className="flex items-center gap-2 mt-1">

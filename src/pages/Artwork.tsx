@@ -1041,14 +1041,14 @@ const Artwork = () => {
     switch (status) {
       case 'approved':
         return (
-          <Badge className="bg-success text-white border-0">
+          <Badge className="bg-success text-success-foreground border-0">
             <CheckCircle className="h-3 w-3 mr-1" />
             Approved
           </Badge>
         );
       case 'pending':
         return (
-          <Badge variant="secondary" className="bg-warning text-white border-0">
+          <Badge variant="secondary" className="bg-warning text-warning-foreground border-0">
             <Clock className="h-3 w-3 mr-1" />
             Proof Pending Approval
           </Badge>
@@ -1253,16 +1253,16 @@ const Artwork = () => {
                   
                   <div className="absolute top-2 left-2">
                     {file.is_approved ? (
-                      <Badge className="bg-success text-white border-0">
+                      <Badge className="bg-success text-success-foreground border-0">
                         <CheckCircle className="h-3 w-3 mr-1" />
                         Approved
                       </Badge>
                     ) : file.artwork_type === 'customer' ? (
-                      <Badge variant="secondary" className="bg-info/90 text-white border-0">
+                      <Badge variant="secondary" className="bg-info/90 text-info-foreground border-0">
                         Customer Art
                       </Badge>
                     ) : (
-                      <Badge variant="secondary" className="bg-warning/90 text-white border-0">
+                      <Badge variant="secondary" className="bg-warning/90 text-warning-foreground border-0">
                         <Clock className="h-3 w-3 mr-1" />
                         Pending
                       </Badge>
@@ -1281,7 +1281,7 @@ const Artwork = () => {
                     <span>{new Date(file.created_at).toLocaleDateString()}</span>
                     {file.is_approved && file.approved_at && (
                       <span className="text-success">
-                        ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ {new Date(file.approved_at).toLocaleDateString()}
+                        ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ {new Date(file.approved_at).toLocaleDateString()}
                       </span>
                     )}
                   </div>
@@ -1405,7 +1405,7 @@ const Artwork = () => {
                       <div className="font-medium truncate" title={f.filename}>{f.filename}</div>
                       <div className="text-xs text-muted-foreground">
                         Rejected {new Date(f.rejected_at).toLocaleDateString()}
-                        {f.rejection_reason ? ` ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â ${f.rejection_reason}` : ''}
+                        {f.rejection_reason ? ` ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ${f.rejection_reason}` : ''}
                       </div>
                     </div>
                     {f.artwork_url && (

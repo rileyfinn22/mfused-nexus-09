@@ -577,14 +577,14 @@ export function CustomerArtworkTab({
     switch (status) {
       case 'approved':
         return (
-          <Badge className="bg-success text-white border-0">
+          <Badge className="bg-success text-success-foreground border-0">
             <CheckCircle className="h-3 w-3 mr-1" />
             Complete
           </Badge>
         );
       case 'pending':
         return (
-          <Badge variant="secondary" className="bg-info text-white border-0">
+          <Badge variant="secondary" className="bg-info text-info-foreground border-0">
             <Clock className="h-3 w-3 mr-1" />
             Customer Art Uploaded
           </Badge>
@@ -735,7 +735,7 @@ export function CustomerArtworkTab({
                     <Edit className="h-4 w-4" />
                   </Button>
                   
-                  <Badge className="absolute top-2 left-2 bg-info text-white border-0">
+                  <Badge className="absolute top-2 left-2 bg-info text-info-foreground border-0">
                     Customer Art
                   </Badge>
                 </div>

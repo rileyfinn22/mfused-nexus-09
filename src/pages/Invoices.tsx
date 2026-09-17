@@ -162,10 +162,10 @@ const Invoices = () => {
 
   const getInvoiceTypeColor = (type: string) => {
     switch (type) {
-      case 'deposit': return 'bg-warning text-white';
-      case 'partial': return 'bg-info text-white';
-      case 'final': return 'bg-success text-white';
-      case 'full': return 'bg-info text-white';
+      case 'deposit': return 'bg-warning text-warning-foreground';
+      case 'partial': return 'bg-info text-info-foreground';
+      case 'final': return 'bg-success text-success-foreground';
+      case 'full': return 'bg-info text-info-foreground';
       default: return 'bg-muted text-muted-foreground';
     }
   };
@@ -447,10 +447,10 @@ const Invoices = () => {
 
   // Canonical blanket/child lifecycle math.
   // - Blankets represent the full ordered amount. Children DRAW DOWN against the blanket.
-  // - Open  = ÃŽÂ£ blanket.total (lifetime ordered) Ã¢Ë†â€™ all payments (parent + children).
+  // - Open  = ÃƒÅ½Ã‚Â£ blanket.total (lifetime ordered) ÃƒÂ¢Ã‹â€ Ã¢â‚¬â„¢ all payments (parent + children).
   //   This is the running AR balance against everything ever ordered.
-  // - Billed (Unpaid) = ÃŽÂ£ (total Ã¢Ë†â€™ paid) for docs with status 'billed' (not past due).
-  // - Due    (Unpaid) = ÃŽÂ£ (total Ã¢Ë†â€™ paid) for docs with status 'due'    (past due).
+  // - Billed (Unpaid) = ÃƒÅ½Ã‚Â£ (total ÃƒÂ¢Ã‹â€ Ã¢â‚¬â„¢ paid) for docs with status 'billed' (not past due).
+  // - Due    (Unpaid) = ÃƒÅ½Ã‚Â£ (total ÃƒÂ¢Ã‹â€ Ã¢â‚¬â„¢ paid) for docs with status 'due'    (past due).
 
   const blanketParents = filteredInvoices.filter(
     inv => (inv.invoice_type === 'full' || !inv.invoice_type)
@@ -714,7 +714,7 @@ const Invoices = () => {
                       return invoice.due_date ? formatDocDate(invoice.due_date, 'numeric') : '-';
                     })()}
                     {(() => {
-                      // Shipped date Ã¢â‚¬â€ drives Net 30 start. Shows on child/shipped invoices and any invoice with a shipped_date.
+                      // Shipped date ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â drives Net 30 start. Shows on child/shipped invoices and any invoice with a shipped_date.
                       let shippedDate = invoice.shipped_date;
                       if (!shippedDate && isParent && hasChildren) {
                         // Show earliest child shipped date as fallback for parent rollup
@@ -728,9 +728,9 @@ const Invoices = () => {
                       return (
                         <div
                           className="text-[11px] text-info whitespace-nowrap mt-0.5"
-                          title="Shipped date Ã¢â‚¬â€ Net 30 starts here"
+                          title="Shipped date ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Net 30 starts here"
                         >
-                          Ã°Å¸â€œÂ¦ {new Date(shippedDate).toLocaleDateString()}
+                          ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â¦ {new Date(shippedDate).toLocaleDateString()}
                         </div>
                       );
                     })()}
@@ -768,7 +768,7 @@ const Invoices = () => {
                       <div className="space-y-2">
                         <EditableDescription
                           value={invoice.orders?.description}
-                          placeholder="Add descriptionÃ¢â‚¬Â¦"
+                          placeholder="Add descriptionÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦"
                           onSave={(text) => {
                             if (!invoice.order_id) return;
                             return handleOrderDescriptionChange(invoice.order_id, text);
@@ -779,7 +779,7 @@ const Invoices = () => {
                           <div className="pl-3 border-l border-border">
                             <EditableDescription
                               value={invoice.description}
-                              placeholder="Add invoice descriptionÃ¢â‚¬Â¦"
+                              placeholder="Add invoice descriptionÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦"
                               className="text-xs"
                               onSave={(text) => handleInvoiceDescriptionChange(invoice.id, text)}
                             />

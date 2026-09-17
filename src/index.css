@@ -83,68 +83,69 @@
   }
 
   .dark {
-    /* Dark mode - deep, refined navy */
-    --background: 222 47% 6%;
-    --foreground: 210 40% 98%;
+    /* Dark: the same system inverted. Warm charcoal ground (not navy), off-white ink,
+       light primary button, status colours lifted so they read as text on the dark ground.
+       Every text token measures 5.5:1 or better on both the ground and cards. */
+    --background: 30 6% 9%;
+    --foreground: 40 10% 92%;
 
-    --card: 222 41% 9%;
-    --card-foreground: 210 40% 98%;
+    --card: 30 6% 12%;
+    --card-foreground: 40 10% 92%;
 
-    --popover: 222 41% 11%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 30 6% 13%;
+    --popover-foreground: 40 10% 92%;
 
-    --primary: 217 91% 60%;
-    --primary-foreground: 222 47% 6%;
+    --primary: 40 10% 92%;
+    --primary-foreground: 30 8% 10%;
 
-    --secondary: 222 30% 14%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 30 6% 16%;
+    --secondary-foreground: 40 10% 92%;
 
-    --muted: 222 30% 12%;
-    --muted-foreground: 215 20% 55%;
+    --muted: 30 6% 15%;
+    --muted-foreground: 30 5% 64%;
 
-    --accent: 222 30% 16%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 30 6% 18%;
+    --accent-foreground: 40 10% 92%;
 
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 4 70% 55%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 222 30% 18%;
-    --input: 222 30% 14%;
-    --ring: 217 91% 60%;
+    --border: 30 6% 20%;
+    --input: 30 6% 24%;
+    --ring: 40 10% 92%;
 
-    --success: 142 71% 45%;
-    --success-foreground: 210 40% 98%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 222 47% 6%;
-    --danger: 0 72% 51%;
-    --danger-foreground: 210 40% 98%;
-    --info: 199 89% 48%;
-    --info-foreground: 210 40% 98%;
+    --brand: 88 52% 55%;
+    --brand-foreground: 30 8% 10%;
 
-    /* Table-specific tokens for dark mode */
-    --table-header: 222 30% 12%;
-    --table-row: 222 41% 9%;
-    --table-row-alt: 222 35% 11%;
-    --table-row-hover: 222 30% 14%;
-    --table-border: 222 30% 18%;
+    --success: 152 40% 58%;
+    --success-foreground: 30 8% 10%;
+    --warning: 32 80% 62%;
+    --warning-foreground: 30 8% 10%;
+    --danger: 4 70% 66%;
+    --danger-foreground: 30 8% 10%;
+    --info: 215 55% 68%;
+    --info-foreground: 30 8% 10%;
 
-    --sidebar-background: 222 47% 5%;
-    --sidebar-foreground: 215 20% 65%;
-    --sidebar-primary: 217 91% 60%;
-    --sidebar-primary-foreground: 222 47% 6%;
-    --sidebar-accent: 222 30% 12%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 222 30% 14%;
-    --sidebar-ring: 217 91% 60%;
+    --table-header: 30 6% 12%;
+    --table-row: 30 6% 10%;
+    --table-row-alt: 30 6% 11%;
+    --table-row-hover: 30 6% 14%;
+    --table-border: 30 6% 18%;
 
-    --brand: 88 52% 50%;
-    --brand-foreground: 213 17% 16%;
+    --sidebar-background: 30 6% 8%;
+    --sidebar-foreground: 30 5% 66%;
+    --sidebar-primary: 40 10% 92%;
+    --sidebar-primary-foreground: 30 8% 10%;
+    --sidebar-accent: 30 6% 15%;
+    --sidebar-accent-foreground: 40 10% 92%;
+    --sidebar-border: 30 6% 16%;
+    --sidebar-ring: 40 10% 92%;
 
-    --chart-1: 217 91% 60%;
-    --chart-2: 142 71% 45%;
-    --chart-3: 38 92% 50%;
-    --chart-4: 280 67% 60%;
-    --chart-5: 0 72% 51%;
+    --chart-1: 40 10% 80%;
+    --chart-2: 152 40% 58%;
+    --chart-3: 32 80% 62%;
+    --chart-4: 30 5% 50%;
+    --chart-5: 4 70% 66%;
   }
 }
 
