@@ -59,12 +59,12 @@ export function getLegStatusColor(status: string) {
     case 'delivered':
     case 'cleared':
     case 'arrived_at_port':
-      return 'bg-green-500/10 text-green-600 border-green-500/30';
+      return 'bg-success/10 text-success border-success/30';
     case 'in_transit':
     case 'out_for_delivery':
-      return 'bg-blue-500/10 text-blue-600 border-blue-500/30';
+      return 'bg-info/10 text-info border-info/30';
     case 'customs_hold':
-      return 'bg-amber-500/10 text-amber-600 border-amber-500/30';
+      return 'bg-warning/10 text-warning border-warning/30';
     default:
       return 'bg-muted text-muted-foreground border-border';
   }

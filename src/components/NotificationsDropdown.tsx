@@ -99,10 +99,10 @@ export function NotificationsDropdown() {
 
   const getTypeColor = (type: string) => {
     switch (type) {
-      case "success": return "bg-green-500/10 text-green-500";
-      case "warning": return "bg-yellow-500/10 text-yellow-500";
-      case "error": return "bg-red-500/10 text-red-500";
-      default: return "bg-blue-500/10 text-blue-500";
+      case "success": return "bg-success/10 text-success";
+      case "warning": return "bg-warning/10 text-warning";
+      case "error": return "bg-danger/10 text-danger";
+      default: return "bg-info/10 text-info";
     }
   };
 

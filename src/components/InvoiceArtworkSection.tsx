@@ -25,7 +25,7 @@ interface OrderItemLite {
 }
 
 /**
- * Art files connected to the invoice's products — mirrors the order page's
+ * Art files connected to the invoice's products â€” mirrors the order page's
  * "Product Artwork" section (matched by SKU) so customers can view and
  * download the artwork behind each shipment. RLS scopes artwork_files to the
  * viewer's company; the artwork bucket is private, so links are signed.
@@ -93,7 +93,7 @@ export default function InvoiceArtworkSection({ orderItems }: { orderItems: Orde
                   className={cn(
                     "p-4 rounded-lg border flex items-start gap-4",
                     art.is_approved
-                      ? "bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-800"
+                      ? "bg-green-50/50 dark:bg-success/20 border-success dark:border-success"
                       : "bg-background border-border"
                   )}
                 >
@@ -113,7 +113,7 @@ export default function InvoiceArtworkSection({ orderItems }: { orderItems: Orde
                         {art.filename}
                       </p>
                       {art.is_approved && (
-                        <Badge variant="default" className="text-[10px] px-1.5 py-0 bg-green-600">
+                        <Badge variant="default" className="text-[10px] px-1.5 py-0 bg-success">
                           Approved
                         </Badge>
                       )}
@@ -124,7 +124,7 @@ export default function InvoiceArtworkSection({ orderItems }: { orderItems: Orde
 
                     <p className="text-xs text-muted-foreground mt-0.5">
                       SKU: {art.sku}
-                      {matchingItem?.name && ` • ${matchingItem.name}`}
+                      {matchingItem?.name && ` â€¢ ${matchingItem.name}`}
                     </p>
 
                     {art.notes && (

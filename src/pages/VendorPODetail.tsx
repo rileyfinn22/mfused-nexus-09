@@ -452,8 +452,8 @@ const VendorPODetail = () => {
 
   /**
    * Builds the payload for the one PO renderer in src/lib/vendorPoPdf.ts. This
-   * page used to carry two byte-identical 130-line copies of the document — one
-   * for Download, one for the email attachment — plus a third copy lived in the
+   * page used to carry two byte-identical 130-line copies of the document â€” one
+   * for Download, one for the email attachment â€” plus a third copy lived in the
    * vendor portal, so any fix had to be made three times and never was.
    * splitPOTotals stays the owner of the money math; the renderer is handed its
    * result rather than re-deriving it.
@@ -807,7 +807,7 @@ Thank you for your business.`;
                   const getStatusBadge = () => {
                     switch (po.status) {
                       case 'paid':
-                        return <Badge className="bg-green-500 text-white">Paid</Badge>;
+                        return <Badge className="bg-success text-white">Paid</Badge>;
                       case 'partial':
                         return <Badge variant="default">Partial Paid</Badge>;
                       case 'sent':
@@ -836,7 +836,7 @@ Thank you for your business.`;
                   <p className="text-xs text-muted-foreground">Shipped Value</p>
                   <p className="text-lg font-bold">${shippedValue.toFixed(2)}</p>
                   {shippedVariance !== 0 && (
-                    <p className={`text-xs ${shippedVariance > 0 ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                    <p className={`text-xs ${shippedVariance > 0 ? 'text-warning' : 'text-muted-foreground'}`}>
                       {shippedVariance > 0 ? '+' : ''}{shippedVariance.toFixed(2)} vs ordered
                     </p>
                   )}
@@ -916,8 +916,8 @@ Thank you for your business.`;
                     <Label className="text-sm font-medium">Show in customer production tracking</Label>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {customerSheetVisible
-                        ? 'The customer can see this PO’s progress, dates and published updates.'
-                        : 'Internal only — the customer will not see this PO at all.'}
+                        ? 'The customer can see this POâ€™s progress, dates and published updates.'
+                        : 'Internal only â€” the customer will not see this PO at all.'}
                       {po.show_on_customer_sheet == null && (
                         <span className="ml-1 opacity-70">
                           (default for a {po.po_type || 'production'} PO)
@@ -1364,7 +1364,7 @@ Thank you for your business.`;
         </CardContent>
       </Card>
 
-      {/* Vendor production (same panel the vendor sees) — here unless it already led the page */}
+      {/* Vendor production (same panel the vendor sees) â€” here unless it already led the page */}
       {!vendorViewFirst && (
         <div className="mt-6">
           <VendorProductionPanel poId={po.id} />
@@ -1440,7 +1440,7 @@ Thank you for your business.`;
             <div className="flex justify-end mt-4 pt-4 border-t">
               <div className="text-right">
                 <p className="text-sm text-muted-foreground">Total Payments</p>
-                <p className="text-xl font-bold text-green-600">
+                <p className="text-xl font-bold text-success">
                   ${poPayments.reduce((sum, p) => sum + Number(p.amount), 0).toFixed(2)}
                 </p>
               </div>

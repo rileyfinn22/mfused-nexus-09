@@ -31,7 +31,7 @@
     --secondary-foreground: 30 8% 13%;
 
     --muted: 40 15% 95%;
-    --muted-foreground: 30 5% 45%;
+    --muted-foreground: 30 5% 42%;      /* 5.1:1 on paper: secondary text stays readable */
 
     --accent: 40 12% 92%;
     --accent-foreground: 30 8% 13%;
@@ -52,7 +52,7 @@
     /* Status colours: deep, print-like, readable as text on white */
     --success: 152 45% 30%;
     --success-foreground: 0 0% 100%;
-    --warning: 30 80% 38%;
+    --warning: 30 80% 34%;              /* deep amber, passes 4.5:1 as text on white */
     --warning-foreground: 0 0% 100%;
     --danger: 4 60% 45%;
     --danger-foreground: 0 0% 100%;

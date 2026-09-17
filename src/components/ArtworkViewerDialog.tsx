@@ -1,4 +1,4 @@
-﻿import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Download, FileImage, FileText, FileCode, CheckCircle, Clock, ExternalLink } from "lucide-react";
@@ -72,12 +72,12 @@ const ArtworkViewerDialog = ({
               <DialogTitle className="flex items-center gap-2">
                 {file.filename}
                 {file.is_approved ? (
-                  <Badge className="bg-green-600 text-white border-0">
+                  <Badge className="bg-success text-white border-0">
                     <CheckCircle className="h-3 w-3 mr-1" />
                     Approved
                   </Badge>
                 ) : (
-                  <Badge variant="secondary" className="bg-yellow-500/90 text-white border-0">
+                  <Badge variant="secondary" className="bg-warning/90 text-white border-0">
                     <Clock className="h-3 w-3 mr-1" />
                     Pending
                   </Badge>
@@ -86,7 +86,7 @@ const ArtworkViewerDialog = ({
               <DialogDescription>
                 SKU: {file.sku} • Uploaded: {new Date(file.created_at).toLocaleDateString()}
                 {file.is_approved && file.approved_at && (
-                  <span className="text-green-600 ml-2">
+                  <span className="text-success ml-2">
                     • Approved: {new Date(file.approved_at).toLocaleDateString()}
                   </span>
                 )}

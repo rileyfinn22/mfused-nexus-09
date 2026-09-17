@@ -310,11 +310,11 @@ export function PoShipmentTracking({ poId, companyId, orderId, editable, onChang
   type StepState = "done" | "active" | "upcoming";
   const stepIcon = (state: StepState) =>
     state === "done" ? (
-      <span className="h-6 w-6 rounded-full bg-green-500/15 text-green-600 flex items-center justify-center shrink-0">
+      <span className="h-6 w-6 rounded-full bg-success/15 text-success flex items-center justify-center shrink-0">
         <Check className="h-3.5 w-3.5" />
       </span>
     ) : state === "active" ? (
-      <span className="h-6 w-6 rounded-full bg-blue-500/15 text-blue-600 flex items-center justify-center shrink-0">
+      <span className="h-6 w-6 rounded-full bg-info/15 text-info flex items-center justify-center shrink-0">
         <Circle className="h-3 w-3 fill-current" />
       </span>
     ) : (
@@ -385,13 +385,13 @@ export function PoShipmentTracking({ poId, companyId, orderId, editable, onChang
             {vesselLeg?.vessel_voyage && (
               <div>
                 Vessel <span className="font-mono text-foreground">{vesselLeg.vessel_voyage}</span>
-                {vesselLeg.carrier ? ` · ${vesselLeg.carrier}` : ""}
+                {vesselLeg.carrier ? ` Â· ${vesselLeg.carrier}` : ""}
               </div>
             )}
             {(vesselLeg?.etd || vesselLeg?.estimated_arrival) && (
               <div>
                 {vesselLeg.etd ? `Sailed ${fmtDate(vesselLeg.etd)}` : ""}
-                {vesselLeg.etd && vesselLeg.estimated_arrival ? " · " : ""}
+                {vesselLeg.etd && vesselLeg.estimated_arrival ? " Â· " : ""}
                 {vesselLeg.estimated_arrival
                   ? `${vesselLeg.status === "arrived_at_port" ? "Arrived" : "ETA"} ${fmtDate(vesselLeg.estimated_arrival)}`
                   : ""}

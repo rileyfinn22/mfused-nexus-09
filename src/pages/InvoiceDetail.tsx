@@ -618,7 +618,7 @@ const InvoiceDetail = () => {
       ? relatedInvoices.filter((ri: any) => ri.parent_invoice_id === invoiceId).reduce((s: number, ri: any) => s + Number(ri.total_paid || 0), 0)
       : 0;
 
-    // Prorated blanket-payment credit for child invoices — single source of truth
+    // Prorated blanket-payment credit for child invoices â€” single source of truth
     // in src/lib/invoiceBalance.ts (same math as the totals section below and the
     // invoice list PDF, so every surface shows the same balance).
     const parentBlanketForPdf = !isBlanket && invoice.parent_invoice_id
@@ -709,10 +709,10 @@ const InvoiceDetail = () => {
 
       const shipY = drawPartyBlock(doc, leftColX, yPos, {
         label: 'DELIVERY ADDRESS',
-        name: shipName || '—',
+        name: shipName || 'â€”',
         lines: [
           shipStreet || null,
-          [shipCity, shipState, shipZip].filter(Boolean).join(', ').replace(', ,', ',') || '—',
+          [shipCity, shipState, shipZip].filter(Boolean).join(', ').replace(', ,', ',') || 'â€”',
         ],
       });
 
@@ -1146,7 +1146,7 @@ const InvoiceDetail = () => {
       }
 
       // Re-sync to get updated payment link.
-      // billed_percentage is a one-shot deposit flag — once an invoice already exists in QBO,
+      // billed_percentage is a one-shot deposit flag â€” once an invoice already exists in QBO,
       // refreshing the link should always bill the full remaining balance (100%), otherwise
       // the QBO invoice/link stays stuck at the original deposit amount.
       const { error } = await supabase.functions.invoke('quickbooks-sync-invoice', {
@@ -1316,7 +1316,7 @@ const InvoiceDetail = () => {
         `${unshippedLines.length === 1 ? 'has' : 'have'} nothing shipped and will bill zero ` +
         `(${formatCurrency(unshippedValue)} as ordered):\n` +
         unshippedLines.slice(0, 8).map((oi: any) =>
-          `  • ${oi.sku || oi.name} — ordered ${Number(oi.quantity || 0).toLocaleString()}, shipped ${oi.shipped_quantity === null || oi.shipped_quantity === undefined ? 'not recorded' : '0'}`
+          `  â€¢ ${oi.sku || oi.name} â€” ordered ${Number(oi.quantity || 0).toLocaleString()}, shipped ${oi.shipped_quantity === null || oi.shipped_quantity === undefined ? 'not recorded' : '0'}`
         ).join('\n') +
         (unshippedLines.length > 8 ? `\n  ...and ${unshippedLines.length - 8} more` : '') +
         `\n\nIf any of those actually shipped, cancel and record the quantities first.`
@@ -1326,7 +1326,7 @@ const InvoiceDetail = () => {
       !confirm(
         `Finalise this blanket at ${formatCurrency(newTotal)}?\n\n` +
         `Current total: ${formatCurrency(Number(invoice.total || 0))}\n` +
-        `Shipped × price: ${formatCurrency(newSubtotal)}\n` +
+        `Shipped Ã— price: ${formatCurrency(newSubtotal)}\n` +
         `Freight${children.length > 0 && childShipping > 0 ? ' (from shipments)' : ''}: ${formatCurrency(newShipping)}\n` +
         `Tax: ${formatCurrency(Number(invoice.tax || 0))}` +
         reconciliation +
@@ -1359,7 +1359,7 @@ const InvoiceDetail = () => {
       toast({
         title: 'Blanket Finalised',
         description: Math.abs(written - newTotal) > 0.01
-          ? `Total is ${formatCurrency(written)}. It did not move to ${formatCurrency(newTotal)} — a paid or QuickBooks-synced blanket is left alone.`
+          ? `Total is ${formatCurrency(written)}. It did not move to ${formatCurrency(newTotal)} â€” a paid or QuickBooks-synced blanket is left alone.`
           : `Final total: ${formatCurrency(written)}`,
         variant: Math.abs(written - newTotal) > 0.01 ? 'destructive' : undefined,
       });
@@ -1393,7 +1393,7 @@ const InvoiceDetail = () => {
       // Persist child-shipment shipping onto the blanket FIRST, so the DB trigger
       // (which owns blanket subtotal/total) folds it into the total it computes
       // when the shipped_quantity writes below fire it. No client-side
-      // subtotal/total write — the trigger bills what shipped (ordered where nothing
+      // subtotal/total write â€” the trigger bills what shipped (ordered where nothing
       // is recorded yet; max(ordered, shipped) once children exist) and applies its
       // settled-invoice guards.
       const newShipping = (relatedInvoices || [])
@@ -1555,7 +1555,7 @@ const InvoiceDetail = () => {
   
   const { subtotal: displaySubtotal, total: rawDisplayTotal } = computeDisplayTotals();
   // For blanket invoices with children, roll up child shipping for display.
-  // NOTE: "Update Blanket Total" / "Set Shipped Qty" persist Σ(child shipping) into the
+  // NOTE: "Update Blanket Total" / "Set Shipped Qty" persist Î£(child shipping) into the
   // blanket's own shipping_cost. To avoid double counting, only add child shipping on top
   // when the blanket's stored shipping_cost is 0 (legacy / not yet rolled up).
   const rawChildShipping = isBlanketDisplay
@@ -1574,11 +1574,11 @@ const InvoiceDetail = () => {
     : 0;
   const displayTotalPaid = Number(invoice?.total_paid || 0) + childPaymentsTotal;
   const billedPct = invoice?.billed_percentage;
-  // Hide the "Deposit (X%)" deduction line on blankets once any payment has been recorded —
+  // Hide the "Deposit (X%)" deduction line on blankets once any payment has been recorded â€”
   // the deposit was billed and (presumably) paid; "Less Payments" already accounts for it.
   // Otherwise we double-deduct (deposit line + payments line).
   // Deposit billing line only applies to parent blanket invoices, never child shipment/deposit invoices.
-  // Once any shipment exists on the order, the deposit % no longer caps the bill — use realized total.
+  // Once any shipment exists on the order, the deposit % no longer caps the bill â€” use realized total.
   const anyShippedOnOrder = (order?.order_items || []).some((it: any) => Number(it.shipped_quantity || 0) > 0);
   const isDepositBilling = isBlanketDisplay && !anyShippedOnOrder && billedPct != null && billedPct > 0 && billedPct < 100 && displayTotalPaid === 0;
   const displayBilledTotal = isDepositBilling ? displayTotal * (billedPct / 100) : displayTotal;
@@ -1642,11 +1642,11 @@ const InvoiceDetail = () => {
                     Save Changes
                   </Button>
                 </> : <>
-                  {/* PRIMARY ACTIONS — always visible */}
+                  {/* PRIMARY ACTIONS â€” always visible */}
                   {invoice.quickbooks_sync_status === 'synced' && invoice.quickbooks_id ? (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white gap-1.5">
+                        <Button size="sm" className="bg-success hover:bg-success text-white gap-1.5">
                           <Check className="h-4 w-4" />
                           Synced
                           <ChevronDown className="h-3 w-3" />
@@ -1674,7 +1674,7 @@ const InvoiceDetail = () => {
                             }
                           }}
                         >
-                          <ExternalLink className="h-4 w-4 mr-2 text-blue-500" />
+                          <ExternalLink className="h-4 w-4 mr-2 text-info" />
                           <span>View in QuickBooks</span>
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
@@ -1682,7 +1682,7 @@ const InvoiceDetail = () => {
                           className="cursor-pointer"
                           onClick={() => setShowSyncDialog(true)}
                         >
-                          <RefreshCw className="h-4 w-4 mr-2 text-amber-500" />
+                          <RefreshCw className="h-4 w-4 mr-2 text-warning" />
                           <span>Re-Sync to QuickBooks</span>
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
@@ -1711,26 +1711,26 @@ const InvoiceDetail = () => {
                           <DollarSign className="h-4 w-4 mr-1.5" />
                           Record Payment
                         </Button>}
-                      {invoice.invoice_type === 'full' && invoice.shipment_number === 1 && <Button size="sm" variant="outline" onClick={() => setShowDepositDialog(true)} className="border-blue-500 text-blue-700 hover:bg-blue-50">
+                      {invoice.invoice_type === 'full' && invoice.shipment_number === 1 && <Button size="sm" variant="outline" onClick={() => setShowDepositDialog(true)} className="border-info text-info hover:bg-blue-50">
                           <DollarSign className="h-4 w-4 mr-1.5" />
                           {hasDeposit ? `Deposit ${Number(invoice.billed_percentage)}%` : 'Bill Deposit'}
                         </Button>}
-                      {hasDeposit && <Button size="sm" variant="outline" onClick={handleClearDeposit} className="border-amber-500 text-amber-700 hover:bg-amber-50">
+                      {hasDeposit && <Button size="sm" variant="outline" onClick={handleClearDeposit} className="border-warning text-warning hover:bg-amber-50">
                           <X className="h-4 w-4 mr-1.5" />
                           Clear Deposit
                         </Button>}
-                      {invoice.invoice_type === 'full' && invoice.status !== 'closed' && <Button size="sm" variant="outline" onClick={() => navigate(`/invoices/${invoiceId}/shipped`)} className="border-purple-500 text-purple-700 hover:bg-purple-50">
+                      {invoice.invoice_type === 'full' && invoice.status !== 'closed' && <Button size="sm" variant="outline" onClick={() => navigate(`/invoices/${invoiceId}/shipped`)} className="border-info text-info hover:bg-purple-50">
                           <Package className="h-4 w-4 mr-1.5" />
                           Edit Shipped Qty
                         </Button>}
-                      {invoice.invoice_type === 'full' && invoice.status !== 'closed' && <Button size="sm" variant="outline" onClick={handleUpdateBlanketTotal} className="border-blue-500 text-blue-700 hover:bg-blue-50">
+                      {invoice.invoice_type === 'full' && invoice.status !== 'closed' && <Button size="sm" variant="outline" onClick={handleUpdateBlanketTotal} className="border-info text-info hover:bg-blue-50">
                           <CheckCircle2 className="h-4 w-4 mr-1.5" />
                           Finalise Blanket
                         </Button>}
                     </>
                   )}
 
-                  {/* CONSOLIDATED ACTIONS DROPDOWN — secondary actions */}
+                  {/* CONSOLIDATED ACTIONS DROPDOWN â€” secondary actions */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button size="sm" variant="outline">
@@ -1790,7 +1790,7 @@ const InvoiceDetail = () => {
                       <DropdownMenuLabel>Status</DropdownMenuLabel>
                       {invoice.status === 'closed' && (
                         <DropdownMenuItem onClick={handleReopenInvoice}>
-                          <RotateCcw className="h-4 w-4 mr-2 text-amber-600" />
+                          <RotateCcw className="h-4 w-4 mr-2 text-warning" />
                           Reopen Invoice
                         </DropdownMenuItem>
                       )}
@@ -1823,9 +1823,9 @@ const InvoiceDetail = () => {
         <CardContent className="p-0">
           <div className="bg-gradient-to-r from-primary/10 to-primary/5 border-b border-table-border p-8">
             {/* Parent Order Link for Pull & Ship */}
-            {order?.order_type === 'pull_ship' && order?.parent_order && <div className="mb-4 p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
+            {order?.order_type === 'pull_ship' && order?.parent_order && <div className="mb-4 p-3 bg-info/10 rounded-lg border border-info/20">
                 <p className="text-sm font-medium mb-1">Pull & Ship Invoice - Linked to Production Order:</p>
-                <Button variant="link" className="p-0 h-auto font-mono text-blue-600" onClick={() => navigate(`/orders/${order.parent_order.id}`)}>
+                <Button variant="link" className="p-0 h-auto font-mono text-info" onClick={() => navigate(`/orders/${order.parent_order.id}`)}>
                   {order.parent_order.order_number}
                 </Button>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -1840,7 +1840,7 @@ const InvoiceDetail = () => {
                     <span className="px-3 py-1 bg-secondary text-secondary-foreground rounded-md font-mono text-sm">
                       Shipment #{invoice.shipment_number}
                     </span>
-                    <span className="px-3 py-1 rounded-md text-sm font-medium bg-purple-500 text-white">
+                    <span className="px-3 py-1 rounded-md text-sm font-medium bg-info text-white">
                       {invoice.invoice_type?.toUpperCase() || 'INVOICE'}
                     </span>
                     {(() => {
@@ -1848,15 +1848,15 @@ const InvoiceDetail = () => {
                   const totalOrdered = order?.order_items?.reduce((sum: number, item: any) => sum + item.quantity, 0) || 0;
                   const shippedPercentage = totalOrdered > 0 ? Math.min((totalShipped / totalOrdered) * 100, 100) : 0;
                   if (shippedPercentage === 0) {
-                    return <span className="text-sm font-medium text-orange-600">
+                    return <span className="text-sm font-medium text-warning">
                             Not Shipped Yet
                           </span>;
                   } else if (shippedPercentage < 100) {
-                    return <span className="text-sm font-medium text-blue-600">
+                    return <span className="text-sm font-medium text-info">
                             {shippedPercentage.toFixed(1)}% Physically Shipped
                           </span>;
                   } else {
-                    return <span className="text-sm font-medium text-green-600">
+                    return <span className="text-sm font-medium text-success">
                             Fully Shipped
                           </span>;
                   }
@@ -1883,7 +1883,7 @@ const InvoiceDetail = () => {
                     <div className="flex-1 min-w-[180px]">
                       <EditableDescription
                         value={(invoice as any)?.customer_po_number ?? order?.po_number ?? ""}
-                        placeholder="Add customer PO…"
+                        placeholder="Add customer POâ€¦"
                         onSave={async (newValue) => {
                           if (!invoice?.id) return;
                           const val = newValue?.trim() ? newValue.trim() : null;
@@ -1917,7 +1917,7 @@ const InvoiceDetail = () => {
                       </div>
                       <EditableDescription
                         value={order?.description}
-                        placeholder="Add description…"
+                        placeholder="Add descriptionâ€¦"
                         onSave={async (newValue) => {
                           if (!order?.id) return;
 
@@ -1951,7 +1951,7 @@ const InvoiceDetail = () => {
                         </div>
                         <EditableDescription
                           value={invoice.description}
-                          placeholder="Add invoice description…"
+                          placeholder="Add invoice descriptionâ€¦"
                           onSave={async (newValue) => {
                             const { error } = await supabase
                               .from("invoices")
@@ -2212,7 +2212,7 @@ const InvoiceDetail = () => {
                     }}
                   />
                 ) : (
-                  <p className="text-sm text-muted-foreground">{invoice?.shipping_method || '—'}</p>
+                  <p className="text-sm text-muted-foreground">{invoice?.shipping_method || 'â€”'}</p>
                 )}
               </div>
               <div>
@@ -2267,11 +2267,11 @@ const InvoiceDetail = () => {
                       rel="noreferrer"
                       className="text-sm text-primary hover:underline inline-flex items-center gap-1"
                     >
-                      {CARRIERS.find(c => c.value === invoice.tracking_carrier)?.label || invoice.tracking_carrier} — {invoice.tracking_number}
+                      {CARRIERS.find(c => c.value === invoice.tracking_carrier)?.label || invoice.tracking_carrier} â€” {invoice.tracking_number}
                       <ExternalLink className="h-3 w-3" />
                     </a>
                   ) : (
-                    <p className="text-sm text-muted-foreground">—</p>
+                    <p className="text-sm text-muted-foreground">â€”</p>
                   )
                 )}
               </div>
@@ -2325,7 +2325,7 @@ const InvoiceDetail = () => {
             return showPaymentPortal ? (
               <div className="p-8 border-b bg-gradient-to-r from-green-500/10 to-emerald-500/5">
                 <div className="flex items-start gap-6">
-                  <div className="flex-shrink-0 w-12 h-12 rounded-full bg-green-500 flex items-center justify-center">
+                  <div className="flex-shrink-0 w-12 h-12 rounded-full bg-success flex items-center justify-center">
                     <DollarSign className="h-6 w-6 text-white" />
                   </div>
                   <div className="flex-1">
@@ -2333,7 +2333,7 @@ const InvoiceDetail = () => {
                       <h3 className="text-lg font-semibold flex items-center gap-2">
                         {isVibeAdmin ? 'Customer Payment Portal' : 'Pay Invoice'}
                         {isVibeAdmin && (
-                          <Badge variant="outline" className="bg-green-500/10 text-green-700 border-green-500/20">
+                          <Badge variant="outline" className="bg-success/10 text-success border-success/20">
                             QuickBooks
                           </Badge>
                         )}
@@ -2347,7 +2347,7 @@ const InvoiceDetail = () => {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                       <div className="bg-background/50 border rounded-lg p-4">
                         <div className="text-sm text-muted-foreground mb-1">Amount Due</div>
-                        <div className="text-2xl font-bold text-green-700 dark:text-green-400">
+                        <div className="text-2xl font-bold text-success dark:text-success">
                           {formatCurrency(Number(displayTotal) - Number(invoice.total_paid || 0))}
                         </div>
                         <div className="text-xs text-muted-foreground mt-1">
@@ -2448,12 +2448,12 @@ const InvoiceDetail = () => {
 
                                   const className =
                                     computed === 'paid'
-                                      ? 'text-green-600'
+                                      ? 'text-success'
                                       : computed === 'due'
-                                        ? 'text-red-600'
+                                        ? 'text-danger'
                                         : computed === 'billed'
-                                          ? 'text-blue-600'
-                                          : 'text-yellow-600';
+                                          ? 'text-info'
+                                          : 'text-warning';
 
                                   return <span className={className}>{computed.toUpperCase()}</span>;
                                 })()}
@@ -2461,13 +2461,13 @@ const InvoiceDetail = () => {
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="open">
-                                <span className="text-yellow-600 font-medium">OPEN</span>
+                                <span className="text-warning font-medium">OPEN</span>
                               </SelectItem>
                               <SelectItem value="due">
-                                <span className="text-red-600 font-medium">DUE</span>
+                                <span className="text-danger font-medium">DUE</span>
                               </SelectItem>
                               <SelectItem value="paid">
-                                <span className="text-green-600 font-medium">PAID</span>
+                                <span className="text-success font-medium">PAID</span>
                               </SelectItem>
                             </SelectContent>
                           </Select>
@@ -2498,12 +2498,12 @@ const InvoiceDetail = () => {
 
                               const className =
                                 computed === 'paid'
-                                  ? 'text-green-600'
+                                  ? 'text-success'
                                   : computed === 'due'
-                                    ? 'text-red-600'
+                                    ? 'text-danger'
                                     : computed === 'billed'
-                                      ? 'text-blue-600'
-                                      : 'text-yellow-600';
+                                      ? 'text-info'
+                                      : 'text-warning';
 
                               return <span className={className}>{computed.toUpperCase()}</span>;
                             })()}
@@ -2552,7 +2552,7 @@ const InvoiceDetail = () => {
                         </div>
                       </> : invoice.quickbooks_id ? (
                         isVibeAdmin ? (
-                          <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 space-y-3">
+                          <div className="bg-info/10 border border-info/20 rounded-lg p-4 space-y-3">
                             <p className="text-sm text-muted-foreground">
                               Invoice synced to QuickBooks but payment link is not available yet.
                             </p>
@@ -2567,7 +2567,7 @@ const InvoiceDetail = () => {
                             </Button>
                           </div>
                         ) : (
-                          <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 space-y-3">
+                          <div className="bg-info/10 border border-info/20 rounded-lg p-4 space-y-3">
                             <p className="text-sm text-muted-foreground">
                               {refreshingLink
                                 ? 'Generating secure payment link...'
@@ -2594,7 +2594,7 @@ const InvoiceDetail = () => {
                             </Button>
                           </div>
                         )
-                      ) : isVibeAdmin ? <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
+                      ) : isVibeAdmin ? <div className="bg-warning/10 border border-warning/20 rounded-lg p-4">
                         <p className="text-sm text-muted-foreground">
                           Payment link will be available after syncing. Click "Bill" above to sync this invoice to QuickBooks.
                         </p>
@@ -2707,14 +2707,14 @@ const InvoiceDetail = () => {
                           <Popover open={openCombobox[`inv-item-${item.id}`]} onOpenChange={(open) => setOpenCombobox(prev => ({ ...prev, [`inv-item-${item.id}`]: open }))}>
                             <PopoverTrigger asChild>
                               <Button variant="outline" className="w-full justify-between text-left font-medium h-auto py-1.5 px-2">
-                                <span className="truncate text-sm">{item.name || 'Pick product / type name…'}</span>
+                                <span className="truncate text-sm">{item.name || 'Pick product / type nameâ€¦'}</span>
                                 <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
                               </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-[350px] p-0" align="start">
                               <Command>
                                 <CommandInput
-                                  placeholder="Search products or type custom name…"
+                                  placeholder="Search products or type custom nameâ€¦"
                                   onValueChange={(val) => setEditedItems(items => items.map(i => i.id === item.id ? { ...i, _typedName: val } : i))}
                                 />
                                 <CommandList>
@@ -2806,9 +2806,9 @@ const InvoiceDetail = () => {
                           </TableCell>
                           <TableCell className="text-center">
                             {isEditMode ? (
-                              <Input type="number" min="0" value={isShippedPlaceholder ? '' : shippedQty} placeholder="0" onChange={e => handleQuantityChange(item.id, parseInt(e.target.value) || 0)} className={`w-24 text-center ${isShippedPlaceholder ? 'text-muted-foreground/50 italic' : ''}`} title={isShippedPlaceholder ? 'Placeholder — not yet shipped. Type 0 to intentionally record no shipment.' : ''} />
+                              <Input type="number" min="0" value={isShippedPlaceholder ? '' : shippedQty} placeholder="0" onChange={e => handleQuantityChange(item.id, parseInt(e.target.value) || 0)} className={`w-24 text-center ${isShippedPlaceholder ? 'text-muted-foreground/50 italic' : ''}`} title={isShippedPlaceholder ? 'Placeholder â€” not yet shipped. Type 0 to intentionally record no shipment.' : ''} />
                             ) : isShippedPlaceholder ? (
-                              <span className="inline-flex items-center gap-1 text-muted-foreground/50 italic" title="Placeholder — not yet shipped. Click Quick Ship to record actual qty.">0</span>
+                              <span className="inline-flex items-center gap-1 text-muted-foreground/50 italic" title="Placeholder â€” not yet shipped. Click Quick Ship to record actual qty.">0</span>
                             ) : (
                               <span className="inline-flex items-center gap-1">
                                 {shippedQty}
@@ -2887,7 +2887,7 @@ const InvoiceDetail = () => {
             {/* Invoice Totals */}
             {(() => {
               // Child invoices always show their OWN numbers (subtotal, shipping, total).
-              // Blanket-level payments appear as a prorated credit line — computed by
+              // Blanket-level payments appear as a prorated credit line â€” computed by
               // src/lib/invoiceBalance.ts, the same math as the PDF and list downloads,
               // so this page and the customer's PDF can never disagree.
               const isPartialChild = invoice && invoice.invoice_type !== 'full' && invoice.parent_invoice_id;
@@ -2942,7 +2942,7 @@ const InvoiceDetail = () => {
                         value={editShippingNote}
                         onChange={(e) => setEditShippingNote(e.target.value)}
                         className="text-xs h-7"
-                        placeholder="Shipping note/description…"
+                        placeholder="Shipping note/descriptionâ€¦"
                       />
                     ) : invoice?.shipping_note ? (
                       <p className="text-xs text-muted-foreground pl-1">{invoice.shipping_note}</p>
@@ -2967,13 +2967,13 @@ const InvoiceDetail = () => {
                     <span className="text-muted-foreground">
                       {depositLabel}
                     </span>
-                    <span className="font-semibold text-green-600">({formatCurrency(depositCredit)})</span>
+                    <span className="font-semibold text-success">({formatCurrency(depositCredit)})</span>
                   </div>
                 )}
                 {displayTotalPaid > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Less Payments</span>
-                    <span className="font-semibold text-green-600">({formatCurrency(displayTotalPaid)})</span>
+                    <span className="font-semibold text-success">({formatCurrency(displayTotalPaid)})</span>
                   </div>
                 )}
                 <div className="h-px bg-border my-2"></div>
@@ -3026,12 +3026,12 @@ const InvoiceDetail = () => {
             if (!blanketInvoice) return null;
             const blanketTotal = Number(blanketInvoice.total || 0);
             const totalBilled = relatedInvoices.filter(inv => inv.shipment_number > 1).reduce((sum, inv) => sum + Number(inv.total || 0), 0);
-            return <div className="mb-6 p-6 bg-gradient-to-br from-blue-50 to-sky-50 dark:from-blue-950/30 dark:to-sky-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                  <h3 className="text-base font-semibold mb-4 text-blue-900 dark:text-blue-100">Billing Against Blanket Invoice</h3>
+            return <div className="mb-6 p-6 bg-gradient-to-br from-blue-50 to-sky-50 dark:from-blue-950/30 dark:to-sky-950/20 rounded-lg border border-info dark:border-info">
+                  <h3 className="text-base font-semibold mb-4 text-info dark:text-info">Billing Against Blanket Invoice</h3>
                   <div className="space-y-3">
-                    <div className="flex justify-between pb-2 border-b border-blue-200 dark:border-blue-700">
-                      <span className="text-sm font-medium text-blue-900 dark:text-blue-100">Blanket Invoice Total</span>
-                      <span className="text-lg font-bold text-blue-900 dark:text-blue-100">{formatCurrency(blanketTotal)}</span>
+                    <div className="flex justify-between pb-2 border-b border-info dark:border-info">
+                      <span className="text-sm font-medium text-info dark:text-info">Blanket Invoice Total</span>
+                      <span className="text-lg font-bold text-info dark:text-info">{formatCurrency(blanketTotal)}</span>
                     </div>
                     
                     {/* List partial invoices */}
@@ -3039,7 +3039,7 @@ const InvoiceDetail = () => {
                       <p className="text-xs font-medium text-muted-foreground mb-2">Partial Invoices:</p>
                       {relatedInvoices.filter(inv => inv.shipment_number > 1).sort((a, b) => a.shipment_number - b.shipment_number).map(inv => {
                     const isCurrentInvoice = inv.id === invoice.id;
-                    return <div key={inv.id} className={`flex justify-between text-sm py-1 ${isCurrentInvoice ? 'text-blue-600 dark:text-blue-400 font-medium' : 'text-muted-foreground'}`}>
+                    return <div key={inv.id} className={`flex justify-between text-sm py-1 ${isCurrentInvoice ? 'text-info dark:text-info font-medium' : 'text-muted-foreground'}`}>
                               <span>
                                 {inv.invoice_number}
                                 {isCurrentInvoice && ' (This Invoice)'}
@@ -3049,10 +3049,10 @@ const InvoiceDetail = () => {
                             </div>;
                   })}
                     </div>
-                    <div className="h-px bg-blue-200 dark:bg-blue-800 my-2"></div>
+                    <div className="h-px bg-info dark:bg-info my-2"></div>
                     <div className="flex justify-between">
-                      <span className="font-semibold text-blue-900 dark:text-blue-100">Total Billed</span>
-                      <span className="text-lg font-bold text-blue-900 dark:text-blue-100">
+                      <span className="font-semibold text-info dark:text-info">Total Billed</span>
+                      <span className="text-lg font-bold text-info dark:text-info">
                         {formatCurrency(totalBilled)}
                       </span>
                     </div>
@@ -3086,7 +3086,7 @@ const InvoiceDetail = () => {
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Total Shipped Invoiced</p>
-                    <p className="text-lg font-semibold text-blue-600 dark:text-blue-400">
+                    <p className="text-lg font-semibold text-info dark:text-info">
                       {formatCurrency(
                         (order?.order_items?.reduce((sum: number, item: any) =>
                           sum + (Number(item.shipped_quantity || 0) * Number(item.unit_price || 0)), 0) || 0)
@@ -3096,7 +3096,7 @@ const InvoiceDetail = () => {
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Total Paid</p>
-                    <p className="text-lg font-semibold text-green-600 dark:text-green-400">
+                    <p className="text-lg font-semibold text-success dark:text-success">
                       {formatCurrency(payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0))}
                     </p>
                   </div>
@@ -3196,7 +3196,7 @@ const InvoiceDetail = () => {
         </CardContent>
       </Card>
 
-      {/* Shipments & Invoices Section — blanket invoices only, admin only */}
+      {/* Shipments & Invoices Section â€” blanket invoices only, admin only */}
       {isVibeAdmin && invoice && invoice.invoice_type === 'full' && invoice.shipment_number === 1 && (
         <Card className="shadow-lg">
           <CardContent className="p-8">
@@ -3211,7 +3211,7 @@ const InvoiceDetail = () => {
                   const billingProgress = order ? (totalBilled / Number(order.total)) * 100 : 0;
                   return (
                     <p className="text-sm text-muted-foreground mt-1">
-                      {shipmentInvoicesForBlanket.length} shipment invoice(s) • {formatCurrency(totalBilled)} billed ({billingProgress.toFixed(1)}% of order total)
+                      {shipmentInvoicesForBlanket.length} shipment invoice(s) â€¢ {formatCurrency(totalBilled)} billed ({billingProgress.toFixed(1)}% of order total)
                     </p>
                   );
                 })()}
@@ -3246,8 +3246,8 @@ const InvoiceDetail = () => {
                           <div className="flex items-center gap-2">
                             <span className="font-mono text-sm font-medium">{relInvoice.invoice_number}</span>
                             <Badge className={
-                              relInvoice.invoice_type === 'partial' ? 'bg-blue-500 text-white' :
-                              'bg-purple-500 text-white'
+                              relInvoice.invoice_type === 'partial' ? 'bg-info text-white' :
+                              'bg-info text-white'
                             }>
                               {relInvoice.invoice_type?.toUpperCase() || 'FULL'}
                             </Badge>
@@ -3258,7 +3258,7 @@ const InvoiceDetail = () => {
                           <div className="flex items-center gap-4 text-xs text-muted-foreground">
                             <span>Created: {new Date(relInvoice.created_at).toLocaleDateString()}</span>
                             {relInvoice.shipping_cost > 0 && (
-                              <span>• Shipping: {formatCurrency(Number(relInvoice.shipping_cost))}</span>
+                              <span>â€¢ Shipping: {formatCurrency(Number(relInvoice.shipping_cost))}</span>
                             )}
                           </div>
                         </div>
@@ -3371,7 +3371,7 @@ const InvoiceDetail = () => {
                                   <TableCell className="font-mono text-muted-foreground py-2">{item.sku}</TableCell>
                                   <TableCell className="text-right py-2">{item.quantity?.toLocaleString()}</TableCell>
                                   <TableCell className={cn("text-right py-2 font-medium", shipped > 0 ? "text-success" : "text-muted-foreground")}>
-                                    {shipped > 0 ? shipped.toLocaleString() : '—'}
+                                    {shipped > 0 ? shipped.toLocaleString() : 'â€”'}
                                   </TableCell>
                                   <TableCell className="text-right py-2">{formatUnitPrice(unitCost)}</TableCell>
                                   <TableCell className="text-right py-2 font-medium">{formatCurrency(itemTotal)}</TableCell>
@@ -3446,7 +3446,7 @@ const InvoiceDetail = () => {
                         {allocation.inventory?.available !== undefined ? allocation.inventory.available + allocation.quantity_allocated : '-'}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={allocation.status === 'shipped' ? 'bg-success/10 text-success border-success/20' : allocation.status === 'picked' ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' : 'bg-muted'}>
+                        <Badge variant="outline" className={allocation.status === 'shipped' ? 'bg-success/10 text-success border-success/20' : allocation.status === 'picked' ? 'bg-info/10 text-info border-info/20' : 'bg-muted'}>
                           {allocation.status}
                         </Badge>
                       </TableCell>
@@ -3456,8 +3456,8 @@ const InvoiceDetail = () => {
                     </TableRow>)}
               </TableBody>
             </Table>
-            {inventoryAllocations.some((a: any) => a.inventory_id === null) && <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                <p className="text-sm text-blue-600">
+            {inventoryAllocations.some((a: any) => a.inventory_id === null) && <div className="mt-4 p-3 bg-info/10 border border-info/20 rounded-lg">
+                <p className="text-sm text-info">
                   <strong>Note:</strong> Some items in this shipment were direct-shipped (not pulled from inventory) and are not shown above.
                 </p>
               </div>}
@@ -3492,7 +3492,7 @@ const InvoiceDetail = () => {
                         Shipment #{relInvoice.shipment_number}
                       </span>
                       <span className="font-mono text-sm">{relInvoice.invoice_number}</span>
-                      <span className={`px-3 py-1 rounded-md text-xs font-medium ${relInvoice.invoice_type === 'partial' ? 'bg-blue-500 text-white' : 'bg-purple-500 text-white'}`}>
+                      <span className={`px-3 py-1 rounded-md text-xs font-medium ${relInvoice.invoice_type === 'partial' ? 'bg-info text-white' : 'bg-info text-white'}`}>
                         {relInvoice.invoice_type?.toUpperCase()}
                       </span>
                     </div>
@@ -3668,7 +3668,7 @@ const InvoiceDetail = () => {
           <DialogHeader>
             <DialogTitle>Set Shipped Quantities</DialogTitle>
             <DialogDescription>
-              Quickly enter shipped quantity for each line item. The blanket total will be recalculated as Σ(shipped × price) + child shipping.
+              Quickly enter shipped quantity for each line item. The blanket total will be recalculated as Î£(shipped Ã— price) + child shipping.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 max-h-[60vh] overflow-y-auto py-2">
@@ -3691,7 +3691,7 @@ const InvoiceDetail = () => {
                     value={quickShipQtys[oi.id] ?? ''}
                     onChange={(e) => setQuickShipQtys((prev) => ({ ...prev, [oi.id]: e.target.value }))}
                     className={(quickShipQtys[oi.id] ?? '') === '' ? 'text-muted-foreground/50 italic' : ''}
-                    title={(quickShipQtys[oi.id] ?? '') === '' ? 'Placeholder — leave blank until shipped, or type 0 to intentionally record no shipment' : ''}
+                    title={(quickShipQtys[oi.id] ?? '') === '' ? 'Placeholder â€” leave blank until shipped, or type 0 to intentionally record no shipment' : ''}
                   />
                 </div>
               </div>

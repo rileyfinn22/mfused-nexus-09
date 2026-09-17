@@ -156,7 +156,7 @@ export function ShipmentTracker({ legs, isVibeAdmin, onStatusChange, onActualArr
             {activeLeg && (
               <p className="text-sm text-muted-foreground">
                 Currently: <span className="font-medium text-foreground">
-                  {LEG_TYPE_LABELS[activeLeg.leg_type] || activeLeg.leg_type} — {activeLeg.status.replace(/_/g, ' ')}
+                  {LEG_TYPE_LABELS[activeLeg.leg_type] || activeLeg.leg_type} â€” {activeLeg.status.replace(/_/g, ' ')}
                 </span>
               </p>
             )}
@@ -190,15 +190,15 @@ export function ShipmentTracker({ legs, isVibeAdmin, onStatusChange, onActualArr
                 {index < legs.length - 1 && (
                   <div className={cn(
                     "absolute left-[19px] top-[44px] w-0.5 h-[calc(100%-20px)]",
-                    isCompleted ? "bg-green-500" : isActive ? "bg-blue-500" : "bg-border"
+                    isCompleted ? "bg-success" : isActive ? "bg-info" : "bg-border"
                   )} />
                 )}
 
                 <div className="flex gap-3 pb-4">
                   <div className={cn(
                     "flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center border-2 z-10",
-                    isCompleted ? "bg-green-500/10 border-green-500 text-green-600" :
-                    isActive ? "bg-blue-500/10 border-blue-500 text-blue-600" :
+                    isCompleted ? "bg-success/10 border-success text-success" :
+                    isActive ? "bg-info/10 border-info text-info" :
                     "bg-muted border-border text-muted-foreground"
                   )}>
                     {getLegIcon(leg.leg_type)}
@@ -206,8 +206,8 @@ export function ShipmentTracker({ legs, isVibeAdmin, onStatusChange, onActualArr
 
                   <div className={cn(
                     "flex-1 border rounded-lg p-4 transition-all",
-                    isActive ? "border-blue-500/50 bg-blue-50/5 shadow-sm" :
-                    isCompleted ? "border-green-500/30 bg-green-50/5" :
+                    isActive ? "border-info/50 bg-blue-50/5 shadow-sm" :
+                    isCompleted ? "border-success/30 bg-green-50/5" :
                     "border-border bg-card"
                   )}>
                     <div className="flex items-start justify-between gap-2 flex-wrap">
@@ -224,9 +224,9 @@ export function ShipmentTracker({ legs, isVibeAdmin, onStatusChange, onActualArr
                         {(leg.origin || leg.destination) && (
                           <div className="flex items-center gap-1.5 mt-1.5 text-sm text-muted-foreground">
                             <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
-                            <span>{leg.origin || '—'}</span>
-                            <span className="mx-1">→</span>
-                            <span>{leg.destination || '—'}</span>
+                            <span>{leg.origin || 'â€”'}</span>
+                            <span className="mx-1">â†’</span>
+                            <span>{leg.destination || 'â€”'}</span>
                           </div>
                         )}
 
@@ -236,7 +236,7 @@ export function ShipmentTracker({ legs, isVibeAdmin, onStatusChange, onActualArr
                             <span className="font-medium text-foreground">{leg.carrier}</span>
                             {trackingUrl && leg.tracking_number && (
                               <>
-                                <span className="text-muted-foreground">•</span>
+                                <span className="text-muted-foreground">â€¢</span>
                                 <a
                                   href={trackingUrl}
                                   target="_blank"
@@ -265,7 +265,7 @@ export function ShipmentTracker({ legs, isVibeAdmin, onStatusChange, onActualArr
                             </span>
                           )}
                           {leg.actual_arrival && (leg.status === 'delivered' || leg.status === 'cleared') && (
-                            <span className="flex items-center gap-1 text-green-600">
+                            <span className="flex items-center gap-1 text-success">
                               <Calendar className="h-3 w-3" />
                               Arrived: {formatDate(leg.actual_arrival)}
                             </span>
@@ -405,7 +405,7 @@ export function ShipmentTracker({ legs, isVibeAdmin, onStatusChange, onActualArr
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-8 text-xs text-green-600 border-green-300 hover:bg-green-50"
+                            className="h-8 text-xs text-success border-success hover:bg-green-50"
                             onClick={() => onSendDeliveryNotification(leg)}
                           >
                             <Send className="h-3 w-3 mr-1" />

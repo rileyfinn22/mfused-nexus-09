@@ -513,7 +513,7 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
               <h2 className="text-sm font-semibold text-foreground">
                 {isVibeAdmin ? "Pending Approval - Customer Submitted" : "Pending Approval"}
               </h2>
-              <Badge variant="secondary" className="bg-amber-500/15 text-amber-700 dark:text-amber-400 font-normal">
+              <Badge variant="secondary" className="bg-warning/15 text-warning dark:text-warning font-normal">
                 {awaitingApprovalOrders.length}
               </Badge>
             </div>
@@ -570,7 +570,7 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
                       />
                     </div>
                     <div className="col-span-1 text-sm">${order.total?.toFixed(2)}</div>
-                    <div className="col-span-2 text-sm text-amber-700 dark:text-amber-400">
+                    <div className="col-span-2 text-sm text-warning dark:text-warning">
                       Awaiting approval
                     </div>
                     <div className="col-span-2 flex gap-1">
@@ -787,10 +787,10 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
                     <ExpandDetailsPanel
                       details={[
                         { label: "Order Type", value: order.order_type || "standard" },
-                        { label: "PO #", value: order.po_number || "—" },
+                        { label: "PO #", value: order.po_number || "â€”" },
                         ...(order.brandNames?.length ? [{ label: "Brand", value: order.brandNames.join(", ") }] : []),
-                        { label: "Customer", value: order.customer_name || "—" },
-                        { label: "Ship To", value: [order.shipping_city, order.shipping_state].filter(Boolean).join(", ") || "—" },
+                        { label: "Customer", value: order.customer_name || "â€”" },
+                        { label: "Ship To", value: [order.shipping_city, order.shipping_state].filter(Boolean).join(", ") || "â€”" },
                         { label: "Items", value: order.order_items?.length ?? 0 },
                         { label: "Total Qty", value: (order.order_items || []).reduce((s: number, i: any) => s + (Number(i.quantity) || 0), 0).toLocaleString() },
                         { label: "Shipped Qty", value: (order.order_items || []).reduce((s: number, i: any) => s + (Number(i.shipped_quantity) || 0), 0).toLocaleString() },

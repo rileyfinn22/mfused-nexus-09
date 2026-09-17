@@ -162,11 +162,11 @@ const Invoices = () => {
 
   const getInvoiceTypeColor = (type: string) => {
     switch (type) {
-      case 'deposit': return 'bg-orange-500 text-white';
-      case 'partial': return 'bg-blue-500 text-white';
-      case 'final': return 'bg-green-500 text-white';
-      case 'full': return 'bg-purple-500 text-white';
-      default: return 'bg-gray-500 text-white';
+      case 'deposit': return 'bg-warning text-white';
+      case 'partial': return 'bg-info text-white';
+      case 'final': return 'bg-success text-white';
+      case 'full': return 'bg-info text-white';
+      default: return 'bg-muted text-muted-foreground';
     }
   };
 
@@ -447,10 +447,10 @@ const Invoices = () => {
 
   // Canonical blanket/child lifecycle math.
   // - Blankets represent the full ordered amount. Children DRAW DOWN against the blanket.
-  // - Open  = Î£ blanket.total (lifetime ordered) âˆ’ all payments (parent + children).
+  // - Open  = ÃŽÂ£ blanket.total (lifetime ordered) Ã¢Ë†â€™ all payments (parent + children).
   //   This is the running AR balance against everything ever ordered.
-  // - Billed (Unpaid) = Î£ (total âˆ’ paid) for docs with status 'billed' (not past due).
-  // - Due    (Unpaid) = Î£ (total âˆ’ paid) for docs with status 'due'    (past due).
+  // - Billed (Unpaid) = ÃŽÂ£ (total Ã¢Ë†â€™ paid) for docs with status 'billed' (not past due).
+  // - Due    (Unpaid) = ÃŽÂ£ (total Ã¢Ë†â€™ paid) for docs with status 'due'    (past due).
 
   const blanketParents = filteredInvoices.filter(
     inv => (inv.invoice_type === 'full' || !inv.invoice_type)
@@ -611,10 +611,10 @@ const Invoices = () => {
               // Determine dropdown button color based on children priority status
               const getDropdownButtonColors = () => {
                 if (childrenPriorityStatus === 'due') {
-                  return 'border-red-400/40 bg-red-500/5 hover:bg-red-500/10 text-red-500/80';
+                  return 'border-danger/40 bg-danger/5 hover:bg-danger/10 text-danger/80';
                 }
                 if (childrenPriorityStatus === 'billed') {
-                  return 'border-blue-400/40 bg-blue-500/5 hover:bg-blue-500/10 text-blue-500/80';
+                  return 'border-info/40 bg-info/5 hover:bg-info/10 text-info/80';
                 }
                 return `border-muted-foreground/20 ${isExpanded ? 'bg-muted/50 border-muted-foreground/30' : 'hover:bg-muted/30'}`;
               };
@@ -642,18 +642,18 @@ const Invoices = () => {
                           }}
                         >
                           {isExpanded ? (
-                            <ChevronDown className={`h-4 w-4 ${childrenPriorityStatus === 'due' ? 'text-red-600' : childrenPriorityStatus === 'billed' ? 'text-blue-600' : 'text-primary'}`} />
+                            <ChevronDown className={`h-4 w-4 ${childrenPriorityStatus === 'due' ? 'text-danger' : childrenPriorityStatus === 'billed' ? 'text-info' : 'text-primary'}`} />
                           ) : (
-                            <ChevronRight className={`h-4 w-4 ${childrenPriorityStatus === 'due' ? 'text-red-600' : childrenPriorityStatus === 'billed' ? 'text-blue-600' : 'text-primary'}`} />
+                            <ChevronRight className={`h-4 w-4 ${childrenPriorityStatus === 'due' ? 'text-danger' : childrenPriorityStatus === 'billed' ? 'text-info' : 'text-primary'}`} />
                           )}
-                          <span className={`text-xs font-medium ${childrenPriorityStatus === 'due' ? 'text-red-600' : childrenPriorityStatus === 'billed' ? 'text-blue-600' : 'text-primary'}`}>
+                          <span className={`text-xs font-medium ${childrenPriorityStatus === 'due' ? 'text-danger' : childrenPriorityStatus === 'billed' ? 'text-info' : 'text-primary'}`}>
                             {invoices.filter(inv => inv.parent_invoice_id === invoice.id).length}
                           </span>
                         </Button>
                       )}
                       {isChild && (
-                        <div className="flex items-center text-blue-500 mr-1">
-                          <div className="w-3 h-px bg-blue-400 mr-1"></div>
+                        <div className="flex items-center text-info mr-1">
+                          <div className="w-3 h-px bg-info mr-1"></div>
                           <Package className="h-3.5 w-3.5" />
                         </div>
                       )}
@@ -661,7 +661,7 @@ const Invoices = () => {
                       {showOverdueAlert && (
                         <Badge 
                           variant="outline" 
-                          className="bg-red-500/10 text-red-700 border-red-500/20 text-xs px-1.5 py-0 animate-pulse"
+                          className="bg-danger/10 text-danger border-danger/20 text-xs px-1.5 py-0 animate-pulse"
                           title="Contains overdue invoices"
                         >
                           <AlertCircle className="h-3 w-3" />
@@ -670,7 +670,7 @@ const Invoices = () => {
                       {invoice.quickbooks_payment_link && (
                         <Badge 
                           variant="outline" 
-                          className="bg-green-500/10 text-green-700 border-green-500/20 text-xs px-1.5 py-0"
+                          className="bg-success/10 text-success border-success/20 text-xs px-1.5 py-0"
                           title="Payment link available"
                         >
                           <Link2 className="h-3 w-3" />
@@ -679,7 +679,7 @@ const Invoices = () => {
                       {invoice.parent_invoice_id && (
                         <Badge 
                           variant="outline" 
-                          className="bg-blue-500/10 text-blue-700 border-blue-500/20 text-xs px-1.5 py-0"
+                          className="bg-info/10 text-info border-info/20 text-xs px-1.5 py-0"
                           title="Linked to deposit invoice"
                         >
                           Linked
@@ -714,7 +714,7 @@ const Invoices = () => {
                       return invoice.due_date ? formatDocDate(invoice.due_date, 'numeric') : '-';
                     })()}
                     {(() => {
-                      // Shipped date â€” drives Net 30 start. Shows on child/shipped invoices and any invoice with a shipped_date.
+                      // Shipped date Ã¢â‚¬â€ drives Net 30 start. Shows on child/shipped invoices and any invoice with a shipped_date.
                       let shippedDate = invoice.shipped_date;
                       if (!shippedDate && isParent && hasChildren) {
                         // Show earliest child shipped date as fallback for parent rollup
@@ -727,10 +727,10 @@ const Invoices = () => {
                       if (!shippedDate) return null;
                       return (
                         <div
-                          className="text-[11px] text-blue-600 whitespace-nowrap mt-0.5"
-                          title="Shipped date â€” Net 30 starts here"
+                          className="text-[11px] text-info whitespace-nowrap mt-0.5"
+                          title="Shipped date Ã¢â‚¬â€ Net 30 starts here"
                         >
-                          ðŸ“¦ {new Date(shippedDate).toLocaleDateString()}
+                          Ã°Å¸â€œÂ¦ {new Date(shippedDate).toLocaleDateString()}
                         </div>
                       );
                     })()}
@@ -768,7 +768,7 @@ const Invoices = () => {
                       <div className="space-y-2">
                         <EditableDescription
                           value={invoice.orders?.description}
-                          placeholder="Add descriptionâ€¦"
+                          placeholder="Add descriptionÃ¢â‚¬Â¦"
                           onSave={(text) => {
                             if (!invoice.order_id) return;
                             return handleOrderDescriptionChange(invoice.order_id, text);
@@ -779,7 +779,7 @@ const Invoices = () => {
                           <div className="pl-3 border-l border-border">
                             <EditableDescription
                               value={invoice.description}
-                              placeholder="Add invoice descriptionâ€¦"
+                              placeholder="Add invoice descriptionÃ¢â‚¬Â¦"
                               className="text-xs"
                               onSave={(text) => handleInvoiceDescriptionChange(invoice.id, text)}
                             />

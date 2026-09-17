@@ -321,9 +321,9 @@ export function ProductionStageTimeline({
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed':
-        return 'bg-green-500';
+        return 'bg-success';
       case 'in_progress':
-        return 'bg-blue-500';
+        return 'bg-info';
       default:
         return 'bg-muted-foreground/30';
     }
@@ -332,9 +332,9 @@ export function ProductionStageTimeline({
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'completed':
-        return <CheckCircle2 className="h-5 w-5 text-green-500" />;
+        return <CheckCircle2 className="h-5 w-5 text-success" />;
       case 'in_progress':
-        return <Clock className="h-5 w-5 text-blue-500 animate-pulse" />;
+        return <Clock className="h-5 w-5 text-info animate-pulse" />;
       default:
         return <Circle className="h-5 w-5 text-muted-foreground/50" />;
     }
@@ -343,8 +343,8 @@ export function ProductionStageTimeline({
   const getStatusBadge = (status: string) => {
     const config = {
       pending: { variant: "outline" as const, className: "border-muted-foreground/30 text-muted-foreground" },
-      in_progress: { variant: "default" as const, className: "bg-blue-500 hover:bg-blue-600" },
-      completed: { variant: "default" as const, className: "bg-green-500 hover:bg-green-600" },
+      in_progress: { variant: "default" as const, className: "bg-info hover:bg-info" },
+      completed: { variant: "default" as const, className: "bg-success hover:bg-success" },
     };
     const { variant, className } = config[status as keyof typeof config] || config.pending;
     return (
@@ -478,8 +478,8 @@ export function ProductionStageTimeline({
         <div
           className={cn(
             "absolute left-4 top-5 w-5 h-5 rounded-full border-2 flex items-center justify-center z-10 transition-all",
-            isComplete ? "bg-green-500 border-green-500" :
-            isActive ? "bg-blue-500 border-blue-500 ring-4 ring-blue-500/20" :
+            isComplete ? "bg-success border-success" :
+            isActive ? "bg-info border-info ring-4 ring-blue-500/20" :
             "bg-background border-muted-foreground/30"
           )}
         >
@@ -491,8 +491,8 @@ export function ProductionStageTimeline({
           <div
             className={cn(
               "border rounded-xl transition-all",
-              isActive ? "border-blue-500/50 bg-blue-50/5 shadow-sm shadow-blue-500/10" :
-              isComplete ? "border-green-500/30 bg-green-50/5" :
+              isActive ? "border-info/50 bg-blue-50/5 shadow-sm shadow-blue-500/10" :
+              isComplete ? "border-success/30 bg-green-50/5" :
               "border-border bg-card"
             )}
           >
@@ -504,13 +504,13 @@ export function ProductionStageTimeline({
                       <h4 className="font-medium text-foreground">{stageDef.label}</h4>
                       {getStatusBadge(displayStatus)}
                       {isVibeAdmin && stageDef.adminOnly && (
-                        <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-600 bg-amber-50/30 dark:bg-amber-500/5">
+                        <Badge variant="outline" className="text-[10px] border-warning/30 text-warning bg-amber-50/30 dark:bg-warning/5">
                           Internal
                         </Badge>
                       )}
                       {/* Unpublished changes indicator for admin */}
                       {isVibeAdmin && stageHasUnpublished && (
-                        <Badge variant="outline" className="text-[10px] border-amber-500/50 text-amber-600 bg-amber-50/50 dark:bg-amber-500/10 gap-1">
+                        <Badge variant="outline" className="text-[10px] border-warning/50 text-warning bg-amber-50/50 dark:bg-warning/10 gap-1">
                           <EyeOff className="h-3 w-3" />
                           {unpublishedCount > 0 ? `${unpublishedCount} unpublished` : 'Unpublished status'}
                         </Badge>
@@ -541,7 +541,7 @@ export function ProductionStageTimeline({
                     <Button 
                       size="sm" 
                       variant="outline" 
-                      className="h-8 text-xs border-amber-500/50 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-500/10"
+                      className="h-8 text-xs border-warning/50 text-warning hover:bg-amber-50 dark:hover:bg-warning/10"
                       disabled={publishingStages.has(stage.id)}
                       onClick={(e) => { e.stopPropagation(); handlePublishStage(stage); }}
                     >
@@ -670,7 +670,7 @@ export function ProductionStageTimeline({
                       return (
                         <a key={attachment.id} href={imgUrl || fileUrl || '#'} target="_blank" rel="noopener noreferrer"
                           className={cn("inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-colors",
-                            attachment.update_type === 'image' ? "bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-500/10 dark:text-purple-400" : "bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-500/10 dark:text-amber-400"
+                            attachment.update_type === 'image' ? "bg-info text-info hover:bg-info dark:bg-info/10 dark:text-info" : "bg-warning text-warning hover:bg-warning dark:bg-warning/10 dark:text-warning"
                           )}>
                           {attachment.update_type === 'image' ? <ImageIcon className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
                           {attachment.file_name || 'Image'}
@@ -713,13 +713,13 @@ export function ProductionStageTimeline({
                   {onQuickStatusChange && (
                     <div className="flex items-center gap-2">
                       <Button size="sm" variant="outline"
-                        className={cn("h-9 text-xs font-medium", stage.status === 'in_progress' ? "bg-blue-500 text-white hover:bg-blue-600 border-blue-500" : "border-blue-500/50 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-500/10")}
+                        className={cn("h-9 text-xs font-medium", stage.status === 'in_progress' ? "bg-info text-white hover:bg-info border-info" : "border-info/50 text-info hover:bg-blue-50 dark:hover:bg-info/10")}
                         disabled={isUpdating}
                         onClick={() => handleQuickStatus(stage.id, stage.status === 'in_progress' ? 'pending' : 'in_progress')}>
                         {isUpdating ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Clock className="h-3.5 w-3.5 mr-1.5" />} In Progress
                       </Button>
                       <Button size="sm" variant="outline"
-                        className={cn("h-9 text-xs font-medium", stage.status === 'completed' ? "bg-green-500 text-white hover:bg-green-600 border-green-500" : "border-green-500/50 text-green-600 hover:bg-green-50 dark:hover:bg-green-500/10")}
+                        className={cn("h-9 text-xs font-medium", stage.status === 'completed' ? "bg-success text-white hover:bg-success border-success" : "border-success/50 text-success hover:bg-green-50 dark:hover:bg-success/10")}
                         disabled={isUpdating}
                         onClick={() => handleQuickStatus(stage.id, stage.status === 'completed' ? 'pending' : 'completed')}>
                         {isUpdating ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />} Complete
@@ -740,8 +740,8 @@ export function ProductionStageTimeline({
 
               {/* Admin Publish Notes Editor */}
               {isVibeAdmin && stageHasUnpublished && onPublishStage && (
-                <div className="mt-3 p-3 bg-amber-50/50 dark:bg-amber-500/5 rounded-lg border border-amber-500/20">
-                  <Label className="text-xs text-amber-600 mb-1.5 block flex items-center gap-1">
+                <div className="mt-3 p-3 bg-amber-50/50 dark:bg-warning/5 rounded-lg border border-warning/20">
+                  <Label className="text-xs text-warning mb-1.5 block flex items-center gap-1">
                     <Pencil className="h-3 w-3" /> Edit customer-facing note before publishing
                   </Label>
                   <Textarea 
@@ -784,22 +784,22 @@ export function ProductionStageTimeline({
                       const customLabel = noteText?.match(/<!--CUSTOM_SUBSTAGE:(.*?)-->/)?.[1];
                       return (
                         <div key={update.id} className={cn("flex items-start gap-2 p-2 rounded-lg transition-colors",
-                          update.update_type === 'note' ? 'bg-slate-100/80 dark:bg-slate-800/30 border-2 border-primary/20' :
-                          update.update_type === 'image' ? 'bg-purple-50 dark:bg-purple-900/10' :
-                          update.update_type === 'file' ? 'bg-amber-50 dark:bg-amber-900/10' :
-                          update.new_status === 'completed' ? 'bg-green-50 dark:bg-green-900/10 border-2 border-success/20' : 'bg-muted/30'
+                          update.update_type === 'note' ? 'bg-muted dark:bg-muted border-2 border-primary/20' :
+                          update.update_type === 'image' ? 'bg-purple-50 dark:bg-info/10' :
+                          update.update_type === 'file' ? 'bg-amber-50 dark:bg-warning/10' :
+                          update.new_status === 'completed' ? 'bg-green-50 dark:bg-success/10 border-2 border-success/20' : 'bg-muted/30'
                         )}>
                           <div className="flex-shrink-0 mt-0.5">
-                            {update.update_type === 'note' ? <MessageSquare className="h-4 w-4 text-slate-500" /> :
-                             update.update_type === 'image' ? <ImageIcon className="h-4 w-4 text-purple-500" /> :
-                             update.update_type === 'file' ? <FileText className="h-4 w-4 text-amber-500" /> :
-                             update.new_status === 'completed' ? <CheckCircle2 className="h-4 w-4 text-green-500" /> :
+                            {update.update_type === 'note' ? <MessageSquare className="h-4 w-4 text-muted-foreground" /> :
+                             update.update_type === 'image' ? <ImageIcon className="h-4 w-4 text-info" /> :
+                             update.update_type === 'file' ? <FileText className="h-4 w-4 text-warning" /> :
+                             update.new_status === 'completed' ? <CheckCircle2 className="h-4 w-4 text-success" /> :
                              <Clock className="h-4 w-4 text-muted-foreground" />}
                           </div>
                           <div className="flex-1 min-w-0">
                             {update.update_type === 'status_change' && <p className="text-sm">Status changed to <span className="font-medium capitalize">{update.new_status?.replace('_', ' ')}</span></p>}
                             {noteText && !isCustomSub && <p className="text-sm whitespace-pre-wrap">{noteText}</p>}
-                            {isCustomSub && <p className="text-sm font-medium text-success">✓ {customLabel}</p>}
+                            {isCustomSub && <p className="text-sm font-medium text-success">âœ“ {customLabel}</p>}
                             {imageUrl && <a href={imageUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1"><ImageIcon className="h-3 w-3" /> View Image</a>}
                             {update.file_url && <a href={update.file_url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1"><Download className="h-3 w-3" /> {update.file_name || 'Download File'}</a>}
                             <div className="flex items-center gap-2 mt-1">
@@ -807,11 +807,11 @@ export function ProductionStageTimeline({
                               {/* Published/unpublished indicator */}
                               {(isVibeAdmin || isVendor) && (
                                 update.is_published ? (
-                                  <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-green-500/30 text-green-600">
+                                  <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-success/30 text-success">
                                     <Eye className="h-2.5 w-2.5 mr-0.5" /> Published
                                   </Badge>
                                 ) : (
-                                  <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-amber-500/30 text-amber-600">
+                                  <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-warning/30 text-warning">
                                     <EyeOff className="h-2.5 w-2.5 mr-0.5" /> {isVendor ? 'Pending review' : 'Unpublished'}
                                   </Badge>
                                 )
@@ -829,7 +829,7 @@ export function ProductionStageTimeline({
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="h-7 text-[10px] border-amber-500/50 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-500/10"
+                                  className="h-7 text-[10px] border-warning/50 text-warning hover:bg-amber-50 dark:hover:bg-warning/10"
                                   disabled={publishingUpdates.has(update.id)}
                                   onClick={() => handlePublishUpdate(update)}
                                 >
@@ -871,7 +871,7 @@ export function ProductionStageTimeline({
           <Button
             variant="outline"
             size="sm"
-            className="border-amber-500/50 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-500/10"
+            className="border-warning/50 text-warning hover:bg-amber-50 dark:hover:bg-warning/10"
             disabled={publishingAll}
             onClick={handlePublishAll}
           >
@@ -924,8 +924,8 @@ export function ProductionStageTimeline({
                       key={def.value} 
                       className={cn(
                         "h-2 rounded-sm transition-colors",
-                        status === 'completed' ? 'bg-green-500' :
-                        status === 'in_progress' ? 'bg-blue-500' :
+                        status === 'completed' ? 'bg-success' :
+                        status === 'in_progress' ? 'bg-info' :
                         'bg-muted'
                       )}
                       style={{ width: `${weight}%` }}
@@ -944,8 +944,8 @@ export function ProductionStageTimeline({
                       key={def.value} 
                       className={cn(
                         "truncate text-center",
-                        status === 'completed' && 'text-green-600 font-medium',
-                        status === 'in_progress' && 'text-blue-600 font-medium'
+                        status === 'completed' && 'text-success font-medium',
+                        status === 'in_progress' && 'text-info font-medium'
                       )}
                       style={{ width: `${weight}%` }}
                     >
@@ -972,8 +972,8 @@ export function ProductionStageTimeline({
                     key={def.value} 
                     className={cn(
                       "h-3 rounded-sm transition-colors relative group",
-                      status === 'completed' ? 'bg-green-500' :
-                      status === 'in_progress' ? 'bg-blue-500 animate-pulse' :
+                      status === 'completed' ? 'bg-success' :
+                      status === 'in_progress' ? 'bg-info animate-pulse' :
                       'bg-muted'
                     )}
                     style={{ width: `${weight}%` }}
@@ -992,8 +992,8 @@ export function ProductionStageTimeline({
                     key={def.value} 
                     className={cn(
                       "truncate text-center",
-                      status === 'completed' && 'text-green-600 font-medium',
-                      status === 'in_progress' && 'text-blue-600 font-medium'
+                      status === 'completed' && 'text-success font-medium',
+                      status === 'in_progress' && 'text-info font-medium'
                     )}
                     style={{ width: `${weight}%` }}
                   >
@@ -1036,7 +1036,7 @@ export function ProductionStageTimeline({
             return (
               <div className="space-y-3 mb-6">
                 <div className="flex items-center gap-2 mb-1">
-                  <Badge variant="outline" className="text-xs border-blue-500/50 text-blue-600 bg-blue-50/50 dark:bg-blue-500/10">
+                  <Badge variant="outline" className="text-xs border-info/50 text-info bg-blue-50/50 dark:bg-info/10">
                     Customer Visible
                   </Badge>
                   <span className="text-xs text-muted-foreground">Visible to customers &amp; vendors</span>
@@ -1057,13 +1057,13 @@ export function ProductionStageTimeline({
             return (
               <div className="space-y-3">
                 <div className="flex items-center gap-2 mb-1">
-                  <Badge variant="outline" className="text-xs border-amber-500/50 text-amber-600 bg-amber-50/50 dark:bg-amber-500/10">
+                  <Badge variant="outline" className="text-xs border-warning/50 text-warning bg-amber-50/50 dark:bg-warning/10">
                     Internal Only
                   </Badge>
                   <span className="text-xs text-muted-foreground">Not visible to customers</span>
                 </div>
                 <div className="relative">
-                  <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-amber-300/40 dark:bg-amber-500/20" />
+                  <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-warning/40 dark:bg-warning/20" />
                   <div className="space-y-3">
                     {internalDefs.map((stageDef) => renderStageCard(stageDef))}
                   </div>

@@ -1041,14 +1041,14 @@ const Artwork = () => {
     switch (status) {
       case 'approved':
         return (
-          <Badge className="bg-green-600 text-white border-0">
+          <Badge className="bg-success text-white border-0">
             <CheckCircle className="h-3 w-3 mr-1" />
             Approved
           </Badge>
         );
       case 'pending':
         return (
-          <Badge variant="secondary" className="bg-yellow-500 text-white border-0">
+          <Badge variant="secondary" className="bg-warning text-white border-0">
             <Clock className="h-3 w-3 mr-1" />
             Proof Pending Approval
           </Badge>
@@ -1253,16 +1253,16 @@ const Artwork = () => {
                   
                   <div className="absolute top-2 left-2">
                     {file.is_approved ? (
-                      <Badge className="bg-green-600 text-white border-0">
+                      <Badge className="bg-success text-white border-0">
                         <CheckCircle className="h-3 w-3 mr-1" />
                         Approved
                       </Badge>
                     ) : file.artwork_type === 'customer' ? (
-                      <Badge variant="secondary" className="bg-blue-600/90 text-white border-0">
+                      <Badge variant="secondary" className="bg-info/90 text-white border-0">
                         Customer Art
                       </Badge>
                     ) : (
-                      <Badge variant="secondary" className="bg-yellow-500/90 text-white border-0">
+                      <Badge variant="secondary" className="bg-warning/90 text-white border-0">
                         <Clock className="h-3 w-3 mr-1" />
                         Pending
                       </Badge>
@@ -1280,8 +1280,8 @@ const Artwork = () => {
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span>{new Date(file.created_at).toLocaleDateString()}</span>
                     {file.is_approved && file.approved_at && (
-                      <span className="text-green-600">
-                        Ã¢Å“â€œ {new Date(file.approved_at).toLocaleDateString()}
+                      <span className="text-success">
+                        ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ {new Date(file.approved_at).toLocaleDateString()}
                       </span>
                     )}
                   </div>
@@ -1316,7 +1316,7 @@ const Artwork = () => {
                       <Button 
                         variant="outline" 
                         size="sm"
-                        className="flex-1 text-green-600 hover:text-green-700 hover:bg-green-50"
+                        className="flex-1 text-success hover:text-success hover:bg-green-50"
                         onClick={() => {
                           setSelectedFile(file);
                           setApprovalDialogOpen(true);
@@ -1328,7 +1328,7 @@ const Artwork = () => {
                       <Button 
                         variant="outline" 
                         size="sm"
-                        className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        className="flex-1 text-danger hover:text-danger hover:bg-red-50"
                         onClick={() => {
                           setSelectedFile(file);
                           setRejectDialogOpen(true);
@@ -1345,7 +1345,7 @@ const Artwork = () => {
                     <Button 
                       variant="outline" 
                       size="sm"
-                      className="w-full text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                      className="w-full text-warning hover:text-warning hover:bg-amber-50"
                       onClick={(e) => {
                         e.stopPropagation();
                         console.log('Archive button clicked, file:', file.id);
@@ -1405,7 +1405,7 @@ const Artwork = () => {
                       <div className="font-medium truncate" title={f.filename}>{f.filename}</div>
                       <div className="text-xs text-muted-foreground">
                         Rejected {new Date(f.rejected_at).toLocaleDateString()}
-                        {f.rejection_reason ? ` Ã¢â‚¬â€ ${f.rejection_reason}` : ''}
+                        {f.rejection_reason ? ` ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â ${f.rejection_reason}` : ''}
                       </div>
                     </div>
                     {f.artwork_url && (
@@ -1850,7 +1850,7 @@ const Artwork = () => {
             Customer Art
             {customerPendingCount > 0 && (
               <span
-                className="h-2 w-2 rounded-full bg-blue-600"
+                className="h-2 w-2 rounded-full bg-info"
                 title={`${customerPendingCount} customer file${customerPendingCount === 1 ? '' : 's'} awaiting proof`}
               />
             )}
@@ -2135,10 +2135,10 @@ const Artwork = () => {
         )}
         {isVibeAdmin && (
           <div
-            className="inline-flex items-center gap-2 bg-card border border-amber-500/30 rounded-lg px-4 py-2 hover:shadow-md transition-all cursor-pointer"
+            className="inline-flex items-center gap-2 bg-card border border-warning/30 rounded-lg px-4 py-2 hover:shadow-md transition-all cursor-pointer"
             onClick={() => navigate('/artwork/reconcile')}
           >
-            <AlertCircle className="h-4 w-4 text-amber-500" />
+            <AlertCircle className="h-4 w-4 text-warning" />
             <span className="text-sm font-medium">Reconcile Orphaned Artwork</span>
           </div>
         )}

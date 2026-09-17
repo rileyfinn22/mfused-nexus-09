@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -558,7 +558,7 @@ const EditProduct = () => {
                     <p className="text-sm font-medium truncate">{artwork.filename}</p>
                     <div className="flex items-center gap-2 mt-2">
                       {artwork.is_approved ? (
-                        <Badge variant="default" className="text-xs bg-green-600 hover:bg-green-700">
+                        <Badge variant="default" className="text-xs bg-success hover:bg-success">
                           <CheckCircle className="h-3 w-3 mr-1" />
                           Approved
                         </Badge>

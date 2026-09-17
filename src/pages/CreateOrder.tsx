@@ -617,7 +617,7 @@ const CreateOrder = () => {
     // Skip auto-save if editing an existing order (orderId is set from URL params)
     if (orderId) return;
 
-    // Buyers have no INSERT/UPDATE rights on orders — they submit through the
+    // Buyers have no INSERT/UPDATE rights on orders â€” they submit through the
     // submit_customer_order RPC instead. Auto-saving would just throw RLS errors
     // at them while they type.
     if (!isVibeAdmin) return;
@@ -1933,7 +1933,7 @@ const CreateOrder = () => {
       const subtotal = matchedSubtotal + unmatchedSubtotalSave;
       const total = subtotal;
 
-      // Buyers can't write orders directly — RLS gives them no INSERT on
+      // Buyers can't write orders directly â€” RLS gives them no INSERT on
       // orders/order_items. Everything goes through the RPC, which assigns the
       // order number, stamps company/creator, checks every product belongs to
       // them, and files it as pending for review.
@@ -1974,7 +1974,7 @@ const CreateOrder = () => {
 
         toast({
           title: "Order Submitted",
-          description: "It's pending review — VibePKG will confirm pricing and timing.",
+          description: "It's pending review â€” VibePKG will confirm pricing and timing.",
         });
         navigate(`/orders/${newOrderId}`);
         return;
@@ -2153,7 +2153,7 @@ const CreateOrder = () => {
         const itemsToDelete = Array.from(existingItemsMap.values());
         if (itemsToDelete.length > 0) {
           const deleteIds = itemsToDelete.map(i => i.id);
-          // Detach vendor PO lines first so they survive (defense in depth — FK is also SET NULL)
+          // Detach vendor PO lines first so they survive (defense in depth â€” FK is also SET NULL)
           await supabase
             .from('vendor_po_items')
             .update({ order_item_id: null })
@@ -2404,7 +2404,7 @@ const CreateOrder = () => {
           </div>
         )}
 
-        {/* AI Order Entry / Re-upload PO — staff only. It calls analyze-po, which
+        {/* AI Order Entry / Re-upload PO â€” staff only. It calls analyze-po, which
             creates orders with service-role rights and matches against vendor
             preferences, so it stays off the buyer's screen. */}
         {isVibeAdmin && (
@@ -2575,7 +2575,7 @@ const CreateOrder = () => {
                   <div className="flex flex-wrap gap-2">
                     {uploadedPOs.map((po, idx) => (
                       <Badge key={idx} variant="outline" className="flex items-center gap-1">
-                        <Check className="h-3 w-3 text-green-500" />
+                        <Check className="h-3 w-3 text-success" />
                         {po.poNumber || po.filename}
                       </Badge>
                     ))}
@@ -2932,8 +2932,8 @@ const CreateOrder = () => {
               <h2 className="text-lg font-semibold">Items from PO (Need Matching)</h2>
               <span className="text-sm text-muted-foreground">{unmatchedPoItems.length} items extracted</span>
             </div>
-            <div className="border border-amber-200 bg-amber-50 dark:bg-amber-950/20 rounded-lg p-4 space-y-3">
-              <p className="text-sm text-amber-800 dark:text-amber-200">
+            <div className="border border-warning bg-amber-50 dark:bg-warning/20 rounded-lg p-4 space-y-3">
+              <p className="text-sm text-warning dark:text-warning">
                 These items were extracted from the purchase order but don't match any products in your catalog. 
                 Add products from your catalog below to fulfill this order.
               </p>
@@ -3395,7 +3395,7 @@ const CreateOrder = () => {
               {poDocumentTotal !== null && (
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">PO Document Total:</span>
-                  <span className={`font-medium ${Math.abs(poDocumentTotal - total) > 0.01 ? 'text-amber-500' : 'text-emerald-500'}`}>
+                  <span className={`font-medium ${Math.abs(poDocumentTotal - total) > 0.01 ? 'text-warning' : 'text-success'}`}>
                     ${poDocumentTotal.toFixed(2)}
                   </span>
                 </div>
@@ -3405,8 +3405,8 @@ const CreateOrder = () => {
                 <span className="font-bold text-xl">${total.toFixed(2)}</span>
               </div>
               {poDocumentTotal !== null && Math.abs(poDocumentTotal - total) > 0.01 && (
-                <p className="text-xs text-amber-500">
-                  Difference: ${Math.abs(poDocumentTotal - total).toFixed(2)} — verify line item prices match the PO
+                <p className="text-xs text-warning">
+                  Difference: ${Math.abs(poDocumentTotal - total).toFixed(2)} â€” verify line item prices match the PO
                 </p>
               )}
             </div>

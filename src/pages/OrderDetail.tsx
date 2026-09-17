@@ -212,7 +212,7 @@ const OrderDetail = () => {
       .single();
     if (!error && data) {
       setOrder(data);
-      // Never clobber the user's in-progress edits with a background refetch —
+      // Never clobber the user's in-progress edits with a background refetch â€”
       // that used to silently drop added lines (and make them look "deleted" on save).
       if (!isEditModeRef.current) {
         setEditedOrder(data);
@@ -1049,7 +1049,7 @@ const OrderDetail = () => {
 
     if (!error) {
       // Check if a blanket invoice already exists.
-      // Use limit(1) + array — .maybeSingle() ERRORS when >1 rows exist and
+      // Use limit(1) + array â€” .maybeSingle() ERRORS when >1 rows exist and
       // returns data=null, which the old code treated as "no invoice" and
       // then inserted another duplicate blanket. That bug created repeat
       // invoice numbers on this order.
@@ -1196,7 +1196,7 @@ const OrderDetail = () => {
               .select('id');
             if (error) throw new Error(`Could not add line items: ${error.message}`);
             if ((data?.length || 0) !== itemsToInsert.length) {
-              throw new Error('Some line items were not saved — nothing was added. Please retry.');
+              throw new Error('Some line items were not saved â€” nothing was added. Please retry.');
             }
           })()
         );
@@ -1774,19 +1774,19 @@ const OrderDetail = () => {
   return <div className="max-w-7xl mx-auto">
       {/* Process Order Banner for Draft/Pending Orders */}
       {isVibeAdmin && (order.status === 'draft' || order.status === 'pending' || order.status === 'pending_pull') && (
-        <div className="mb-6 p-4 bg-blue-500/10 border-2 border-blue-500 rounded-lg">
+        <div className="mb-6 p-4 bg-info/10 border-2 border-info rounded-lg">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-blue-600">Order Ready to Process</h3>
+              <h3 className="text-lg font-semibold text-info">Order Ready to Process</h3>
               <p className="text-sm text-muted-foreground">This order is pending and ready to be moved to production</p>
             </div>
             <Button 
               size="lg"
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              className="bg-info hover:bg-info text-white"
               onClick={() => handleStatusChange('in production')}
             >
               <CheckCircle2 className="h-5 w-5 mr-2" />
-              Process Order → Production
+              Process Order â†’ Production
             </Button>
           </div>
         </div>
@@ -2035,11 +2035,11 @@ const OrderDetail = () => {
 
       {/* Unmatched PO Items Section */}
       {unmatchedPoItems.length > 0 && (
-        <Card className="mb-6 border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/20">
+        <Card className="mb-6 border-warning/50 bg-amber-50/50 dark:bg-warning/20">
           <CardContent className="p-6">
             <div className="flex items-center gap-2 mb-4">
-              <AlertCircle className="h-5 w-5 text-amber-600" />
-              <h3 className="font-semibold text-amber-800 dark:text-amber-200">
+              <AlertCircle className="h-5 w-5 text-warning" />
+              <h3 className="font-semibold text-warning dark:text-warning">
                 Unmatched PO Items ({unmatchedPoItems.length})
               </h3>
             </div>
@@ -2052,7 +2052,7 @@ const OrderDetail = () => {
                   <div className="flex-1">
                     <p className="font-medium">{item.name || item.raw_name || 'Unknown Item'}</p>
                     <p className="text-sm text-muted-foreground">
-                      Qty: {item.quantity || 1} {item.unit_price ? `• $${item.unit_price.toFixed(2)}` : ''}
+                      Qty: {item.quantity || 1} {item.unit_price ? `â€¢ $${item.unit_price.toFixed(2)}` : ''}
                     </p>
                   </div>
                   <Popover open={openCombobox[`unmatched-${index}`]} onOpenChange={(open) => setOpenCombobox(prev => ({ ...prev, [`unmatched-${index}`]: open }))}>
@@ -2126,7 +2126,7 @@ const OrderDetail = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="flex items-center gap-3">
               {artApproved ? (
-                <CheckCircle2 className="h-6 w-6 text-green-600" />
+                <CheckCircle2 className="h-6 w-6 text-success" />
               ) : (
                 <Circle className="h-6 w-6 text-muted-foreground" />
               )}
@@ -2152,7 +2152,7 @@ const OrderDetail = () => {
             
             <div className="flex items-center gap-3">
               {orderFinalized ? (
-                <CheckCircle2 className="h-6 w-6 text-green-600" />
+                <CheckCircle2 className="h-6 w-6 text-success" />
               ) : (
                 <Circle className="h-6 w-6 text-muted-foreground" />
               )}
@@ -2171,7 +2171,7 @@ const OrderDetail = () => {
             
             <div className="flex items-center gap-3">
               {vibeProcessed ? (
-                <CheckCircle2 className="h-6 w-6 text-green-600" />
+                <CheckCircle2 className="h-6 w-6 text-success" />
               ) : (
                 <Circle className="h-6 w-6 text-muted-foreground" />
               )}
@@ -2222,7 +2222,7 @@ const OrderDetail = () => {
                   ) : (
                     <span>Order Date: {formatDocDate(order.order_date || order.created_at, "numeric")}</span>
                   )}
-                  <span>•</span>
+                  <span>â€¢</span>
                   {(isVibeAdmin || isFinance) ? (
                     <div className="flex items-center gap-2">
                       <span>Est. Delivery:</span>
@@ -2244,9 +2244,9 @@ const OrderDetail = () => {
                   ) : (
                     <span className={`${
                       order.estimated_delivery_date && new Date(order.estimated_delivery_date) < new Date() 
-                        ? 'text-red-600 font-medium' 
+                        ? 'text-danger font-medium' 
                         : order.estimated_delivery_date && (new Date(order.estimated_delivery_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24) <= 7
-                          ? 'text-amber-600 font-medium'
+                          ? 'text-warning font-medium'
                           : ''
                     }`}>
                       Est. Delivery: {order.estimated_delivery_date ? new Date(order.estimated_delivery_date).toLocaleDateString() : 'Not set'}
@@ -2254,7 +2254,7 @@ const OrderDetail = () => {
                   )}
                   {order.quote_id && (
                     <>
-                      <span>•</span>
+                      <span>â€¢</span>
                       <Button 
                         variant="link" 
                         className="h-auto p-0 text-sm text-primary"
@@ -2313,7 +2313,7 @@ const OrderDetail = () => {
                 )}
                 {!(isVibeAdmin || isFinance) && (order.shipping_method || order.tracking_number) && (
                   <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
-                    {order.shipping_method && <span>📦 {order.shipping_method}</span>}
+                    {order.shipping_method && <span>ðŸ“¦ {order.shipping_method}</span>}
                     {order.tracking_number && (
                       order.tracking_url ? (
                         <a href={order.tracking_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">
@@ -2384,10 +2384,10 @@ const OrderDetail = () => {
                           shipping_city: a.city, shipping_state: a.state, shipping_zip: a.zip,
                         });
                       }}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Load saved address…" /></SelectTrigger>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Load saved addressâ€¦" /></SelectTrigger>
                         <SelectContent>
                           {savedAddresses.filter(a => a.address_type === 'shipping').map(a => (
-                            <SelectItem key={a.id} value={a.id}>{a.name} — {a.city}, {a.state}</SelectItem>
+                            <SelectItem key={a.id} value={a.id}>{a.name} â€” {a.city}, {a.state}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -2446,10 +2446,10 @@ const OrderDetail = () => {
                           billing_city: a.city, billing_state: a.state, billing_zip: a.zip,
                         });
                       }}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Load saved address…" /></SelectTrigger>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Load saved addressâ€¦" /></SelectTrigger>
                         <SelectContent>
                           {savedAddresses.filter(a => a.address_type === 'billing').map(a => (
-                            <SelectItem key={a.id} value={a.id}>{a.name} — {a.city}, {a.state}</SelectItem>
+                            <SelectItem key={a.id} value={a.id}>{a.name} â€” {a.city}, {a.state}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -2801,7 +2801,7 @@ const OrderDetail = () => {
                       const billingProgress = (totalBilled / order.total) * 100;
                       return (
                         <p className="text-sm text-muted-foreground mt-1">
-                          {invoices.length} shipment(s) • ${totalBilled.toFixed(2)} billed ({billingProgress.toFixed(1)}% of order total)
+                          {invoices.length} shipment(s) â€¢ ${totalBilled.toFixed(2)} billed ({billingProgress.toFixed(1)}% of order total)
                         </p>
                       );
                     })()}
@@ -2836,8 +2836,8 @@ const OrderDetail = () => {
                               <div className="flex items-center gap-2">
                                 <span className="font-mono text-sm font-medium">{invoice.invoice_number}</span>
                                 <Badge className={
-                                  invoice.invoice_type === 'partial' ? 'bg-blue-500 text-white' :
-                                  'bg-purple-500 text-white'
+                                  invoice.invoice_type === 'partial' ? 'bg-info text-white' :
+                                  'bg-info text-white'
                                 }>
                                   {invoice.invoice_type?.toUpperCase() || 'FULL'}
                                 </Badge>
@@ -2848,7 +2848,7 @@ const OrderDetail = () => {
                               <div className="flex items-center gap-4 text-xs text-muted-foreground">
                                 <span>Created: {new Date(invoice.created_at).toLocaleDateString()}</span>
                                 {invoice.shipping_cost > 0 && (
-                                  <span>• Shipping: ${Number(invoice.shipping_cost).toFixed(2)}</span>
+                                  <span>â€¢ Shipping: ${Number(invoice.shipping_cost).toFixed(2)}</span>
                                 )}
                               </div>
                             </div>
@@ -2895,9 +2895,9 @@ const OrderDetail = () => {
               <div className="space-y-2 text-sm text-muted-foreground">
                 <p><strong>Payment Terms:</strong> {order.terms}</p>
                 <div className="space-y-1 pl-4">
-                  <p>• Payment is due according to the terms specified above</p>
-                  <p>• Late payments may incur additional fees</p>
-                  <p>• All prices are in USD unless otherwise specified</p>
+                  <p>â€¢ Payment is due according to the terms specified above</p>
+                  <p>â€¢ Late payments may incur additional fees</p>
+                  <p>â€¢ All prices are in USD unless otherwise specified</p>
                 </div>
                 <p className="pt-2"><strong>Order Acceptance:</strong> All orders are subject to acceptance and availability</p>
                 <p><strong>Shipping & Delivery:</strong> Delivery dates are estimates only. Risk of loss passes to buyer upon delivery to carrier</p>
@@ -3155,7 +3155,7 @@ const OrderDetail = () => {
                       className={cn(
                         "p-4 rounded-lg border flex items-start gap-4",
                         artwork.is_approved 
-                          ? "bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-800" 
+                          ? "bg-green-50/50 dark:bg-success/20 border-success dark:border-success" 
                           : "bg-background border-border"
                       )}
                     >
@@ -3184,7 +3184,7 @@ const OrderDetail = () => {
                             {artwork.filename}
                           </p>
                           {artwork.is_approved && (
-                            <Badge variant="default" className="text-[10px] px-1.5 py-0 bg-green-600">
+                            <Badge variant="default" className="text-[10px] px-1.5 py-0 bg-success">
                               Approved
                             </Badge>
                           )}
@@ -3195,7 +3195,7 @@ const OrderDetail = () => {
                         
                         <p className="text-xs text-muted-foreground mt-0.5">
                           SKU: {artwork.sku}
-                          {matchingItem && ` • ${matchingItem.name}`}
+                          {matchingItem && ` â€¢ ${matchingItem.name}`}
                         </p>
                         
                         {artwork.notes && (
@@ -3251,18 +3251,18 @@ const OrderDetail = () => {
 
           {/* Internal Vibe Notes with Attachments - Only for Vibe Admins when in production */}
           {isVibeAdmin && order.status === 'in production' && (
-            <div className="border-t border-table-border bg-amber-50/50 dark:bg-amber-950/20 p-8">
+            <div className="border-t border-table-border bg-amber-50/50 dark:bg-warning/20 p-8">
               <div className="flex items-center gap-2 mb-4">
-                <Lock className="h-5 w-5 text-amber-600" />
-                <h2 className="text-lg font-semibold text-amber-800 dark:text-amber-400">Internal Vibe Notes</h2>
-                <Badge variant="outline" className="text-xs border-amber-500 text-amber-700">Admin Only</Badge>
+                <Lock className="h-5 w-5 text-warning" />
+                <h2 className="text-lg font-semibold text-warning dark:text-warning">Internal Vibe Notes</h2>
+                <Badge variant="outline" className="text-xs border-warning text-warning">Admin Only</Badge>
               </div>
               <p className="text-sm text-muted-foreground mb-4">
                 These notes and attachments are only visible to Vibe Admins.
               </p>
 
               {/* Upload Section */}
-              <div className="p-4 bg-background rounded-lg border border-amber-200 dark:border-amber-800 mb-4">
+              <div className="p-4 bg-background rounded-lg border border-warning dark:border-warning mb-4">
                 <h3 className="font-medium text-sm mb-3">Add Attachment</h3>
                 <div className="space-y-3">
                   <div>
@@ -3308,7 +3308,7 @@ const OrderDetail = () => {
               <div className="space-y-2">
                 <h3 className="font-medium text-sm">Attachments ({vibeAttachments.length})</h3>
                 {vibeAttachments.length === 0 ? (
-                  <p className="text-sm text-muted-foreground p-4 bg-background rounded border border-amber-200 dark:border-amber-800">
+                  <p className="text-sm text-muted-foreground p-4 bg-background rounded border border-warning dark:border-warning">
                     No internal attachments yet
                   </p>
                 ) : (
@@ -3316,10 +3316,10 @@ const OrderDetail = () => {
                     {vibeAttachments.map((attachment) => (
                       <div
                         key={attachment.id}
-                        className="flex items-center justify-between p-3 bg-background rounded-lg border border-amber-200 dark:border-amber-800"
+                        className="flex items-center justify-between p-3 bg-background rounded-lg border border-warning dark:border-warning"
                       >
                         <div className="flex items-center gap-3">
-                          <FileText className="h-5 w-5 text-amber-600" />
+                          <FileText className="h-5 w-5 text-warning" />
                           <div>
                             <p className="text-sm font-medium">{attachment.file_name}</p>
                             {attachment.note && (

@@ -23,9 +23,9 @@ export function ProductionProgressBar({
   };
 
   const getProgressColor = (progress: number) => {
-    if (progress >= 100) return 'bg-green-500';
-    if (progress >= 60) return 'bg-blue-500';
-    if (progress >= 30) return 'bg-amber-500';
+    if (progress >= 100) return 'bg-success';
+    if (progress >= 60) return 'bg-info';
+    if (progress >= 30) return 'bg-warning';
     return 'bg-muted-foreground/50';
   };
 
@@ -48,8 +48,8 @@ export function ProductionProgressBar({
               key={index}
               className={cn(
                 "flex-1 transition-colors",
-                stage.status === 'completed' ? 'bg-green-500' :
-                stage.status === 'in_progress' ? 'bg-blue-500' :
+                stage.status === 'completed' ? 'bg-success' :
+                stage.status === 'in_progress' ? 'bg-info' :
                 'bg-muted'
               )}
             />
@@ -110,10 +110,10 @@ export function ProductionStatusIndicator({
 
   const getStatusConfig = (progress: number) => {
     if (progress >= 100) {
-      return { icon: CheckCircle2, color: 'text-green-500', ring: 'ring-green-500', bg: 'bg-green-500/10' };
+      return { icon: CheckCircle2, color: 'text-success', ring: 'ring-green-500', bg: 'bg-success/10' };
     }
     if (progress > 0) {
-      return { icon: Clock, color: 'text-blue-500', ring: 'ring-blue-500', bg: 'bg-blue-500/10' };
+      return { icon: Clock, color: 'text-info', ring: 'ring-blue-500', bg: 'bg-info/10' };
     }
     return { icon: Circle, color: 'text-muted-foreground', ring: 'ring-muted-foreground/30', bg: 'bg-muted' };
   };

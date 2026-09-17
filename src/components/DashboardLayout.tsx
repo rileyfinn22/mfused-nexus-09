@@ -140,10 +140,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           </header>
           
           {/* Main content with proper padding */}
+          {/* No fade-in on every navigation: content should just be there. */}
           <main className="flex-1 p-6 overflow-auto">
-            <div className="animate-fade-in">
-              {children}
-            </div>
+            {children}
           </main>
         </div>
       </div>
