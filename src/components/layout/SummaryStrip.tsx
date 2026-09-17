@@ -17,22 +17,27 @@ const TONE: Record<NonNullable<SummaryItem["tone"]>, string> = {
   success: "text-success",
   warning: "text-warning",
   danger: "text-danger",
-  muted: "text-muted-foreground",
+  muted: "text-foreground",
 };
 
 /**
- * Replaces the row of four stat cards. A single quiet line of label / value pairs with
- * hairline dividers: the numbers are still there, they just stop shouting.
+ * Quiet stat tiles: a row of small bordered boxes, label above, number below. No shadow,
+ * no uppercase tracking, numbers at 18px rather than 30px. Colour only on values that
+ * need attention.
  */
 export function SummaryStrip({ items, className }: SummaryStripProps) {
   if (items.length === 0) return null;
   return (
-    <div className={cn("flex flex-wrap items-baseline gap-x-6 gap-y-2 text-sm", className)}>
-      {items.map((item, i) => (
-        <div key={item.label} className="flex items-baseline gap-2">
-          {i > 0 && <span className="hidden sm:inline-block h-3 w-px bg-border self-center -ml-3" aria-hidden />}
-          <span className="text-muted-foreground">{item.label}</span>
-          <span className={cn("font-medium tabular-nums", TONE[item.tone ?? "default"])}>{item.value}</span>
+    <div className={cn("flex flex-wrap gap-3", className)}>
+      {items.map((item) => (
+        <div
+          key={item.label}
+          className="min-w-[8.5rem] flex-1 sm:flex-none rounded-lg border border-border bg-card px-4 py-3"
+        >
+          <p className="text-xs text-muted-foreground">{item.label}</p>
+          <p className={cn("mt-0.5 text-lg font-semibold leading-6 tabular-nums", TONE[item.tone ?? "default"])}>
+            {item.value}
+          </p>
         </div>
       ))}
     </div>
