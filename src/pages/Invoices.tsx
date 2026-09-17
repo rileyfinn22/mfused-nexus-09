@@ -30,12 +30,13 @@ import { fetchChildPdfInputs } from "@/lib/invoiceBalance";
 import { EditableDescription } from "@/components/EditableDescription";
 import { CustomerStatementTab } from "@/components/CustomerStatementTab";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
+import { StatusDot, type StatusTone } from "@/components/StatusDot";
 import { brandsForItems, fetchBrandsByProductId, recordMatchesBrandFilter } from "@/lib/productBrands";
 import { useBrandFilter } from "@/hooks/useBrandFilter";
 import { BrandSelect } from "@/components/BrandSelect";
 import { ExpandToggleButton, ExpandDetailsPanel, useInvoiceItems, useInvoicePayments } from "@/components/RowExpandPanel";
 import InvoiceReconciliationBanner from "@/components/InvoiceReconciliationBanner";
-import { formatDocDate } from "@/lib/utils";
+import { cn, formatDocDate } from "@/lib/utils";
 
 const Invoices = () => {
   const navigate = useNavigate();
@@ -167,11 +168,19 @@ const Invoices = () => {
   };
 
   const getStatusColor = (status: string) => {
-    if (status === 'PAID') return 'text-green-600 dark:text-green-400';
-    if (status === 'DUE') return 'text-red-600 dark:text-red-400';
-    if (status === 'BILLED') return 'text-blue-600 dark:text-blue-400';
-    if (status === 'OPEN') return 'text-yellow-600 dark:text-yellow-400';
+    if (status === 'PAID') return 'text-success';
+    if (status === 'DUE') return 'text-danger';
+    if (status === 'BILLED') return 'text-info';
+    if (status === 'OPEN') return 'text-warning';
     return 'text-muted-foreground';
+  };
+
+  const getStatusTone = (status: string): StatusTone => {
+    if (status === 'PAID') return 'success';
+    if (status === 'DUE') return 'danger';
+    if (status === 'BILLED') return 'info';
+    if (status === 'OPEN') return 'warning';
+    return 'neutral';
   };
 
   const getStatusIcon = (invoice: any) => {
@@ -847,16 +856,13 @@ const Invoices = () => {
                     )}
                   </div>
                   <div className="col-span-1 font-semibold text-sm">{formatCurrency(Number(invoice.total))}</div>
-                  <div className="col-span-1 text-sm font-medium">
-                    <div className="flex items-center gap-1">
-                      <StatusIcon className={`h-3 w-3 ${getStatusColor(displayStatus)}`} />
-                      <span className={getStatusColor(displayStatus)}>{displayStatus}</span>
-                    </div>
+                  <div className="col-span-1 text-sm">
+                    <StatusDot tone={getStatusTone(displayStatus)}>
+                      {displayStatus.charAt(0) + displayStatus.slice(1).toLowerCase()}
+                    </StatusDot>
                   </div>
-                  <div className={isVibeAdmin ? 'col-span-1' : 'col-span-2'}>
-                    <Badge className={getInvoiceTypeColor(invoice.invoice_type || 'full')}>
-                      {invoice.invoice_type === 'full' || !invoice.invoice_type ? 'Blanket' : invoice.invoice_type === 'partial' ? 'Shipped' : (invoice.invoice_type.charAt(0).toUpperCase() + invoice.invoice_type.slice(1))}
-                    </Badge>
+                  <div className={cn("text-sm text-muted-foreground", isVibeAdmin ? 'col-span-1' : 'col-span-2')}>
+                    {invoice.invoice_type === 'full' || !invoice.invoice_type ? 'Blanket' : invoice.invoice_type === 'partial' ? 'Shipped' : (invoice.invoice_type.charAt(0).toUpperCase() + invoice.invoice_type.slice(1))}
                   </div>
                   {isVibeAdmin && (
                     <div className="col-span-2 flex min-w-0 flex-col justify-center gap-2 overflow-hidden">

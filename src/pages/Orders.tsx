@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot, type StatusTone } from "@/components/StatusDot";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -44,7 +45,7 @@ import { exportToCSV } from "@/lib/exportUtils";
 import { EditableDescription } from "@/components/EditableDescription";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { ExpandToggleButton, ExpandDetailsPanel } from "@/components/RowExpandPanel";
-import { formatDocDate } from "@/lib/utils";
+import { cn, formatDocDate } from "@/lib/utils";
 
 const Orders = () => {
   const navigate = useNavigate();
@@ -259,39 +260,34 @@ const Orders = () => {
     }
   };
 
-  const getStatusColor = (status: string) => {
+  // Status as a dot tone: grey = not started, blue = moving, amber = needs a look, green = done.
+  const getStatusTone = (status: string): StatusTone => {
     switch (status.toLowerCase()) {
-      case 'draft': return 'text-muted-foreground';
-      case 'pending': return 'text-blue-500';
-      case 'pending_pull': return 'text-blue-500';
-      case 'picked': return 'text-blue-600';
-      case 'order placed': return 'text-muted-foreground';
-      case 'in production': return 'text-primary';
-      case 'qc review': return 'text-warning';
-      case 'ready to ship': return 'text-success';
-      default: return 'text-muted-foreground';
+      case 'draft': return 'neutral';
+      case 'order placed': return 'neutral';
+      case 'pending':
+      case 'pending_pull':
+      case 'picked':
+      case 'in production': return 'info';
+      case 'qc review': return 'warning';
+      case 'ready to ship':
+      case 'shipped':
+      case 'delivered':
+      case 'completed': return 'success';
+      default: return 'neutral';
     }
   };
+  const statusLabel = (status: string) => {
+    const s = status.replace(/_/g, ' ');
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  };
 
-  const getOrderTypeDisplay = (orderType: string, status?: string) => {
+  // Only pull & ship gets a type note; "production" is what the status column already says.
+  const getOrderTypeDisplay = (orderType: string) => {
     if (orderType === 'pull_ship') {
-      return {
-        label: 'Pull & Ship',
-        icon: Truck,
-        badgeColor: 'bg-blue-600 text-white text-[10px] px-1.5 py-0.5',
-        textColor: 'text-blue-600',
-        show: true
-      };
+      return { label: 'Pull & ship', icon: Truck, show: true };
     }
-    // Only show badge when status is actually 'in production'
-    const isInProduction = status?.toLowerCase() === 'in production';
-    return {
-      label: 'Production',
-      icon: Factory,
-      badgeColor: 'bg-purple-600 text-white text-[10px] px-1.5 py-0.5',
-      textColor: 'text-purple-600',
-      show: isInProduction
-    };
+    return { label: 'Production', icon: Factory, show: false };
   };
 
   // Brand filter (persisted per company, shared with Products / Artwork / ordering).
@@ -439,7 +435,7 @@ const Orders = () => {
               <div className="divide-y divide-border">
                 {draftOrders.map((order) => {
 const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estimated_delivery_date)?.toLocaleDateString() ?? 'Not set' : 'Not set';
-                  const orderTypeInfo = getOrderTypeDisplay(order.order_type, order.status);
+                  const orderTypeInfo = getOrderTypeDisplay(order.order_type);
                   const OrderIcon = orderTypeInfo.icon;
                   
                   return (
@@ -450,10 +446,7 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
                       <div className="col-span-2 space-y-1">
                         <div className="font-medium font-mono text-sm">{order.order_number}</div>
                         {orderTypeInfo.show && (
-                          <Badge variant="secondary" className={`${orderTypeInfo.badgeColor} flex items-center gap-0.5 w-fit font-normal`}>
-                            <OrderIcon className="h-2.5 w-2.5" />
-                            {orderTypeInfo.label}
-                          </Badge>
+                          <div className="text-xs text-muted-foreground">{orderTypeInfo.label}</div>
                         )}
                       </div>
                       <div className="col-span-1 text-sm text-muted-foreground">
@@ -561,13 +554,7 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
                   >
                     <div className="col-span-2 space-y-1">
                       <div className="font-medium font-mono text-sm">{order.order_number}</div>
-                      <Badge
-                        variant="secondary"
-                        className="bg-amber-500/15 text-amber-700 dark:text-amber-400 flex items-center gap-1 w-fit font-normal"
-                      >
-                        <UserCircle className="h-2.5 w-2.5" />
-                        Customer order
-                      </Badge>
+                      <div className="text-xs text-muted-foreground">Submitted by customer</div>
                     </div>
                     <div className="col-span-1 text-sm text-muted-foreground">
                       {order.order_date ? formatDocDate(order.order_date, 'numeric') : '-'}
@@ -668,7 +655,7 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
                 const deliveryStatus = diffDays !== null 
                   ? diffDays < 0 ? 'overdue' : diffDays <= 7 ? 'soon' : 'normal'
                   : null;
-                const orderTypeInfo = getOrderTypeDisplay(order.order_type, order.status);
+                const orderTypeInfo = getOrderTypeDisplay(order.order_type);
                 const OrderIcon = orderTypeInfo.icon;
                 const completedStatuses = ['shipped', 'delivered', 'completed'];
                 const isCompleted = completedStatuses.includes(order.status.toLowerCase());
@@ -682,20 +669,11 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
                     <div className="col-span-2 space-y-1">
                       <div className="font-medium font-mono text-base">{order.order_number}</div>
                       {orderTypeInfo.show && (
-                        <Badge variant="secondary" className={`${orderTypeInfo.badgeColor} flex items-center gap-0.5 w-fit font-normal`}>
-                          <OrderIcon className="h-2.5 w-2.5" />
-                          {orderTypeInfo.label}
-                        </Badge>
+                        <div className="text-xs text-muted-foreground">{orderTypeInfo.label}</div>
                       )}
                       {/* "Customer order" only matters until VibePKG has approved it. */}
                       {order.submitted_by_customer && !order.vibe_approved && (
-                        <Badge
-                          variant="secondary"
-                          className="bg-amber-500/15 text-amber-700 dark:text-amber-400 flex items-center gap-0.5 w-fit font-normal"
-                        >
-                          <UserCircle className="h-2.5 w-2.5" />
-                          Customer order
-                        </Badge>
+                        <div className="text-xs text-muted-foreground">Submitted by customer</div>
                       )}
                     </div>
                     <div className="col-span-1 text-sm text-muted-foreground">
@@ -725,17 +703,14 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
                     <div className="col-span-1 text-sm">${order.total?.toFixed(2)}</div>
                     <div className="col-span-2 space-y-1">
                       {isCompleted ? (
-                        <Badge variant="success" className="flex items-center gap-1 w-fit">
-                          <CheckCircle className="h-3 w-3" />
-                          {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                        </Badge>
+                        <StatusDot tone="success">{statusLabel(order.status)}</StatusDot>
                       ) : (
                         <>
-                          <div className="flex justify-between text-xs">
-                            <span className={`capitalize ${getStatusColor(order.status)}`}>{order.status.replace('_', ' ')}</span>
-                            {progress > 0 && <span className="text-muted-foreground">{progress}%</span>}
+                          <div className="flex justify-between items-center gap-2">
+                            <StatusDot tone={getStatusTone(order.status)}>{statusLabel(order.status)}</StatusDot>
+                            {progress > 0 && <span className="text-xs text-muted-foreground tabular-nums">{progress}%</span>}
                           </div>
-                          {progress > 0 && <Progress value={progress} className="h-1" />}
+                          {progress > 0 && <Progress value={progress} className="h-1 bg-muted [&>div]:bg-foreground/60" />}
                           {!isCompleted && ['pending', 'pending_pull'].includes(order.status.toLowerCase()) && (
                             <div className="flex gap-1 items-center mt-0.5">
                               <div className="flex items-center" title="Art Approved">
@@ -766,12 +741,15 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
                     </div>
                     <div className="col-span-1">
                       {estDelivery ? (
-                        <Badge 
-                          variant={deliveryStatus === 'overdue' ? 'danger' : deliveryStatus === 'soon' ? 'warning' : 'info'}
-                          className="text-xs"
+                        <span
+                          className={cn(
+                            "text-sm tabular-nums",
+                            deliveryStatus === 'overdue' ? "text-danger font-medium" : deliveryStatus === 'soon' ? "text-warning font-medium" : "text-foreground"
+                          )}
+                          title={deliveryStatus === 'overdue' ? 'Past the estimated delivery date' : deliveryStatus === 'soon' ? 'Due within a week' : undefined}
                         >
                           {estDelivery.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                        </Badge>
+                        </span>
                       ) : (
                         <span className="text-xs text-muted-foreground">Not set</span>
                       )}

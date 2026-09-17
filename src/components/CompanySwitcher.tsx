@@ -25,8 +25,8 @@ export function CompanySwitcher({ collapsed = false }: CompanySwitcherProps) {
         "flex items-center gap-3",
         collapsed && "justify-center"
       )}>
-        <div className="w-9 h-9 bg-gradient-primary rounded-lg flex items-center justify-center shadow-glow shrink-0">
-          <span className="text-primary-foreground font-bold text-sm">
+        <div className="w-9 h-9 bg-primary text-primary-foreground rounded-md flex items-center justify-center shrink-0">
+          <span className="font-semibold text-xs tracking-wide">
             {activeCompany.name.charAt(0).toUpperCase()}
           </span>
         </div>
@@ -35,7 +35,7 @@ export function CompanySwitcher({ collapsed = false }: CompanySwitcherProps) {
             <h2 className="font-semibold text-sidebar-foreground text-sm truncate">
               {activeCompany.name}
             </h2>
-            <p className="text-[10px] text-muted-foreground">Invoice Portal</p>
+            <p className="text-[11px] text-muted-foreground">VibePKG portal</p>
           </div>
         )}
       </div>
@@ -53,8 +53,8 @@ export function CompanySwitcher({ collapsed = false }: CompanySwitcherProps) {
             collapsed && "justify-center px-2"
           )}
         >
-          <div className="w-9 h-9 bg-gradient-primary rounded-lg flex items-center justify-center shadow-glow shrink-0">
-            <span className="text-primary-foreground font-bold text-sm">
+          <div className="w-9 h-9 bg-primary text-primary-foreground rounded-md flex items-center justify-center shrink-0">
+            <span className="font-semibold text-xs tracking-wide">
               {activeCompany.name.charAt(0).toUpperCase()}
             </span>
           </div>

@@ -13,72 +13,73 @@
 
 @layer base {
   :root {
-    /* Ground and ink */
-    --background: 210 20% 98%;          /* paper */
-    --foreground: 213 17% 16%;          /* ink #232931 */
+    /* Ground and ink. Neutrals lean warm, like paper stock, not screen grey. */
+    --background: 40 20% 98%;           /* paper */
+    --foreground: 30 8% 13%;            /* ink */
 
     --card: 0 0% 100%;
-    --card-foreground: 213 17% 16%;
+    --card-foreground: 30 8% 13%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 213 17% 16%;
+    --popover-foreground: 30 8% 13%;
 
     /* Primary action is ink on paper, not a colour */
-    --primary: 213 17% 16%;
+    --primary: 30 8% 13%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 20% 95%;
-    --secondary-foreground: 213 17% 16%;
+    --secondary: 40 15% 95%;
+    --secondary-foreground: 30 8% 13%;
 
-    --muted: 210 20% 95%;
-    --muted-foreground: 211 8% 49%;     /* #78808A */
+    --muted: 40 15% 95%;
+    --muted-foreground: 30 5% 45%;
 
-    --accent: 210 20% 93%;
-    --accent-foreground: 213 17% 16%;
+    --accent: 40 12% 92%;
+    --accent-foreground: 30 8% 13%;
 
-    --destructive: 0 65% 48%;
+    --destructive: 4 60% 45%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 216 17% 88%;              /* rule #DCE0E6 */
-    --input: 216 17% 84%;
-    --ring: 213 17% 16%;
+    --border: 40 10% 87%;               /* rule */
+    --input: 40 10% 82%;
+    --ring: 30 8% 13%;
 
     --radius: 0.375rem;
 
-    /* Brand accent: the logo green, kept for meaning (active, success), never decoration */
+    /* Brand accent: the logo green, kept for meaning (active nav), never decoration */
     --brand: 88 52% 42%;
     --brand-foreground: 0 0% 100%;
 
-    --success: 88 52% 36%;
+    /* Status colours: deep, print-like, readable as text on white */
+    --success: 152 45% 30%;
     --success-foreground: 0 0% 100%;
-    --warning: 34 90% 42%;
+    --warning: 30 80% 38%;
     --warning-foreground: 0 0% 100%;
-    --danger: 0 65% 48%;
+    --danger: 4 60% 45%;
     --danger-foreground: 0 0% 100%;
-    --info: 213 40% 42%;
+    --info: 215 40% 42%;
     --info-foreground: 0 0% 100%;
 
     /* Tables: quiet header band, hairline rules, no zebra shouting */
-    --table-header: 210 20% 97%;
+    --table-header: 40 15% 97%;
     --table-row: 0 0% 100%;
-    --table-row-alt: 210 20% 99%;
-    --table-row-hover: 210 20% 96%;
-    --table-border: 216 17% 90%;
+    --table-row-alt: 40 15% 99%;
+    --table-row-hover: 40 15% 96%;
+    --table-border: 40 10% 89%;
 
-    --sidebar-background: 210 20% 97%;
-    --sidebar-foreground: 211 8% 40%;
-    --sidebar-primary: 213 17% 16%;
+    --sidebar-background: 40 15% 97%;
+    --sidebar-foreground: 30 5% 38%;
+    --sidebar-primary: 30 8% 13%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 210 20% 92%;
-    --sidebar-accent-foreground: 213 17% 16%;
-    --sidebar-border: 216 17% 88%;
-    --sidebar-ring: 213 17% 16%;
+    --sidebar-accent: 40 12% 91%;
+    --sidebar-accent-foreground: 30 8% 13%;
+    --sidebar-border: 40 10% 87%;
+    --sidebar-ring: 30 8% 13%;
 
-    --chart-1: 213 17% 30%;
-    --chart-2: 88 52% 42%;
-    --chart-3: 34 90% 48%;
-    --chart-4: 211 8% 60%;
-    --chart-5: 0 65% 48%;
+    --chart-1: 30 8% 30%;
+    --chart-2: 152 45% 34%;
+    --chart-3: 30 80% 45%;
+    --chart-4: 30 5% 62%;
+    --chart-5: 4 60% 45%;
   }
 
   .dark {
