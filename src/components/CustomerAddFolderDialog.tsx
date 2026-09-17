@@ -81,19 +81,27 @@ export function CustomerAddFolderDialog({
   const kindLabel = kind === OTHER ? config.other_label : group?.label ?? "";
   const productType = group ? group.product_types[0] ?? null : null;
 
-  // Existing folder for this brand + category (only for an existing brand).
+  // Existing folder for this brand + category (only for an existing brand). "Other" folders are
+  // each their own thing, so one is reused only when the typed name matches it.
   const existingFolder = useMemo(() => {
     if (!brandId || wantsNewBrand || !kind) return null;
-    return (
-      folders.find((f) => f.brand_id === brandId && orderPickerGroupKey(config, f.product_type) === kind) ?? null
-    );
-  }, [folders, brandId, wantsNewBrand, kind, config]);
+    const sameKind = folders.filter((f) => f.brand_id === brandId && orderPickerGroupKey(config, f.product_type) === kind);
+    if (kind !== OTHER) return sameKind[0] ?? null;
+    const typed = folderName.trim().toLowerCase();
+    return typed ? sameKind.find((f) => f.name.trim().toLowerCase() === typed) ?? null : null;
+  }, [folders, brandId, wantsNewBrand, kind, config, folderName]);
 
-  // Default folder name follows the brand + category until the user edits it.
+  // Boxes / Foils name the folder "<Brand> <Category>" until the user edits it. "Other" is a
+  // real thing with its own name (inserts, labels, ...), so the customer must type it.
+  const isOther = kind === OTHER;
   useEffect(() => {
     if (folderNameTouched) return;
+    if (isOther) {
+      setFolderName("");
+      return;
+    }
     setFolderName(brandLabel && kindLabel ? `${brandLabel} ${kindLabel}` : "");
-  }, [brandLabel, kindLabel, folderNameTouched]);
+  }, [brandLabel, kindLabel, folderNameTouched, isOther]);
 
   const names = useMemo(
     () =>
@@ -108,7 +116,10 @@ export function CustomerAddFolderDialog({
     [namesText]
   );
 
-  const canSave = kind !== "" && (wantsNewBrand ? newBrandName.trim().length > 0 : brandId !== "") && (existingFolder ? true : folderName.trim().length > 0);
+  const canSave =
+    kind !== "" &&
+    (wantsNewBrand ? newBrandName.trim().length > 0 : brandId !== "") &&
+    (existingFolder && !isOther ? true : folderName.trim().length > 0);
 
   const handleSave = async () => {
     if (!canSave) return;
@@ -243,8 +254,11 @@ export function CustomerAddFolderDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="cust-folder-name">Folder</Label>
-            {existingFolder ? (
+            <Label htmlFor="cust-folder-name">
+              {isOther ? "What is it?" : "Folder"}
+              {isOther && <span className="text-destructive"> *</span>}
+            </Label>
+            {existingFolder && !isOther ? (
               <div className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-sm">
                 <FolderPlus className="h-4 w-4 text-muted-foreground" />
                 <span>
@@ -252,16 +266,28 @@ export function CustomerAddFolderDialog({
                 </span>
               </div>
             ) : (
-              <Input
-                id="cust-folder-name"
-                value={folderName}
-                onChange={(e) => {
-                  setFolderNameTouched(true);
-                  setFolderName(e.target.value);
-                }}
-                placeholder="e.g. Dissolvd Boxes"
-                disabled={!brandLabel || !kind}
-              />
+              <>
+                <Input
+                  id="cust-folder-name"
+                  value={folderName}
+                  onChange={(e) => {
+                    setFolderNameTouched(true);
+                    setFolderName(e.target.value);
+                  }}
+                  placeholder={isOther ? (brandLabel ? `e.g. ${brandLabel} Inserts` : "e.g. Dissolvd Inserts") : "e.g. Dissolvd Boxes"}
+                  disabled={!brandLabel || !kind}
+                />
+                {isOther && existingFolder && (
+                  <p className="text-xs text-muted-foreground">
+                    Matches your existing folder <span className="font-medium">{existingFolder.name}</span>. Products will be added to it.
+                  </p>
+                )}
+                {isOther && !existingFolder && (
+                  <p className="text-xs text-muted-foreground">
+                    This becomes a folder, so it can hold one SKU or several.
+                  </p>
+                )}
+              </>
             )}
           </div>
 
