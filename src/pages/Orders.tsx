@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { StatusDot, type StatusTone } from "@/components/StatusDot";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { FilterBar } from "@/components/layout/FilterBar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -350,35 +352,22 @@ const Orders = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-border pb-4">
-        <div>
-          <h1 className="text-2xl font-semibold">Orders & Production</h1>
-          <p className="text-sm text-muted-foreground mt-1">Track order progress and production pipeline</p>
-        </div>
-        <div className="flex gap-3">
-          <Button size="sm" variant="outline" onClick={() => exportToCSV(filteredOrders, 'orders')}>
-            <Download className="h-4 w-4 mr-2" />
-            Export CSV
-          </Button>
-          <Button size="sm" className="bg-primary text-primary-foreground" onClick={() => navigate("/orders/create")}>
-            <Plus className="h-4 w-4 mr-2" />
-            New Order
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Orders"
+        actions={
+          <>
+            <Button variant="outline" onClick={() => exportToCSV(filteredOrders, 'orders')}>
+              Export CSV
+            </Button>
+            <Button onClick={() => navigate("/orders/create")}>
+              <Plus className="h-4 w-4" />
+              New order
+            </Button>
+          </>
+        }
+      />
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search orders..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
-        </div>
+      <FilterBar search={{ value: searchQuery, onChange: setSearchQuery, placeholder: "Search orders" }}>
         {isVibeAdmin && (
           <Select value={companyFilter} onValueChange={setCompanyFilter}>
             <SelectTrigger className="w-full sm:w-48">
@@ -412,16 +401,16 @@ const Orders = () => {
             <SelectItem value="shipped">Shipped</SelectItem>
           </SelectContent>
         </Select>
-      </div>
+      </FilterBar>
 
       <div className="space-y-8">
         {/* Draft Orders */}
         {draftOrders.length > 0 && (
           <div className="space-y-3">
-            <h2 className="text-lg font-medium">Draft Orders - Incomplete</h2>
-            <div className="border border-border rounded-xl bg-card shadow-sm overflow-hidden">
-              <div className="bg-muted border-b-2 border-border">
-                <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            <h2 className="text-sm font-semibold text-foreground">Draft Orders - Incomplete</h2>
+            <div className="rounded-lg border border-border bg-card overflow-hidden">
+              <div className="bg-table-header border-b border-border">
+                <div className="grid grid-cols-12 gap-4 px-4 py-2 text-xs font-medium text-muted-foreground">
                   <div className="col-span-2">Order # / Type</div>
                   <div className="col-span-1">Date</div>
                   {isVibeAdmin && <div className="col-span-2">Company</div>}
@@ -521,7 +510,7 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
         {awaitingApprovalOrders.length > 0 && (
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-medium">
+              <h2 className="text-sm font-semibold text-foreground">
                 {isVibeAdmin ? "Pending Approval - Customer Submitted" : "Pending Approval"}
               </h2>
               <Badge variant="secondary" className="bg-amber-500/15 text-amber-700 dark:text-amber-400 font-normal">
@@ -533,9 +522,9 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
                 ? "Placed by the customer. Review and approve to move them into the pipeline."
                 : "Submitted to VibePKG. Production starts once these are approved."}
             </p>
-            <div className="border border-amber-500/30 rounded-xl bg-amber-500/[0.03] shadow-sm overflow-hidden">
-              <div className="bg-amber-500/10 border-b-2 border-amber-500/20">
-                <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            <div className="rounded-lg border border-warning/30 bg-card overflow-hidden">
+              <div className="bg-warning/5 border-b border-warning/20">
+                <div className="grid grid-cols-12 gap-4 px-4 py-2 text-xs font-medium text-muted-foreground">
                   <div className="col-span-2">Order # / Type</div>
                   <div className="col-span-1">Submitted</div>
                   {isVibeAdmin && <div className="col-span-2">Company</div>}
@@ -621,10 +610,10 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
 
         {/* All Orders */}
         <div className="space-y-3">
-          <h2 className="text-lg font-medium">All Orders</h2>
-          <div className="border border-border rounded-xl bg-card shadow-sm overflow-hidden">
-            <div className="bg-muted border-b-2 border-border">
-              <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          <h2 className="text-sm font-semibold text-foreground">All Orders</h2>
+          <div className="rounded-lg border border-border bg-card overflow-hidden">
+            <div className="bg-table-header border-b border-border">
+              <div className="grid grid-cols-12 gap-4 px-4 py-2 text-xs font-medium text-muted-foreground">
                 <div className="col-span-2">Order # / Type</div>
                 <div className="col-span-1">Date</div>
                 {isVibeAdmin && <div className="col-span-1">Company</div>}

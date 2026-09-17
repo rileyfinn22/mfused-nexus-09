@@ -42,6 +42,10 @@ import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { useBrandFilter } from "@/hooks/useBrandFilter";
 import { BrandSelect } from "@/components/BrandSelect";
 import { ManageBrandsDialog } from "@/components/ManageBrandsDialog";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { FilterBar } from "@/components/layout/FilterBar";
+import { SummaryStrip } from "@/components/layout/SummaryStrip";
+import { EmptyState } from "@/components/layout/EmptyState";
 import { KindSelect } from "@/components/KindSelect";
 import { useCompanyPortalFeatures } from "@/hooks/useCompanyPortalFeatures";
 import { useKindFilter } from "@/hooks/useKindFilter";
@@ -1277,7 +1281,7 @@ const Artwork = () => {
                     <span>{new Date(file.created_at).toLocaleDateString()}</span>
                     {file.is_approved && file.approved_at && (
                       <span className="text-green-600">
-                        âœ“ {new Date(file.approved_at).toLocaleDateString()}
+                        Ã¢Å“â€œ {new Date(file.approved_at).toLocaleDateString()}
                       </span>
                     )}
                   </div>
@@ -1401,7 +1405,7 @@ const Artwork = () => {
                       <div className="font-medium truncate" title={f.filename}>{f.filename}</div>
                       <div className="text-xs text-muted-foreground">
                         Rejected {new Date(f.rejected_at).toLocaleDateString()}
-                        {f.rejection_reason ? ` â€” ${f.rejection_reason}` : ''}
+                        {f.rejection_reason ? ` Ã¢â‚¬â€ ${f.rejection_reason}` : ''}
                       </div>
                     </div>
                     {f.artwork_url && (
@@ -1832,13 +1836,7 @@ const Artwork = () => {
   // TEMPLATE GRID VIEW (default)
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Artwork Library</h1>
-          <p className="text-muted-foreground mt-1">Browse templates and products to view artwork files</p>
-        </div>
-      </div>
+      <PageHeader title="Artwork" />
 
       {/* Tabs for Vibe Proofs and Customer Art */}
       <Tabs defaultValue="proofs" className="space-y-6">
@@ -1874,37 +1872,17 @@ const Artwork = () => {
             </div>
           )}
 
-      {/* Summary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="p-6">
-          <p className="text-sm text-muted-foreground">Total Files</p>
-          <p className="text-3xl font-bold mt-2">{totalArtwork}</p>
-        </Card>
-        <Card className="p-6">
-          <p className="text-sm text-muted-foreground">Approved</p>
-          <p className="text-3xl font-bold mt-2 text-green-600">{approvedArtwork}</p>
-        </Card>
-        <Card className="p-6">
-          <p className="text-sm text-muted-foreground">Pending Review</p>
-          <p className="text-3xl font-bold mt-2 text-yellow-600">{pendingArtwork}</p>
-        </Card>
-        <Card className="p-6">
-          <p className="text-sm text-muted-foreground">Templates</p>
-          <p className="text-3xl font-bold mt-2">{templates.length}</p>
-        </Card>
-      </div>
+      <SummaryStrip
+        items={[
+          { label: "Files", value: totalArtwork },
+          { label: "Approved", value: approvedArtwork, tone: "success" },
+          { label: "Pending review", value: pendingArtwork, tone: pendingArtwork > 0 ? "warning" : "muted" },
+          { label: "Folders", value: templates.length, tone: "muted" },
+        ]}
+      />
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search templates..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
-        </div>
+
+      <FilterBar search={{ value: searchQuery, onChange: setSearchQuery, placeholder: "Search folders" }}>
         {/* Brand filter: only companies that use brands see this */}
         <BrandSelect
           brands={brands}
@@ -1956,7 +1934,7 @@ const Artwork = () => {
             </Command>
           </PopoverContent>
         </Popover>
-      </div>
+      </FilterBar>
 
       {brandCompanyId && (
         <ManageBrandsDialog
@@ -1973,12 +1951,8 @@ const Artwork = () => {
 
       {/* Templates Grid */}
       {templates.length === 0 && singleProducts.length === 0 ? (
-        <Card className="p-12 text-center">
-          <Package className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-          <p className="font-medium mb-2">No products found</p>
-          <p className="text-sm text-muted-foreground">
-            Create products and organize them into templates to manage artwork
-          </p>
+        <Card>
+          <EmptyState title="No products yet" hint="Artwork is kept per product. Once products exist, their folders appear here." />
         </Card>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">

@@ -31,6 +31,9 @@ import { EditableDescription } from "@/components/EditableDescription";
 import { CustomerStatementTab } from "@/components/CustomerStatementTab";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
 import { StatusDot, type StatusTone } from "@/components/StatusDot";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { FilterBar } from "@/components/layout/FilterBar";
+import { SummaryStrip } from "@/components/layout/SummaryStrip";
 import { brandsForItems, fetchBrandsByProductId, recordMatchesBrandFilter } from "@/lib/productBrands";
 import { useBrandFilter } from "@/hooks/useBrandFilter";
 import { BrandSelect } from "@/components/BrandSelect";
@@ -444,10 +447,10 @@ const Invoices = () => {
 
   // Canonical blanket/child lifecycle math.
   // - Blankets represent the full ordered amount. Children DRAW DOWN against the blanket.
-  // - Open  = Σ blanket.total (lifetime ordered) − all payments (parent + children).
+  // - Open  = Î£ blanket.total (lifetime ordered) âˆ’ all payments (parent + children).
   //   This is the running AR balance against everything ever ordered.
-  // - Billed (Unpaid) = Σ (total − paid) for docs with status 'billed' (not past due).
-  // - Due    (Unpaid) = Σ (total − paid) for docs with status 'due'    (past due).
+  // - Billed (Unpaid) = Î£ (total âˆ’ paid) for docs with status 'billed' (not past due).
+  // - Due    (Unpaid) = Î£ (total âˆ’ paid) for docs with status 'due'    (past due).
 
   const blanketParents = filteredInvoices.filter(
     inv => (inv.invoice_type === 'full' || !inv.invoice_type)
@@ -490,25 +493,21 @@ const Invoices = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="border-b border-table-border pb-4 flex justify-between items-start">
-        <div>
-          <h1 className="text-2xl font-semibold">Invoices & Billing</h1>
-          <p className="text-sm text-muted-foreground mt-1">Manage invoices, track payments, and monitor due dates</p>
-        </div>
-        <div className="flex gap-2">
-          {isVibeAdmin && (
-            <Button size="sm" variant="outline" onClick={() => navigate('/invoices/deleted')}>
-              <Trash2 className="h-4 w-4 mr-2" />
-              Deleted Archive
+      <PageHeader
+        title="Invoices"
+        actions={
+          <>
+            {isVibeAdmin && (
+              <Button variant="outline" onClick={() => navigate('/invoices/deleted')}>
+                Deleted archive
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => exportToCSV(filteredInvoices, 'invoices')}>
+              Export CSV
             </Button>
-          )}
-          <Button size="sm" variant="outline" onClick={() => exportToCSV(filteredInvoices, 'invoices')}>
-            <Download className="h-4 w-4 mr-2" />
-            Export CSV
-          </Button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       <Tabs defaultValue="invoices" className="space-y-6">
         <TabsList>
@@ -527,37 +526,20 @@ const Invoices = () => {
         <TabsContent value="invoices" className="space-y-6">
           <InvoiceReconciliationBanner enabled={isVibeAdmin} />
 
-          {/* Summary Row */}
-          <div className="grid grid-cols-3 gap-6">
-            <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Open Balance</p>
-              <p className="text-2xl font-bold mt-2 text-warning">{formatCurrency(openAmount)}</p>
-              
-            </div>
-            <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Billed (Unpaid)</p>
-              <p className="text-2xl font-bold mt-2 text-info">{formatCurrency(billedAmount)}</p>
-              
-            </div>
-            <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Due (Unpaid)</p>
-              <p className="text-2xl font-bold mt-2 text-danger">{formatCurrency(dueAmount)}</p>
-              
-            </div>
-          </div>
-
-
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search invoices..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+          {/* Summary: one quiet line instead of three cards. Blanket / shipped counts live here too. */}
+          <SummaryStrip
+            items={[
+              { label: "Open balance", value: formatCurrency(openAmount), tone: openAmount > 0 ? "warning" : "default" },
+              { label: "Billed, unpaid", value: formatCurrency(billedAmount), tone: "default" },
+              { label: "Due, unpaid", value: formatCurrency(dueAmount), tone: dueAmount > 0 ? "danger" : "default" },
+              { label: "Blanket", value: invoices.filter(inv => !inv.invoice_type || inv.invoice_type === 'full').length, tone: "muted" },
+              { label: "Shipped", value: invoices.filter(inv => inv.invoice_type === 'partial').length, tone: "muted" },
+            ]}
           />
-        </div>
+
+
+
+      <FilterBar search={{ value: searchQuery, onChange: setSearchQuery, placeholder: "Search invoices" }}>
         {isVibeAdmin && (
           <Select value={companyFilter} onValueChange={setCompanyFilter}>
             <SelectTrigger className="w-full sm:w-48">
@@ -574,64 +556,25 @@ const Invoices = () => {
         {/* Brand filter: only companies that use brands see this */}
         <BrandSelect brands={brands} value={brandFilter} onChange={setBrandFilter} className="sm:w-48" />
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-48">
+          <SelectTrigger className="w-full sm:w-44">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="all">All statuses</SelectItem>
             <SelectItem value="open">Open</SelectItem>
             <SelectItem value="billed">Billed</SelectItem>
             <SelectItem value="due">Due</SelectItem>
             <SelectItem value="paid">Paid</SelectItem>
           </SelectContent>
         </Select>
-      </div>
+      </FilterBar>
 
-      {/* Invoice Type Filter Tabs */}
-      <div className="flex gap-2 flex-wrap">
-        <Button
-          variant={statusFilter === "all" ? "default" : "outline"}
-          size="sm"
-          onClick={() => setStatusFilter("all")}
-          className="h-8"
-        >
-          All Invoices
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-8"
-          onClick={() => {
-            const fullInvoices = invoices.filter(inv => !inv.invoice_type || inv.invoice_type === 'full');
-            if (fullInvoices.length === 0) {
-              toast({ title: "No Blanket Invoices", description: "No blanket invoices found" });
-            }
-          }}
-        >
-          <Badge className="bg-purple-500 text-white mr-2">Blanket</Badge>
-          {invoices.filter(inv => !inv.invoice_type || inv.invoice_type === 'full').length}
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-8"
-          onClick={() => {
-            const partialInvoices = invoices.filter(inv => inv.invoice_type === 'partial');
-            if (partialInvoices.length === 0) {
-              toast({ title: "No Shipped Invoices", description: "No shipped invoices found" });
-            }
-          }}
-        >
-          <Badge className="bg-blue-500 text-white mr-2">Shipped</Badge>
-          {invoices.filter(inv => inv.invoice_type === 'partial').length}
-        </Button>
-      </div>
 
       {/* Invoices Table */}
-      <div className="border border-border rounded-xl bg-card shadow-sm overflow-hidden">
+      <div className="rounded-lg border border-border bg-card overflow-hidden">
         {/* Table Header */}
-        <div className="bg-muted border-b-2 border-border">
-          <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+        <div className="bg-table-header border-b border-border">
+          <div className="grid grid-cols-12 gap-4 px-4 py-2 text-xs font-medium text-muted-foreground">
             <div className="col-span-2">Invoice ID</div>
             <div className="col-span-1">Due / Shipped</div>
             <div className="col-span-2">{isVibeAdmin ? 'Company' : hasBrands ? 'Brand' : 'PO'}</div>
@@ -771,7 +714,7 @@ const Invoices = () => {
                       return invoice.due_date ? formatDocDate(invoice.due_date, 'numeric') : '-';
                     })()}
                     {(() => {
-                      // Shipped date — drives Net 30 start. Shows on child/shipped invoices and any invoice with a shipped_date.
+                      // Shipped date â€” drives Net 30 start. Shows on child/shipped invoices and any invoice with a shipped_date.
                       let shippedDate = invoice.shipped_date;
                       if (!shippedDate && isParent && hasChildren) {
                         // Show earliest child shipped date as fallback for parent rollup
@@ -785,9 +728,9 @@ const Invoices = () => {
                       return (
                         <div
                           className="text-[11px] text-blue-600 whitespace-nowrap mt-0.5"
-                          title="Shipped date — Net 30 starts here"
+                          title="Shipped date â€” Net 30 starts here"
                         >
-                          📦 {new Date(shippedDate).toLocaleDateString()}
+                          ðŸ“¦ {new Date(shippedDate).toLocaleDateString()}
                         </div>
                       );
                     })()}
@@ -825,7 +768,7 @@ const Invoices = () => {
                       <div className="space-y-2">
                         <EditableDescription
                           value={invoice.orders?.description}
-                          placeholder="Add description…"
+                          placeholder="Add descriptionâ€¦"
                           onSave={(text) => {
                             if (!invoice.order_id) return;
                             return handleOrderDescriptionChange(invoice.order_id, text);
@@ -836,7 +779,7 @@ const Invoices = () => {
                           <div className="pl-3 border-l border-border">
                             <EditableDescription
                               value={invoice.description}
-                              placeholder="Add invoice description…"
+                              placeholder="Add invoice descriptionâ€¦"
                               className="text-xs"
                               onSave={(text) => handleInvoiceDescriptionChange(invoice.id, text)}
                             />

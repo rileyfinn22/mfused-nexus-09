@@ -955,12 +955,11 @@ const Products = () => {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="page-header flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
-          <h1 className="page-title">Product Catalog</h1>
-          <p className="page-subtitle">{isVibeAdmin ? "Manage SKUs and state-specific packaging requirements" : "View your product catalog"}</p>
+          <h1 className="text-xl font-semibold tracking-tight leading-7">Products</h1>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {isVibeAdmin && viewMode === "list" && selectedProducts.size > 0 && (
             <Button variant="destructive" size="sm" onClick={handleDeleteSelected}>
               <Trash2 className="h-4 w-4 mr-1.5" />
@@ -1016,13 +1015,13 @@ const Products = () => {
       {/* Filters and View Toggle */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search products..."
+              placeholder="Search products"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
+              className="pl-8"
             />
           </div>
           {isVibeAdmin && (
@@ -1079,10 +1078,9 @@ const Products = () => {
       {viewMode === "grid" && (
         <div className="space-y-4">
           {filteredTemplates.length === 0 && filteredProducts.filter(p => !p.template_id).length === 0 ? (
-            <div className="empty-state py-16">
-              <Package className="h-12 w-12 mb-4 text-muted-foreground/50" />
-              <p className="font-medium">No products found</p>
-              <p className="text-sm">{emptyHint}</p>
+            <div className="empty-state py-14">
+              <p className="text-sm font-medium text-foreground">No products found</p>
+              <p className="text-sm mt-1">{emptyHint}</p>
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
@@ -1293,10 +1291,9 @@ const Products = () => {
           {/* Table Body */}
           <div className="divide-y divide-border">
             {filteredProducts.length === 0 ? (
-              <div className="empty-state py-16">
-                <Package className="h-12 w-12 mb-4 text-muted-foreground/50" />
-                <p className="font-medium">No products found</p>
-                <p className="text-sm">{emptyHint}</p>
+              <div className="empty-state py-14">
+                <p className="text-sm font-medium text-foreground">No products found</p>
+                <p className="text-sm mt-1">{emptyHint}</p>
               </div>
             ) : (
               filteredProducts.map((product) => {

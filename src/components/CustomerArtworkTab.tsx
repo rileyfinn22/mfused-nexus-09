@@ -41,6 +41,9 @@ import { cn } from "@/lib/utils";
 import { useBrandFilter } from "@/hooks/useBrandFilter";
 import { BrandSelect } from "@/components/BrandSelect";
 import { ManageBrandsDialog } from "@/components/ManageBrandsDialog";
+import { FilterBar } from "@/components/layout/FilterBar";
+import { SummaryStrip } from "@/components/layout/SummaryStrip";
+import { EmptyState } from "@/components/layout/EmptyState";
 import { KindSelect } from "@/components/KindSelect";
 import { useCompanyPortalFeatures } from "@/hooks/useCompanyPortalFeatures";
 import { useKindFilter } from "@/hooks/useKindFilter";
@@ -1054,7 +1057,7 @@ export function CustomerArtworkTab({
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-xl font-semibold">Customer Art Files</h2>
+          <h2 className="text-base font-semibold">Customer art</h2>
           <p className="text-muted-foreground text-sm">
             Upload customer-provided artwork for Vibe to proof. Browse by template and product.
           </p>
@@ -1071,35 +1074,16 @@ export function CustomerArtworkTab({
         </div>
       </div>
 
-      {/* Summary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="p-6">
-          <p className="text-sm text-muted-foreground">Total Customer Art Files</p>
-          <p className="text-3xl font-bold mt-2">{totalArtwork}</p>
-        </Card>
-        <Card className="p-6">
-          <p className="text-sm text-muted-foreground">Unique Products</p>
-          <p className="text-3xl font-bold mt-2">
-            {Object.keys(artworkCounts).length}
-          </p>
-        </Card>
-        <Card className="p-6">
-          <p className="text-sm text-muted-foreground">Templates</p>
-          <p className="text-3xl font-bold mt-2">{templates.length}</p>
-        </Card>
-      </div>
+      <SummaryStrip
+        items={[
+          { label: "Files", value: totalArtwork },
+          { label: "Products with art", value: Object.keys(artworkCounts).length, tone: "muted" },
+          { label: "Folders", value: templates.length, tone: "muted" },
+        ]}
+      />
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search templates..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
-        </div>
+
+      <FilterBar search={{ value: searchQuery, onChange: setSearchQuery, placeholder: "Search folders" }}>
         {/* Brand filter: only companies that use brands see this */}
         <BrandSelect
           brands={brands}
@@ -1123,20 +1107,21 @@ export function CustomerArtworkTab({
             </SelectContent>
           </Select>
         )}
-      </div>
+      </FilterBar>
 
       {/* Templates Grid */}
       {filteredTemplates.length === 0 ? (
-        <Card className="p-12 text-center">
-          <Package className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-          <p className="font-medium mb-2">No templates with products</p>
-          <p className="text-sm text-muted-foreground mb-4">
-            Create products and organize them into templates to manage customer artwork
-          </p>
-          <Button onClick={() => setUploadDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Customer Art
-          </Button>
+        <Card>
+          <EmptyState
+            title="No folders to show"
+            hint="Customer art is kept per product inside its folder. Add products first, or clear the filters."
+            action={
+              <Button variant="outline" onClick={() => setUploadDialogOpen(true)}>
+                <Plus className="h-4 w-4" />
+                Add customer art
+              </Button>
+            }
+          />
         </Card>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
