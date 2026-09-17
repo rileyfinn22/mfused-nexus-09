@@ -28,16 +28,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import jsPDF from "jspdf";
-import {
-  DOC,
-  DOC_COLORS,
-  drawDetailRows,
-  drawDocumentTitle,
-  drawFooter,
-  drawMasthead,
-  drawPartyBlock,
-  ensureRoom,
-} from "@/lib/pdfDocument";
+import { DOC, DOC_COLORS, docTableStyles, drawDetailRows, drawDocumentTitle, drawFooter, drawMasthead, drawPartyBlock, ensureRoom } from "@/lib/pdfDocument";
 import autoTable from "jspdf-autotable";
 
 interface PackingListFile {
@@ -351,25 +342,10 @@ export const VendorPOPackingListSection = ({
         startY: yPos,
         head: [['ITEM DESCRIPTION', 'CARTONS', 'QTY/CTN', 'TOTAL QTY', 'GROSS WT.', 'NET WT.', 'CBM']],
         body: tableData,
-        theme: 'grid',
-        styles: {
-          fontSize: 9,
-          cellPadding: 4,
-          lineColor: DOC_COLORS.rule,
-          lineWidth: 0.2,
-        },
-        headStyles: {
-          fillColor: DOC_COLORS.headerBg,
-          textColor: DOC_COLORS.muted,
-          fontStyle: 'bold',
-          fontSize: 8,
-          cellPadding: 4,
-          halign: 'center'
-        },
-        bodyStyles: {
-          textColor: DOC_COLORS.body,
-          valign: 'middle'
-        },
+        // House table (hairline rows, no grid) like every other document.
+        ...docTableStyles(),
+        headStyles: { ...(docTableStyles().headStyles as object), halign: 'center' },
+        bodyStyles: { ...(docTableStyles().bodyStyles as object), valign: 'middle' },
         columnStyles: {
           0: { cellWidth: 'auto', halign: 'left', fontStyle: 'bold', textColor: DOC_COLORS.ink },
           1: { cellWidth: 22, halign: 'right' },
@@ -380,8 +356,6 @@ export const VendorPOPackingListSection = ({
           6: { cellWidth: 22, halign: 'right' }
         },
         margin: { left: margin, right: margin, bottom: DOC.FOOTER_RESERVE },
-        tableLineColor: DOC_COLORS.rule,
-        tableLineWidth: 0.2,
       });
 
       // ===== SUMMARY SECTION =====
@@ -620,7 +594,7 @@ export const VendorPOPackingListSection = ({
                         <div>
                           <p className="font-medium">{packingList.file_name}</p>
                           <p className="text-xs text-muted-foreground">
-                            Generated {format(new Date(packingList.created_at), 'MMM d, yyyy h:mm a')} â€¢ {formatFileSize(packingList.file_size)}
+                            Generated {format(new Date(packingList.created_at), 'MMM d, yyyy h:mm a')} • {formatFileSize(packingList.file_size)}
                           </p>
                         </div>
                         <Badge variant="secondary" className="ml-2">
@@ -676,7 +650,7 @@ export const VendorPOPackingListSection = ({
                         <div>
                           <p className="font-medium">{packingList.file_name}</p>
                           <p className="text-xs text-muted-foreground">
-                            Uploaded {format(new Date(packingList.created_at), 'MMM d, yyyy h:mm a')} â€¢ {formatFileSize(packingList.file_size)}
+                            Uploaded {format(new Date(packingList.created_at), 'MMM d, yyyy h:mm a')} • {formatFileSize(packingList.file_size)}
                           </p>
                           {packingList.notes && (
                             <p className="text-xs text-muted-foreground mt-1">{packingList.notes}</p>

@@ -385,13 +385,13 @@ export function PoShipmentTracking({ poId, companyId, orderId, editable, onChang
             {vesselLeg?.vessel_voyage && (
               <div>
                 Vessel <span className="font-mono text-foreground">{vesselLeg.vessel_voyage}</span>
-                {vesselLeg.carrier ? ` Â· ${vesselLeg.carrier}` : ""}
+                {vesselLeg.carrier ? ` · ${vesselLeg.carrier}` : ""}
               </div>
             )}
             {(vesselLeg?.etd || vesselLeg?.estimated_arrival) && (
               <div>
                 {vesselLeg.etd ? `Sailed ${fmtDate(vesselLeg.etd)}` : ""}
-                {vesselLeg.etd && vesselLeg.estimated_arrival ? " Â· " : ""}
+                {vesselLeg.etd && vesselLeg.estimated_arrival ? " · " : ""}
                 {vesselLeg.estimated_arrival
                   ? `${vesselLeg.status === "arrived_at_port" ? "Arrived" : "ETA"} ${fmtDate(vesselLeg.estimated_arrival)}`
                   : ""}

@@ -799,7 +799,7 @@ export function ProductionStageTimeline({
                           <div className="flex-1 min-w-0">
                             {update.update_type === 'status_change' && <p className="text-sm">Status changed to <span className="font-medium capitalize">{update.new_status?.replace('_', ' ')}</span></p>}
                             {noteText && !isCustomSub && <p className="text-sm whitespace-pre-wrap">{noteText}</p>}
-                            {isCustomSub && <p className="text-sm font-medium text-success">Ã¢Å“â€œ {customLabel}</p>}
+                            {isCustomSub && <p className="text-sm font-medium text-success">✓ {customLabel}</p>}
                             {imageUrl && <a href={imageUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1"><ImageIcon className="h-3 w-3" /> View Image</a>}
                             {update.file_url && <a href={update.file_url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1"><Download className="h-3 w-3" /> {update.file_name || 'Download File'}</a>}
                             <div className="flex items-center gap-2 mt-1">

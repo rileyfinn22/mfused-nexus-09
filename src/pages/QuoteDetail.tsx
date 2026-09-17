@@ -711,7 +711,7 @@ const QuoteDetail = () => {
             </div>
             <p className="page-subtitle">
               Created {new Date(quote.created_at).toLocaleDateString()}
-              {quote.valid_until && ` â€¢ Valid until ${new Date(quote.valid_until).toLocaleDateString()}`}
+              {quote.valid_until && ` • Valid until ${new Date(quote.valid_until).toLocaleDateString()}`}
               {isVibeAdmin && quote.parent_quote_id && (
                 <Button 
                   variant="link" 
@@ -721,7 +721,7 @@ const QuoteDetail = () => {
                     navigate(`/quotes/${quote.parent_quote_id}`);
                   }}
                 >
-                  â† View Original Request
+                  ← View Original Request
                 </Button>
               )}
             </p>
@@ -1292,7 +1292,7 @@ const QuoteDetail = () => {
               )}
               <div>
                 <p className="text-sm text-muted-foreground">Terms</p>
-                <p className="font-medium">{quote.terms || 'â€”'}</p>
+                <p className="font-medium">{quote.terms || '—'}</p>
               </div>
               {quote.valid_until && (
                 <div>

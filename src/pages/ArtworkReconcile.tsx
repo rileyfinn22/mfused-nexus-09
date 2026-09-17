@@ -181,7 +181,7 @@ export default function ArtworkReconcile() {
         <div className="flex-1" />
         <Badge variant="outline" className="text-sm">
           <AlertTriangle className="h-3 w-3 mr-1" />
-          {orphans.length} total orphans Â· {filtered.length} shown
+          {orphans.length} total orphans · {filtered.length} shown
         </Badge>
         <Button variant="outline" onClick={runSuggest} disabled={!someChecked || suggesting}>
           {suggesting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}
@@ -224,7 +224,7 @@ export default function ArtworkReconcile() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium truncate" title={o.filename}>{o.filename}</div>
-                    <div className="text-xs text-muted-foreground">{companyName(o.company_id)} Â· {new Date(o.created_at).toLocaleDateString()}</div>
+                    <div className="text-xs text-muted-foreground">{companyName(o.company_id)} · {new Date(o.created_at).toLocaleDateString()}</div>
                   </div>
                   <div className="w-[180px]">
                     <Badge variant="outline" className="text-xs font-mono">{o.sku || '(none)'}</Badge>
@@ -242,7 +242,7 @@ export default function ArtworkReconcile() {
                         {sug.confidence}
                       </Badge>
                     ) : (
-                      <span className="text-xs text-muted-foreground">â€”</span>
+                      <span className="text-xs text-muted-foreground">—</span>
                     )}
                   </div>
                 </div>
@@ -263,7 +263,7 @@ function ProductPicker({ products, value, onChange }: { products: Product[]; val
       <PopoverTrigger asChild>
         <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
           <span className="truncate text-left">
-            {selected ? `${selected.name} Â· ${selected.item_id}` : 'Pick productâ€¦'}
+            {selected ? `${selected.name} · ${selected.item_id}` : 'Pick product…'}
           </span>
           <ChevronsUpDown className="h-3 w-3 opacity-50 shrink-0" />
         </Button>

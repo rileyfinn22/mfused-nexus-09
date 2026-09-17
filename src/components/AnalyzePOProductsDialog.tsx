@@ -382,7 +382,7 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
           name: finalName,
           description: selectedTemplate?.description || productDescription || null,
           state: selectedTemplate?.state || productState || null,
-          // Cost moved to companion table product_costs â€” kept here transiently for the companion upsert below
+          // Cost moved to companion table product_costs — kept here transiently for the companion upsert below
           _cost: productCost || selectedTemplate?.cost || null,
           price: selectedTemplate?.price || null,
           product_type: productType || null,
@@ -606,7 +606,7 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
                 <Badge variant="outline" className="bg-warning/10 text-warning border-warning dark:text-warning dark:border-warning">
                   {newCount} new
                 </Badge>
-                <span>Â· {selectedCount} selected</span>
+                <span>· {selectedCount} selected</span>
               </div>
             </div>
 

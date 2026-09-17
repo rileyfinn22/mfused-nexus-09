@@ -212,7 +212,7 @@ const OrderDetail = () => {
       .single();
     if (!error && data) {
       setOrder(data);
-      // Never clobber the user's in-progress edits with a background refetch Ã¢â‚¬â€
+      // Never clobber the user's in-progress edits with a background refetch —
       // that used to silently drop added lines (and make them look "deleted" on save).
       if (!isEditModeRef.current) {
         setEditedOrder(data);
@@ -1049,7 +1049,7 @@ const OrderDetail = () => {
 
     if (!error) {
       // Check if a blanket invoice already exists.
-      // Use limit(1) + array Ã¢â‚¬â€ .maybeSingle() ERRORS when >1 rows exist and
+      // Use limit(1) + array — .maybeSingle() ERRORS when >1 rows exist and
       // returns data=null, which the old code treated as "no invoice" and
       // then inserted another duplicate blanket. That bug created repeat
       // invoice numbers on this order.
@@ -1196,7 +1196,7 @@ const OrderDetail = () => {
               .select('id');
             if (error) throw new Error(`Could not add line items: ${error.message}`);
             if ((data?.length || 0) !== itemsToInsert.length) {
-              throw new Error('Some line items were not saved Ã¢â‚¬â€ nothing was added. Please retry.');
+              throw new Error('Some line items were not saved — nothing was added. Please retry.');
             }
           })()
         );
@@ -1786,7 +1786,7 @@ const OrderDetail = () => {
               onClick={() => handleStatusChange('in production')}
             >
               <CheckCircle2 className="h-5 w-5 mr-2" />
-              Process Order Ã¢â€ â€™ Production
+              Process Order → Production
             </Button>
           </div>
         </div>
@@ -2052,7 +2052,7 @@ const OrderDetail = () => {
                   <div className="flex-1">
                     <p className="font-medium">{item.name || item.raw_name || 'Unknown Item'}</p>
                     <p className="text-sm text-muted-foreground">
-                      Qty: {item.quantity || 1} {item.unit_price ? `Ã¢â‚¬Â¢ $${item.unit_price.toFixed(2)}` : ''}
+                      Qty: {item.quantity || 1} {item.unit_price ? `• $${item.unit_price.toFixed(2)}` : ''}
                     </p>
                   </div>
                   <Popover open={openCombobox[`unmatched-${index}`]} onOpenChange={(open) => setOpenCombobox(prev => ({ ...prev, [`unmatched-${index}`]: open }))}>
@@ -2222,7 +2222,7 @@ const OrderDetail = () => {
                   ) : (
                     <span>Order Date: {formatDocDate(order.order_date || order.created_at, "numeric")}</span>
                   )}
-                  <span>Ã¢â‚¬Â¢</span>
+                  <span>•</span>
                   {(isVibeAdmin || isFinance) ? (
                     <div className="flex items-center gap-2">
                       <span>Est. Delivery:</span>
@@ -2254,7 +2254,7 @@ const OrderDetail = () => {
                   )}
                   {order.quote_id && (
                     <>
-                      <span>Ã¢â‚¬Â¢</span>
+                      <span>•</span>
                       <Button 
                         variant="link" 
                         className="h-auto p-0 text-sm text-primary"
@@ -2313,7 +2313,7 @@ const OrderDetail = () => {
                 )}
                 {!(isVibeAdmin || isFinance) && (order.shipping_method || order.tracking_number) && (
                   <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
-                    {order.shipping_method && <span>Ã°Å¸â€œÂ¦ {order.shipping_method}</span>}
+                    {order.shipping_method && <span>📦 {order.shipping_method}</span>}
                     {order.tracking_number && (
                       order.tracking_url ? (
                         <a href={order.tracking_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">
@@ -2384,10 +2384,10 @@ const OrderDetail = () => {
                           shipping_city: a.city, shipping_state: a.state, shipping_zip: a.zip,
                         });
                       }}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Load saved addressÃ¢â‚¬Â¦" /></SelectTrigger>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Load saved address…" /></SelectTrigger>
                         <SelectContent>
                           {savedAddresses.filter(a => a.address_type === 'shipping').map(a => (
-                            <SelectItem key={a.id} value={a.id}>{a.name} Ã¢â‚¬â€ {a.city}, {a.state}</SelectItem>
+                            <SelectItem key={a.id} value={a.id}>{a.name} — {a.city}, {a.state}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -2446,10 +2446,10 @@ const OrderDetail = () => {
                           billing_city: a.city, billing_state: a.state, billing_zip: a.zip,
                         });
                       }}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Load saved addressÃ¢â‚¬Â¦" /></SelectTrigger>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Load saved address…" /></SelectTrigger>
                         <SelectContent>
                           {savedAddresses.filter(a => a.address_type === 'billing').map(a => (
-                            <SelectItem key={a.id} value={a.id}>{a.name} Ã¢â‚¬â€ {a.city}, {a.state}</SelectItem>
+                            <SelectItem key={a.id} value={a.id}>{a.name} — {a.city}, {a.state}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -2801,7 +2801,7 @@ const OrderDetail = () => {
                       const billingProgress = (totalBilled / order.total) * 100;
                       return (
                         <p className="text-sm text-muted-foreground mt-1">
-                          {invoices.length} shipment(s) Ã¢â‚¬Â¢ ${totalBilled.toFixed(2)} billed ({billingProgress.toFixed(1)}% of order total)
+                          {invoices.length} shipment(s) • ${totalBilled.toFixed(2)} billed ({billingProgress.toFixed(1)}% of order total)
                         </p>
                       );
                     })()}
@@ -2848,7 +2848,7 @@ const OrderDetail = () => {
                               <div className="flex items-center gap-4 text-xs text-muted-foreground">
                                 <span>Created: {new Date(invoice.created_at).toLocaleDateString()}</span>
                                 {invoice.shipping_cost > 0 && (
-                                  <span>Ã¢â‚¬Â¢ Shipping: ${Number(invoice.shipping_cost).toFixed(2)}</span>
+                                  <span>• Shipping: ${Number(invoice.shipping_cost).toFixed(2)}</span>
                                 )}
                               </div>
                             </div>
@@ -2895,9 +2895,9 @@ const OrderDetail = () => {
               <div className="space-y-2 text-sm text-muted-foreground">
                 <p><strong>Payment Terms:</strong> {order.terms}</p>
                 <div className="space-y-1 pl-4">
-                  <p>Ã¢â‚¬Â¢ Payment is due according to the terms specified above</p>
-                  <p>Ã¢â‚¬Â¢ Late payments may incur additional fees</p>
-                  <p>Ã¢â‚¬Â¢ All prices are in USD unless otherwise specified</p>
+                  <p>• Payment is due according to the terms specified above</p>
+                  <p>• Late payments may incur additional fees</p>
+                  <p>• All prices are in USD unless otherwise specified</p>
                 </div>
                 <p className="pt-2"><strong>Order Acceptance:</strong> All orders are subject to acceptance and availability</p>
                 <p><strong>Shipping & Delivery:</strong> Delivery dates are estimates only. Risk of loss passes to buyer upon delivery to carrier</p>
@@ -3195,7 +3195,7 @@ const OrderDetail = () => {
                         
                         <p className="text-xs text-muted-foreground mt-0.5">
                           SKU: {artwork.sku}
-                          {matchingItem && ` Ã¢â‚¬Â¢ ${matchingItem.name}`}
+                          {matchingItem && ` • ${matchingItem.name}`}
                         </p>
                         
                         {artwork.notes && (

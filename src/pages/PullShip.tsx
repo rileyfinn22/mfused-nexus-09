@@ -291,7 +291,7 @@ const PullShip = () => {
       doc,
       doc.internal.pageSize.getWidth() / 2 + 4,
       yPos,
-      [['Destination', orderData.state || 'â€”']],
+      [['Destination', orderData.state || '—']],
       { valueOffset: 30 }
     );
 
@@ -603,7 +603,7 @@ const PullShip = () => {
         .from('po-documents')
         .getPublicUrl(fileName);
 
-      // Submit against whichever company the switcher is on â€” reading user_roles
+      // Submit against whichever company the switcher is on — reading user_roles
       // directly threw for anyone in more than one company.
       if (!activeCompanyId) {
         throw new Error('User not associated with a company');
@@ -1078,7 +1078,7 @@ const PullShip = () => {
                                 <div className="text-xs text-muted-foreground">
                                   {item.products?.name || 'No name'}
                                   {item.orders?.order_number && (
-                                    <span className="ml-1 text-primary font-medium">â€¢ Linked to #{item.orders.order_number}</span>
+                                    <span className="ml-1 text-primary font-medium">• Linked to #{item.orders.order_number}</span>
                                   )}
                                 </div>
                               </div>

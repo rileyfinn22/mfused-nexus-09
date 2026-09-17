@@ -167,12 +167,12 @@ export default function ForwarderOrders() {
                 onClick={() => navigate(`/forwarder/orders/${order.id}`)}
               >
                 <TableCell className="font-mono font-medium">{order.order_number}</TableCell>
-                <TableCell className="whitespace-pre-wrap">{order.description || "â€”"}</TableCell>
+                <TableCell className="whitespace-pre-wrap">{order.description || "—"}</TableCell>
                 <TableCell>{order.customer_name}</TableCell>
                 <TableCell>
                   {order.financed_invoice_number ? (
                     <Badge variant="outline" className="font-mono">{order.financed_invoice_number}</Badge>
-                  ) : "â€”"}
+                  ) : "—"}
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   {order.shipping_city}, {order.shipping_state}

@@ -447,10 +447,10 @@ const Invoices = () => {
 
   // Canonical blanket/child lifecycle math.
   // - Blankets represent the full ordered amount. Children DRAW DOWN against the blanket.
-  // - Open  = ÃƒÅ½Ã‚Â£ blanket.total (lifetime ordered) ÃƒÂ¢Ã‹â€ Ã¢â‚¬â„¢ all payments (parent + children).
+  // - Open  = Σ blanket.total (lifetime ordered) − all payments (parent + children).
   //   This is the running AR balance against everything ever ordered.
-  // - Billed (Unpaid) = ÃƒÅ½Ã‚Â£ (total ÃƒÂ¢Ã‹â€ Ã¢â‚¬â„¢ paid) for docs with status 'billed' (not past due).
-  // - Due    (Unpaid) = ÃƒÅ½Ã‚Â£ (total ÃƒÂ¢Ã‹â€ Ã¢â‚¬â„¢ paid) for docs with status 'due'    (past due).
+  // - Billed (Unpaid) = Σ (total − paid) for docs with status 'billed' (not past due).
+  // - Due    (Unpaid) = Σ (total − paid) for docs with status 'due'    (past due).
 
   const blanketParents = filteredInvoices.filter(
     inv => (inv.invoice_type === 'full' || !inv.invoice_type)
@@ -714,7 +714,7 @@ const Invoices = () => {
                       return invoice.due_date ? formatDocDate(invoice.due_date, 'numeric') : '-';
                     })()}
                     {(() => {
-                      // Shipped date ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â drives Net 30 start. Shows on child/shipped invoices and any invoice with a shipped_date.
+                      // Shipped date — drives Net 30 start. Shows on child/shipped invoices and any invoice with a shipped_date.
                       let shippedDate = invoice.shipped_date;
                       if (!shippedDate && isParent && hasChildren) {
                         // Show earliest child shipped date as fallback for parent rollup
@@ -728,9 +728,9 @@ const Invoices = () => {
                       return (
                         <div
                           className="text-[11px] text-info whitespace-nowrap mt-0.5"
-                          title="Shipped date ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Net 30 starts here"
+                          title="Shipped date — Net 30 starts here"
                         >
-                          ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â¦ {new Date(shippedDate).toLocaleDateString()}
+                          📦 {new Date(shippedDate).toLocaleDateString()}
                         </div>
                       );
                     })()}
@@ -768,7 +768,7 @@ const Invoices = () => {
                       <div className="space-y-2">
                         <EditableDescription
                           value={invoice.orders?.description}
-                          placeholder="Add descriptionÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦"
+                          placeholder="Add description…"
                           onSave={(text) => {
                             if (!invoice.order_id) return;
                             return handleOrderDescriptionChange(invoice.order_id, text);
@@ -779,7 +779,7 @@ const Invoices = () => {
                           <div className="pl-3 border-l border-border">
                             <EditableDescription
                               value={invoice.description}
-                              placeholder="Add invoice descriptionÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦"
+                              placeholder="Add invoice description…"
                               className="text-xs"
                               onSave={(text) => handleInvoiceDescriptionChange(invoice.id, text)}
                             />

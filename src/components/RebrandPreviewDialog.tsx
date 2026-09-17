@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { COMPANY, DOC, DOC_COLORS } from "@/lib/pdfDocument";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -215,9 +216,16 @@ export const RebrandPreviewDialog = ({
     const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-    let logoImage: any = null;
+    // Same masthead every other document gets (src/lib/pdfDocument.ts), drawn with pdf-lib
+    // because this one edits an existing vendor PDF instead of generating a page: a charcoal
+    // band over the vendor's header, white legal name, muted contact line, print wordmark.
+    const ink = rgb(DOC_COLORS.ink[0] / 255, DOC_COLORS.ink[1] / 255, DOC_COLORS.ink[2] / 255);
+    const onInkMuted = rgb(DOC_COLORS.onInkMuted[0] / 255, DOC_COLORS.onInkMuted[1] / 255, DOC_COLORS.onInkMuted[2] / 255);
+    const white = rgb(1, 1, 1);
+
+    let logoImage: Awaited<ReturnType<typeof pdfDoc.embedPng>> | null = null;
     try {
-      const logoResponse = await fetch("/images/vibe-logo.png");
+      const logoResponse = await fetch("/images/vibe-logo-print.png");
       const logoBytes = await logoResponse.arrayBuffer();
       logoImage = await pdfDoc.embedPng(new Uint8Array(logoBytes));
     } catch {
@@ -227,32 +235,27 @@ export const RebrandPreviewDialog = ({
     const pages = pdfDoc.getPages();
     for (const page of pages) {
       const { width, height } = page.getSize();
-      page.drawRectangle({ x: 0, y: height - coverH, width, height: coverH, color: rgb(1, 1, 1) });
+      // The band is at least masthead height (30mm ≈ 85pt) and grows to hide the vendor header.
+      const bandH = Math.max(coverH, 85);
+      const margin = 45; // 16mm in points
+      page.drawRectangle({ x: 0, y: height - bandH, width, height: bandH, color: ink });
 
-      const brandY = height - 25;
-      page.drawText("ArmorPak Inc. DBA Vibe Packaging", {
-        x: 20, y: brandY, size: 12, font: helveticaBold,
-        color: rgb(0.298, 0.686, 0.314),
+      const textTop = height - bandH + bandH / 2;
+      page.drawText(COMPANY.legalName, {
+        x: margin, y: textTop + 4, size: 13, font: helveticaBold, color: white,
       });
-      page.drawText("1415 S 700 W", {
-        x: 20, y: brandY - 14, size: 8, font: helvetica,
-        color: rgb(0.39, 0.39, 0.39),
-      });
-      page.drawText("Salt Lake City, UT 84104", {
-        x: 20, y: brandY - 23, size: 8, font: helvetica,
-        color: rgb(0.39, 0.39, 0.39),
-      });
-      page.drawText("www.vibepkg.com", {
-        x: 20, y: brandY - 32, size: 8, font: helvetica,
-        color: rgb(0.39, 0.39, 0.39),
+      page.drawText(COMPANY.contactLine, {
+        x: margin, y: textTop - 10, size: 8.5, font: helvetica, color: onInkMuted,
       });
 
       if (logoImage) {
-        const logoW = 50;
-        const logoH = (logoImage.height / logoImage.width) * logoW;
+        const logoH = Math.min(42, bandH * 0.5);
+        const logoW = logoH * DOC.LOGO_ASPECT;
         page.drawImage(logoImage, {
-          x: width - logoW - 20, y: height - logoH - 10,
-          width: logoW, height: logoH,
+          x: width - margin - logoW,
+          y: height - bandH + (bandH - logoH) / 2,
+          width: logoW,
+          height: logoH,
         });
       }
     }

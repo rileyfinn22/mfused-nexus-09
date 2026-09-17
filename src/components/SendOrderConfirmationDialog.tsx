@@ -192,11 +192,7 @@ Thank you for your business!`;
     try {
       const { base64: pdfBase64 } = await generateOrderConfirmationPdf(order, items);
 
-      const htmlMessage = message
-        .split("\n")
-        .map((line) => (line.trim() === "" ? "<br/>" : `<p style="margin: 8px 0;">${line}</p>`))
-        .join("");
-
+      // The function renders the shared house email; we only send the typed message.
       const { data, error } = await supabase.functions.invoke("send-invoice-email", {
         body: {
           invoiceId: order.id,
@@ -204,20 +200,8 @@ Thank you for your business!`;
           senderName,
           senderEmail,
           subject,
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              ${htmlMessage}
-              <br/>
-              <p style="color: #666; margin-top: 24px; padding-top: 16px; border-top: 1px solid #eee;">
-                ${VIBE_COMPANY.name}<br/>
-                ${VIBE_COMPANY.address.street}<br/>
-                ${VIBE_COMPANY.address.city}, ${VIBE_COMPANY.address.state} ${VIBE_COMPANY.address.zip}
-              </p>
-              <p style="color: #ef4444; font-size: 11px; margin-top: 12px; font-weight: bold;">
-                ⚠️ This email was sent from an unmonitored mailbox. Please do not reply directly to this email.
-              </p>
-            </div>
-          `,
+          documentLabel: "ORDER CONFIRMATION",
+          intro: message,
           pdfBase64,
           pdfFilename: `${order.order_number}_confirmation.pdf`,
           invoiceNumber: order.order_number,

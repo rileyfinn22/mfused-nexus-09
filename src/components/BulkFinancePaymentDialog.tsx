@@ -115,7 +115,7 @@ export function BulkFinancePaymentDialog({ open, onOpenChange, onSuccess, invoic
       }))
       .filter((r) => r.amount > 0.005);
 
-    // Shortfall: the cash payment doesn't cover the allocations â€” fund the difference
+    // Shortfall: the cash payment doesn't cover the allocations — fund the difference
     // from the deposit balance by splitting it off the last allocated PO as a deposit pull.
     if (shortfall > 0 && payload.length > 0 && paymentMethod !== "deposit") {
       const last = payload[payload.length - 1];
@@ -126,7 +126,7 @@ export function BulkFinancePaymentDialog({ open, onOpenChange, onSuccess, invoic
         amount: Number(pull.toFixed(2)),
         payment_method: "deposit",
         source: "deposit",
-        notes: `Deposit pull to cover ${formatUSD(pull)} shortfall${notes ? ` â€” ${notes}` : ""}`,
+        notes: `Deposit pull to cover ${formatUSD(pull)} shortfall${notes ? ` — ${notes}` : ""}`,
       });
     }
 
@@ -222,7 +222,7 @@ export function BulkFinancePaymentDialog({ open, onOpenChange, onSuccess, invoic
                   <Checkbox checked={isSel} onCheckedChange={(c) => toggle(r.id, !!c)} />
                   <div className="flex-1 min-w-0">
                     <div className="font-mono text-xs">
-                      {vpo?.po_number ? `PO #${vpo.po_number}` : r.invoice_number || "â€”"}
+                      {vpo?.po_number ? `PO #${vpo.po_number}` : r.invoice_number || "—"}
                     </div>
                     <div className="text-xs text-muted-foreground truncate">
                       {r.description || vpo?.description || ""}

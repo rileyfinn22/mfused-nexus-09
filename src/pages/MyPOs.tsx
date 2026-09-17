@@ -169,13 +169,13 @@ export default function MyPOs() {
                       </span>
                       {order.invoices && order.invoices.length > 0 && (
                         <>
-                          <span>â€¢</span>
+                          <span>•</span>
                           <span>Invoice #{order.invoices[0].invoice_number}</span>
                         </>
                       )}
-                      <span>â€¢</span>
+                      <span>•</span>
                       <span>{order.customer_name}</span>
-                      <span>â€¢</span>
+                      <span>•</span>
                       <span>{new Date(order.created_at).toLocaleDateString()}</span>
                       <Badge className={`ml-auto ${getStatusColor(order.status)}`}>
                         {order.status}

@@ -25,7 +25,7 @@ interface OrderItemLite {
 }
 
 /**
- * Art files connected to the invoice's products â€” mirrors the order page's
+ * Art files connected to the invoice's products — mirrors the order page's
  * "Product Artwork" section (matched by SKU) so customers can view and
  * download the artwork behind each shipment. RLS scopes artwork_files to the
  * viewer's company; the artwork bucket is private, so links are signed.
@@ -124,7 +124,7 @@ export default function InvoiceArtworkSection({ orderItems }: { orderItems: Orde
 
                     <p className="text-xs text-muted-foreground mt-0.5">
                       SKU: {art.sku}
-                      {matchingItem?.name && ` â€¢ ${matchingItem.name}`}
+                      {matchingItem?.name && ` • ${matchingItem.name}`}
                     </p>
 
                     {art.notes && (

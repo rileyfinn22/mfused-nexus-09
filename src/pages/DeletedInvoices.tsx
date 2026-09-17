@@ -174,7 +174,7 @@ const DeletedInvoices = () => {
             size="sm"
             onClick={() => navigate('/invoices')}
           >
-            â† Back to Invoices
+            ← Back to Invoices
           </Button>
         </div>
         <h1 className="text-2xl font-semibold">Deleted Invoices Archive</h1>

@@ -60,8 +60,8 @@ export function SendDeliveryNotificationDialog({
     });
 
     // Pre-populate defaults
-    const descPart = orderDescription ? ` â€” ${orderDescription}` : "";
-    setSubject(`Order ${orderNumber}${descPart} â€” Shipment Delivered`);
+    const descPart = orderDescription ? ` — ${orderDescription}` : "";
+    setSubject(`Order ${orderNumber}${descPart} — Shipment Delivered`);
 
     // Fix timezone: parse date parts to avoid UTC shift
     let arrivalStr = "recently";
@@ -155,7 +155,7 @@ export function SendDeliveryNotificationDialog({
 
           if (orderData) {
             // Child invoices bill from their own allocation lines with a prorated
-            // blanket-payment credit (src/lib/invoiceBalance.ts) â€” the emailed PDF
+            // blanket-payment credit (src/lib/invoiceBalance.ts) — the emailed PDF
             // must match the portal and downloaded PDFs exactly.
             const { itemsOverride, credit } = await fetchChildPdfInputs(supabase, inv);
             const invForPdf = credit.amount > 0
@@ -267,7 +267,7 @@ export function SendDeliveryNotificationDialog({
               {leg.carrier && <p className="text-foreground">Carrier: <strong>{leg.carrier}</strong></p>}
               {leg.tracking_number && <p className="text-foreground font-mono text-xs">{leg.tracking_number}</p>}
               {(leg.origin || leg.destination) && (
-                <p className="text-muted-foreground">{leg.origin || "â€”"} â†’ {leg.destination || "â€”"}</p>
+                <p className="text-muted-foreground">{leg.origin || "—"} → {leg.destination || "—"}</p>
               )}
             </div>
           )}
@@ -291,7 +291,7 @@ export function SendDeliveryNotificationDialog({
 
           {/* Auto-attach note */}
           <p className="text-xs text-muted-foreground">
-            ðŸ“Ž Invoice PDF will be attached automatically if available for this order.
+            📎 Invoice PDF will be attached automatically if available for this order.
           </p>
         </div>
 

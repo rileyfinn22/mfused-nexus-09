@@ -187,7 +187,7 @@ export function VendorBillsSection({ vendorPO, vendorName, onChanged }: VendorBi
                 <p className="mb-3 rounded-md border border-warning/40 bg-amber-50/60 px-3 py-2 text-xs text-warning dark:bg-warning/20 dark:text-warning">
                   {drafts.length === 1 ? 'A bill was' : `${drafts.length} bills were`} read automatically from
                   what the vendor uploaded. Nothing is costed at {drafts.length === 1 ? 'it' : 'them'} until you
-                  confirm â€” check the figures against the document first, and edit if the read is off.
+                  confirm — check the figures against the document first, and edit if the read is off.
                   {finalBills.some((b) => b.source === 'reconstructed') &&
                     ' Confirming replaces the bill migrated from this PO.'}
                 </p>
@@ -209,16 +209,16 @@ export function VendorBillsSection({ vendorPO, vendorName, onChanged }: VendorBi
                     <TableRow key={bill.id} className={bill.status === 'draft' ? 'bg-amber-50/60 dark:bg-warning/20' : undefined}>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
-                          {bill.invoice_number || <span className="text-muted-foreground">â€”</span>}
+                          {bill.invoice_number || <span className="text-muted-foreground">—</span>}
                           {bill.status === 'draft' && (
                             <Badge variant="outline" className="border-warning text-warning dark:text-warning">
-                              Draft{bill.parse_confidence != null && Number(bill.parse_confidence) < 0.7 ? ' Â· check' : ''}
+                              Draft{bill.parse_confidence != null && Number(bill.parse_confidence) < 0.7 ? ' · check' : ''}
                             </Badge>
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>{bill.bill_date ? formatDocDate(bill.bill_date, 'numeric') : 'â€”'}</TableCell>
-                      <TableCell>{bill.due_date ? formatDocDate(bill.due_date, 'numeric') : 'â€”'}</TableCell>
+                      <TableCell>{bill.bill_date ? formatDocDate(bill.bill_date, 'numeric') : '—'}</TableCell>
+                      <TableCell>{bill.due_date ? formatDocDate(bill.due_date, 'numeric') : '—'}</TableCell>
                       <TableCell className="text-right">{formatCurrency(Number(bill.subtotal || 0))}</TableCell>
                       <TableCell className="text-right">{formatCurrency(Number(bill.freight || 0))}</TableCell>
                       <TableCell className="text-right font-semibold">{formatCurrency(Number(bill.total || 0))}</TableCell>

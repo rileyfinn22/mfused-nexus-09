@@ -1,3 +1,4 @@
+import { EMAIL, renderEmail, paragraph, paragraphsFromText, detailCard, escapeHtml } from "../_shared/emailLayout.ts";
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
 
@@ -106,170 +107,51 @@ const handler = async (req: Request): Promise<Response> => {
         })
       : null;
 
-    // Build the email HTML - NO portal link, PO-specific wording
-    const emailHtml = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>PO ${poNumber} from VibePKG</title>
-      </head>
-      <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f5;">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="min-width: 100%; background-color: #f4f4f5;">
-          <tr>
-            <td align="center" style="padding: 40px 20px;">
-              <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
-                <!-- Header -->
-                <tr>
-                  <td style="background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); padding: 40px 40px 30px 40px; border-radius: 12px 12px 0 0;">
-                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-                      <tr>
-                        <td>
-                          <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;">VibePKG</h1>
-                          <p style="margin: 8px 0 0 0; color: rgba(255, 255, 255, 0.9); font-size: 14px;">Premium Packaging Solutions</p>
-                        </td>
-                        <td align="right">
-                          <span style="background-color: rgba(255, 255, 255, 0.2); color: #ffffff; padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 600;">PURCHASE ORDER</span>
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-                
-                <!-- Content -->
-                <tr>
-                  <td style="padding: 40px;">
-                    <p style="margin: 0 0 24px 0; color: #374151; font-size: 16px; line-height: 1.6;">
-                      Dear ${vendorName || "Valued Vendor"},
-                    </p>
-                    
-                    ${customMessage ? `
-                    <p style="margin: 0 0 24px 0; color: #374151; font-size: 16px; line-height: 1.6; white-space: pre-line;">
-                      ${customMessage}
-                    </p>
-                    ` : `
-                    <p style="margin: 0 0 24px 0; color: #374151; font-size: 16px; line-height: 1.6;">
-                      Please find attached the purchase order from VibePKG. Please confirm receipt of this order and provide an estimated delivery date.
-                    </p>
-                    `}
-                    
-                    <!-- PO Details Card -->
-                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f9fafb; border-radius: 8px; margin-bottom: 24px;">
-                      <tr>
-                        <td style="padding: 24px;">
-                          <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-                            <tr>
-                              <td style="padding-bottom: 16px; border-bottom: 1px solid #e5e7eb;">
-                                <p style="margin: 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">PO Number</p>
-                                <p style="margin: 4px 0 0 0; color: #111827; font-size: 18px; font-weight: 600;">${poNumber}</p>
-                                ${orderNumbers && orderNumbers.length > 0 ? `
-                                <p style="margin: 12px 0 0 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Order Number${orderNumbers.length > 1 ? 's' : ''}</p>
-                                <p style="margin: 4px 0 0 0; color: #111827; font-size: 16px; font-weight: 600;">${orderNumbers.join(', ')}</p>
-                                ` : ''}
-                              </td>
-                            </tr>
-                            <tr>
-                              <td style="padding: 16px 0;">
-                                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-                                  <tr>
-                                    <td width="50%">
-                                      <p style="margin: 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Order Date</p>
-                                      <p style="margin: 4px 0 0 0; color: #111827; font-size: 16px; font-weight: 500;">${formattedOrderDate}</p>
-                                    </td>
-                                    <td width="50%" align="right">
-                                      <p style="margin: 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Total Amount</p>
-                                      <p style="margin: 4px 0 0 0; color: #16a34a; font-size: 24px; font-weight: 700;">${formattedAmount}</p>
-                                    </td>
-                                  </tr>
-                                </table>
-                              </td>
-                            </tr>
-                            ${formattedDeliveryDate ? `
-                            <tr>
-                              <td style="padding-top: 16px; border-top: 1px solid #e5e7eb;">
-                                <p style="margin: 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Expected Delivery</p>
-                                <p style="margin: 4px 0 0 0; color: #111827; font-size: 16px; font-weight: 500;">${formattedDeliveryDate}</p>
-                              </td>
-                            </tr>
-                            ` : ''}
-                          </table>
-                        </td>
-                      </tr>
-                    </table>
-                    
-                    ${caseStickerInfo && caseStickerInfo.length > 0 ? `
-                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #fef3c7; border: 2px solid #f59e0b; border-radius: 8px; margin-bottom: 24px;">
-                      <tr>
-                        <td style="padding: 20px 24px;">
-                          <p style="margin: 0 0 8px 0; color: #92400e; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
-                            ⚠️ Required on Case Stickers
-                          </p>
-                          <p style="margin: 0 0 12px 0; color: #78350f; font-size: 14px; line-height: 1.5;">
-                            Please include the following Invoice # and Customer PO # on the case stickers for this order:
-                          </p>
-                          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border-radius: 6px;">
-                            <tr style="background-color: #fde68a;">
-                              <th align="left" style="padding: 8px 12px; color: #78350f; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Order #</th>
-                              <th align="left" style="padding: 8px 12px; color: #78350f; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Inv #</th>
-                              <th align="left" style="padding: 8px 12px; color: #78350f; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">CPO #</th>
-                            </tr>
-                            ${caseStickerInfo.map((e) => `
-                            <tr>
-                              <td style="padding: 8px 12px; color: #111827; font-size: 14px; font-weight: 600; border-top: 1px solid #fde68a;">${e.orderNumber || '—'}</td>
-                              <td style="padding: 8px 12px; color: #111827; font-size: 14px; font-weight: 600; border-top: 1px solid #fde68a;">${e.invoiceNumber || '—'}</td>
-                              <td style="padding: 8px 12px; color: #111827; font-size: 14px; font-weight: 600; border-top: 1px solid #fde68a;">${e.customerPO || '—'}</td>
-                            </tr>
-                            `).join('')}
-                          </table>
-                        </td>
-                      </tr>
-                    </table>
-                    ` : ''}
-                    
-                    <p style="margin: 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
-                      The purchase order PDF is attached to this email for your records.
-                    </p>
-                  </td>
-                </tr>
-                
-                <!-- Footer -->
-                <tr>
-                  <td style="background-color: #f9fafb; padding: 24px 40px; border-radius: 0 0 12px 12px; border-top: 1px solid #e5e7eb;">
-                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-                      <tr>
-                        <td>
-                          <p style="margin: 0; color: #ef4444; font-size: 12px; font-weight: 600;">
-                            ⚠️ Please do not reply to this email — this mailbox is not monitored.
-                          </p>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style="padding-top: 8px;">
-                          <p style="margin: 0; color: #6b7280; font-size: 14px;">
-                            Questions? Contact us at 
-                            <a href="mailto:${senderEmail}" style="color: #16a34a; text-decoration: none;">${senderEmail}</a>
-                          </p>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style="padding-top: 16px;">
-                          <p style="margin: 0; color: #9ca3af; font-size: 12px;">
-                            © ${new Date().getFullYear()} VibePKG. All rights reserved.
-                          </p>
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-        </table>
-      </body>
-      </html>
-    `;
+    // Case-sticker requirement: a bordered panel in ink, not an amber alert box.
+    const stickerRows = caseStickerInfo && caseStickerInfo.length > 0
+      ? `
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border: 1px solid ${EMAIL.ink}; border-radius: 6px; margin: 0 0 24px 0;">
+          <tr><td style="padding: 16px 20px;">
+            <p style="margin: 0 0 4px 0; color: ${EMAIL.ink}; font-size: 13px; font-weight: 700;">Required on case stickers</p>
+            <p style="margin: 0 0 12px 0; color: ${EMAIL.body}; font-size: 13px; line-height: 1.5;">Please print the Invoice # and Customer PO # below on the case stickers for this order.</p>
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse: collapse;">
+              <tr>
+                <th align="left" style="padding: 6px 8px; color: ${EMAIL.muted}; font-size: 11px; font-weight: 600; border-bottom: 1px solid ${EMAIL.rule};">Order #</th>
+                <th align="left" style="padding: 6px 8px; color: ${EMAIL.muted}; font-size: 11px; font-weight: 600; border-bottom: 1px solid ${EMAIL.rule};">Invoice #</th>
+                <th align="left" style="padding: 6px 8px; color: ${EMAIL.muted}; font-size: 11px; font-weight: 600; border-bottom: 1px solid ${EMAIL.rule};">Customer PO #</th>
+              </tr>
+              ${caseStickerInfo.map((e) => `
+              <tr>
+                <td style="padding: 8px; color: ${EMAIL.ink}; font-size: 14px; font-weight: 600; border-bottom: 1px solid ${EMAIL.rule};">${escapeHtml(e.orderNumber || "—")}</td>
+                <td style="padding: 8px; color: ${EMAIL.ink}; font-size: 14px; font-weight: 600; border-bottom: 1px solid ${EMAIL.rule};">${escapeHtml(e.invoiceNumber || "—")}</td>
+                <td style="padding: 8px; color: ${EMAIL.ink}; font-size: 14px; font-weight: 600; border-bottom: 1px solid ${EMAIL.rule};">${escapeHtml(e.customerPO || "—")}</td>
+              </tr>`).join("")}
+            </table>
+          </td></tr>
+        </table>`
+      : "";
 
+    const emailHtml = renderEmail({
+      documentLabel: "PURCHASE ORDER",
+      title: `PO ${poNumber} from Vibe Packaging`,
+      bodyHtml:
+        paragraph(`Dear ${escapeHtml(vendorName || "Valued Vendor")},`) +
+        (customMessage
+          ? paragraphsFromText(customMessage)
+          : paragraph("Please find the attached purchase order. Kindly confirm receipt and provide an estimated delivery date.")) +
+        detailCard([
+          { label: "PO number", value: escapeHtml(poNumber), emphasis: true },
+          ...(orderNumbers && orderNumbers.length > 0
+            ? [{ label: orderNumbers.length > 1 ? "Order numbers" : "Order number", value: escapeHtml(orderNumbers.join(", ")) }]
+            : []),
+          { label: "Order date", value: escapeHtml(formattedOrderDate) },
+          ...(formattedDeliveryDate ? [{ label: "Expected delivery", value: escapeHtml(formattedDeliveryDate) }] : []),
+          { label: "Total", value: escapeHtml(formattedAmount), emphasis: true },
+        ]) +
+        stickerRows +
+        paragraph("The purchase order PDF is attached for your records.", { muted: true, last: true }),
+      contactEmail: senderEmail,
+    });
     // Build attachments array - primary PDF + any additional attachments
     const attachments: Attachment[] = [
       {

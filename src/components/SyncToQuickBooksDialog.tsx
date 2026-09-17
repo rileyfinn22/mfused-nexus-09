@@ -227,7 +227,7 @@ export function SyncToQuickBooksDialog({
                 <span className="text-right font-semibold">{formatCurrency(invoiceTotal)}</span>
                 
                 <span className="text-muted-foreground">Paid</span>
-                <span className="text-right font-medium text-success">{thisInvoicePaid > 0 ? formatCurrency(thisInvoicePaid) : 'â€”'}</span>
+                <span className="text-right font-medium text-success">{thisInvoicePaid > 0 ? formatCurrency(thisInvoicePaid) : '—'}</span>
                 
                 <span className="text-muted-foreground">Balance Due</span>
                 <span className="text-right font-semibold">{formatCurrency(thisInvoiceBalance)}</span>
@@ -235,7 +235,7 @@ export function SyncToQuickBooksDialog({
               {isResync && (
                 <div className="flex items-center gap-1 text-xs text-warning pt-1">
                   <AlertCircle className="h-3 w-3" />
-                  Already synced â€” will update existing QBO invoice
+                  Already synced — will update existing QBO invoice
                 </div>
               )}
             </div>
@@ -255,7 +255,7 @@ export function SyncToQuickBooksDialog({
                           {inv.quickbooks_id ? (
                             <CheckCircle2 className="h-3 w-3 text-success shrink-0" />
                           ) : (
-                            <span className="text-muted-foreground">Â·</span>
+                            <span className="text-muted-foreground">·</span>
                           )}
                           {!inv.parent_invoice_id && !isPullShipInvoice && Number(inv.billed_percentage || 100) < 99.99 && (
                             <Badge variant="secondary" className="text-[10px] shrink-0">
@@ -302,7 +302,7 @@ export function SyncToQuickBooksDialog({
                   <span className="text-right font-medium text-destructive">-{formatCurrency(depositAmount)}</span>
                   {depositPaid > 0 && (
                     <>
-                      <span className="text-info dark:text-info text-xs">â†³ Deposit Paid</span>
+                      <span className="text-info dark:text-info text-xs">↳ Deposit Paid</span>
                       <span className="text-right text-xs text-success">{formatCurrency(depositPaid)}</span>
                     </>
                   )}
@@ -324,7 +324,7 @@ export function SyncToQuickBooksDialog({
               </div>
               {thisInvoicePaid > 0 && !isResync && (
                 <p className="text-xs text-muted-foreground">
-                  {formatCurrency(thisInvoicePaid)} already paid â€” sync payments separately after billing.
+                  {formatCurrency(thisInvoicePaid)} already paid — sync payments separately after billing.
                 </p>
               )}
             </div>
@@ -366,7 +366,7 @@ export function SyncToQuickBooksDialog({
               )}
               {hasDeposit && billingPercentage === 100 && (
                 <p className="text-xs text-info">
-                  Deposit of {formatCurrency(depositAmount)} will be auto-deducted â†’ Net: {formatCurrency(invoiceTotal - depositAmount)}
+                  Deposit of {formatCurrency(depositAmount)} will be auto-deducted → Net: {formatCurrency(invoiceTotal - depositAmount)}
                 </p>
               )}
             </div>

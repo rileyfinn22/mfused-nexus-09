@@ -156,7 +156,7 @@ export function ShipmentTracker({ legs, isVibeAdmin, onStatusChange, onActualArr
             {activeLeg && (
               <p className="text-sm text-muted-foreground">
                 Currently: <span className="font-medium text-foreground">
-                  {LEG_TYPE_LABELS[activeLeg.leg_type] || activeLeg.leg_type} â€” {activeLeg.status.replace(/_/g, ' ')}
+                  {LEG_TYPE_LABELS[activeLeg.leg_type] || activeLeg.leg_type} — {activeLeg.status.replace(/_/g, ' ')}
                 </span>
               </p>
             )}
@@ -224,9 +224,9 @@ export function ShipmentTracker({ legs, isVibeAdmin, onStatusChange, onActualArr
                         {(leg.origin || leg.destination) && (
                           <div className="flex items-center gap-1.5 mt-1.5 text-sm text-muted-foreground">
                             <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
-                            <span>{leg.origin || 'â€”'}</span>
-                            <span className="mx-1">â†’</span>
-                            <span>{leg.destination || 'â€”'}</span>
+                            <span>{leg.origin || '—'}</span>
+                            <span className="mx-1">→</span>
+                            <span>{leg.destination || '—'}</span>
                           </div>
                         )}
 
@@ -236,7 +236,7 @@ export function ShipmentTracker({ legs, isVibeAdmin, onStatusChange, onActualArr
                             <span className="font-medium text-foreground">{leg.carrier}</span>
                             {trackingUrl && leg.tracking_number && (
                               <>
-                                <span className="text-muted-foreground">â€¢</span>
+                                <span className="text-muted-foreground">•</span>
                                 <a
                                   href={trackingUrl}
                                   target="_blank"

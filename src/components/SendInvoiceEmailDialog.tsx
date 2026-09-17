@@ -735,12 +735,12 @@ Thank you for your business.`;
               {additionalAttachments.length > 0 && (
                 <div className="space-y-1">
                   <p className="text-xs text-muted-foreground">
-                    {additionalAttachments.length} additional file{additionalAttachments.length > 1 ? 's' : ''} â€¢ 
+                    {additionalAttachments.length} additional file{additionalAttachments.length > 1 ? 's' : ''} • 
                     Total: {formatFileSize(additionalAttachments.reduce((sum, a) => sum + a.file.size, 0))}
                   </p>
                   {additionalAttachments.reduce((sum, a) => sum + a.file.size, 0) > 10 * 1024 * 1024 && (
                     <p className="text-xs text-warning dark:text-warning">
-                      âš ï¸ Large attachments may take a minute to send
+                      ⚠️ Large attachments may take a minute to send
                     </p>
                   )}
                 </div>

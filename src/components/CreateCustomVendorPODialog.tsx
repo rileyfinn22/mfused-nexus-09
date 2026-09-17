@@ -286,7 +286,7 @@ export function CreateCustomVendorPODialog({
       const action = existingPO ? "updated" : "created";
       toast({
         title: "Success",
-        description: `Vendor PO ${targetPO.po_number} ${action} â€” ${validItems.length} line item(s) added for Order ${orderNumber}`,
+        description: `Vendor PO ${targetPO.po_number} ${action} — ${validItems.length} line item(s) added for Order ${orderNumber}`,
       });
 
       onCreated();

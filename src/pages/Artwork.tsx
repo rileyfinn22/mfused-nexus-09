@@ -1281,7 +1281,7 @@ const Artwork = () => {
                     <span>{new Date(file.created_at).toLocaleDateString()}</span>
                     {file.is_approved && file.approved_at && (
                       <span className="text-success">
-                        ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ {new Date(file.approved_at).toLocaleDateString()}
+                        ✓ {new Date(file.approved_at).toLocaleDateString()}
                       </span>
                     )}
                   </div>
@@ -1405,7 +1405,7 @@ const Artwork = () => {
                       <div className="font-medium truncate" title={f.filename}>{f.filename}</div>
                       <div className="text-xs text-muted-foreground">
                         Rejected {new Date(f.rejected_at).toLocaleDateString()}
-                        {f.rejection_reason ? ` ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ${f.rejection_reason}` : ''}
+                        {f.rejection_reason ? ` — ${f.rejection_reason}` : ''}
                       </div>
                     </div>
                     {f.artwork_url && (

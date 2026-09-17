@@ -393,7 +393,7 @@ const Products = () => {
 
       let countsByTemplate = new Map<string, number>();
       if (templateIds.length > 0) {
-        // Exact per-template counts via HEAD requests â€” a bulk select is capped by
+        // Exact per-template counts via HEAD requests — a bulk select is capped by
         // PostgREST's max-rows, which silently under-counts large templates.
         const countOne = async (templateId: string) => {
           let q = supabase
@@ -1252,8 +1252,8 @@ const Products = () => {
                     )}
                     <p className="text-sm font-medium">
                       {isVibeAdmin
-                        ? (product.cost ? `$${product.cost.toFixed(3)}` : 'â€”')
-                        : (product.price ? `$${product.price.toFixed(3)}` : 'â€”')}
+                        ? (product.cost ? `$${product.cost.toFixed(3)}` : '—')
+                        : (product.price ? `$${product.price.toFixed(3)}` : '—')}
                     </p>
                   </div>
                 </Card>
@@ -1365,8 +1365,8 @@ const Products = () => {
                       </div>
                       <div className="col-span-1 text-sm font-medium">
                         {isVibeAdmin 
-                          ? (product.cost ? `$${product.cost.toFixed(3)}` : 'â€”')
-                          : (product.price ? `$${product.price.toFixed(3)}` : 'â€”')}
+                          ? (product.cost ? `$${product.cost.toFixed(3)}` : '—')
+                          : (product.price ? `$${product.price.toFixed(3)}` : '—')}
                       </div>
                       {!isEditMode && (
                         <div className="col-span-1 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>

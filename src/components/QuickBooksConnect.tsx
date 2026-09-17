@@ -308,9 +308,9 @@ export const QuickBooksConnect = () => {
             <div className="space-y-2">
               <h4 className="text-sm font-medium">Auto-Sync Enabled For:</h4>
               <ul className="text-sm text-muted-foreground space-y-1 ml-4">
-                <li>âœ“ Products â†’ Non-Inventory Items</li>
-                <li>âœ“ Invoices â†’ Sales Invoices</li>
-                <li>âœ“ Vendor POs â†’ Bills</li>
+                <li>✓ Products → Non-Inventory Items</li>
+                <li>✓ Invoices → Sales Invoices</li>
+                <li>✓ Vendor POs → Bills</li>
               </ul>
               <p className="text-xs text-muted-foreground mt-2">
                 Tokens are automatically refreshed every 30 minutes
@@ -342,9 +342,9 @@ export const QuickBooksConnect = () => {
               Connect your QuickBooks Online account to automatically sync:
             </p>
             <ul className="text-sm text-muted-foreground space-y-1 ml-4">
-              <li>â€¢ Products as Non-Inventory Items</li>
-              <li>â€¢ Customer Invoices as Sales Invoices</li>
-              <li>â€¢ Vendor Purchase Orders as Bills</li>
+              <li>• Products as Non-Inventory Items</li>
+              <li>• Customer Invoices as Sales Invoices</li>
+              <li>• Vendor Purchase Orders as Bills</li>
             </ul>
             
             <Button 

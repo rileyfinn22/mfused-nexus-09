@@ -484,7 +484,7 @@ export default function ShipmentUpdate() {
                           </td>
                           <td className="px-2 py-2">
                             {isCustoms ? (
-                              <span className="text-xs text-muted-foreground italic px-1">â€”</span>
+                              <span className="text-xs text-muted-foreground italic px-1">—</span>
                             ) : (
                               <Input
                                 value={getValue(leg, "destination")}
@@ -496,7 +496,7 @@ export default function ShipmentUpdate() {
                           </td>
                           <td className="px-2 py-2">
                             {isCustoms ? (
-                              <span className="text-xs text-muted-foreground italic px-1">â€”</span>
+                              <span className="text-xs text-muted-foreground italic px-1">—</span>
                             ) : (
                               <Input
                                 value={getValue(leg, "carrier")}
@@ -508,7 +508,7 @@ export default function ShipmentUpdate() {
                           </td>
                           <td className="px-2 py-2">
                             {isCustoms ? (
-                              <span className="text-xs text-muted-foreground italic px-1">â€”</span>
+                              <span className="text-xs text-muted-foreground italic px-1">—</span>
                             ) : (
                               <Input
                                 value={getValue(leg, "tracking_number")}
@@ -566,7 +566,7 @@ export default function ShipmentUpdate() {
                       return (
                         <tr key={leg.id} className="border-b border-border hover:bg-muted/50">
                           <td className="px-2 py-2"></td>
-                          <td className="px-2 py-2 text-center text-muted-foreground text-xs">â€”</td>
+                          <td className="px-2 py-2 text-center text-muted-foreground text-xs">—</td>
                           <td className="px-2 py-2">
                             <Select value={leg.leg_type} onValueChange={(val) => updateNewLeg(leg.id, "leg_type", val)}>
                               <SelectTrigger className="h-8 text-xs w-[110px]">
@@ -584,21 +584,21 @@ export default function ShipmentUpdate() {
                           </td>
                           <td className="px-2 py-2">
                             {isCustoms ? (
-                              <span className="text-xs text-muted-foreground italic px-1">â€”</span>
+                              <span className="text-xs text-muted-foreground italic px-1">—</span>
                             ) : (
                               <Input value={leg.destination} onChange={(e) => updateNewLeg(leg.id, "destination", e.target.value)} placeholder="Destination" className="h-8 text-xs w-full min-w-[100px]" />
                             )}
                           </td>
                           <td className="px-2 py-2">
                             {isCustoms ? (
-                              <span className="text-xs text-muted-foreground italic px-1">â€”</span>
+                              <span className="text-xs text-muted-foreground italic px-1">—</span>
                             ) : (
                               <Input value={leg.carrier} onChange={(e) => updateNewLeg(leg.id, "carrier", e.target.value)} placeholder="e.g. UPS, FedEx" className="h-8 text-xs w-full min-w-[100px]" />
                             )}
                           </td>
                           <td className="px-2 py-2">
                             {isCustoms ? (
-                              <span className="text-xs text-muted-foreground italic px-1">â€”</span>
+                              <span className="text-xs text-muted-foreground italic px-1">—</span>
                             ) : (
                               <Input value={leg.tracking_number} onChange={(e) => updateNewLeg(leg.id, "tracking_number", e.target.value)} placeholder="Tracking/PRO #" className="h-8 text-xs w-full min-w-[110px]" />
                             )}

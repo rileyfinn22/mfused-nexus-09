@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { measureRichText, drawRichText } from './pdfRichText';
-import { DOC, DOC_COLORS, drawMasthead } from './pdfDocument';
+import { DOC, DOC_COLORS, docTableStyles, drawMasthead } from './pdfDocument';
 
 interface QuantityTier {
   qty: number;
@@ -265,20 +265,9 @@ export async function generateQuotePDF(quote: Quote, items: QuoteItem[]): Promis
     startY: yPos,
     head: headRow,
     body: tableBody,
-    theme: 'plain',
-    headStyles: {
-      fillColor: COLORS.headerBg,
-      textColor: COLORS.muted,
-      fontStyle: 'bold',
-      fontSize: 8,
-      cellPadding: { top: 4, right: 4, bottom: 4, left: 6 },
-    },
-    bodyStyles: {
-      fontSize: 9,
-      cellPadding: { top: 4, right: 4, bottom: 4, left: 6 },
-      textColor: COLORS.body,
-      lineWidth: 0,
-    },
+    // The quote is where the house table was worked out; it now reads it back from the
+    // shared module so a palette change never needs two commits.
+    ...docTableStyles(),
     columnStyles: allDescriptionOnly
       ? { 0: { cellWidth: tableInnerWidth } }
       : {

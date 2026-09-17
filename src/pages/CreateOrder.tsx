@@ -617,7 +617,7 @@ const CreateOrder = () => {
     // Skip auto-save if editing an existing order (orderId is set from URL params)
     if (orderId) return;
 
-    // Buyers have no INSERT/UPDATE rights on orders â€” they submit through the
+    // Buyers have no INSERT/UPDATE rights on orders — they submit through the
     // submit_customer_order RPC instead. Auto-saving would just throw RLS errors
     // at them while they type.
     if (!isVibeAdmin) return;
@@ -1933,7 +1933,7 @@ const CreateOrder = () => {
       const subtotal = matchedSubtotal + unmatchedSubtotalSave;
       const total = subtotal;
 
-      // Buyers can't write orders directly â€” RLS gives them no INSERT on
+      // Buyers can't write orders directly — RLS gives them no INSERT on
       // orders/order_items. Everything goes through the RPC, which assigns the
       // order number, stamps company/creator, checks every product belongs to
       // them, and files it as pending for review.
@@ -1974,7 +1974,7 @@ const CreateOrder = () => {
 
         toast({
           title: "Order Submitted",
-          description: "It's pending review â€” VibePKG will confirm pricing and timing.",
+          description: "It's pending review — VibePKG will confirm pricing and timing.",
         });
         navigate(`/orders/${newOrderId}`);
         return;
@@ -2153,7 +2153,7 @@ const CreateOrder = () => {
         const itemsToDelete = Array.from(existingItemsMap.values());
         if (itemsToDelete.length > 0) {
           const deleteIds = itemsToDelete.map(i => i.id);
-          // Detach vendor PO lines first so they survive (defense in depth â€” FK is also SET NULL)
+          // Detach vendor PO lines first so they survive (defense in depth — FK is also SET NULL)
           await supabase
             .from('vendor_po_items')
             .update({ order_item_id: null })
@@ -2404,7 +2404,7 @@ const CreateOrder = () => {
           </div>
         )}
 
-        {/* AI Order Entry / Re-upload PO â€” staff only. It calls analyze-po, which
+        {/* AI Order Entry / Re-upload PO — staff only. It calls analyze-po, which
             creates orders with service-role rights and matches against vendor
             preferences, so it stays off the buyer's screen. */}
         {isVibeAdmin && (
@@ -3406,7 +3406,7 @@ const CreateOrder = () => {
               </div>
               {poDocumentTotal !== null && Math.abs(poDocumentTotal - total) > 0.01 && (
                 <p className="text-xs text-warning">
-                  Difference: ${Math.abs(poDocumentTotal - total).toFixed(2)} â€” verify line item prices match the PO
+                  Difference: ${Math.abs(poDocumentTotal - total).toFixed(2)} — verify line item prices match the PO
                 </p>
               )}
             </div>
