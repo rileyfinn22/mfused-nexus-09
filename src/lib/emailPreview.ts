@@ -7,7 +7,7 @@ const EMAIL_PREVIEW = {
   paper: "#FBFAF9",
   panel: "#F5F6F8",
   danger: "#B8372E",
-  logoUrl: "https://spxdyqdygsmzyngrqxni.supabase.co/storage/v1/object/public/print-files/demo/vibe-logo-dark.png",
+  logoUrl: "https://vibepkgportal.com/images/vibe-logo-print.png",
 };
 
 function escapeEmailHtml(value: unknown): string {

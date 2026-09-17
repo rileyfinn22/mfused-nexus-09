@@ -8,7 +8,7 @@
 // Everything is table-based inline CSS because that is what mail clients render reliably.
 
 export const EMAIL = {
-  logoUrl: "https://spxdyqdygsmzyngrqxni.supabase.co/storage/v1/object/public/print-files/demo/vibe-logo-dark.png",
+  logoUrl: "https://vibepkgportal.com/images/vibe-logo-print.png",
   ink: "#232931",        // masthead, footer, buttons, headings
   body: "#464E59",       // body text
   muted: "#78808A",      // labels, secondary text
