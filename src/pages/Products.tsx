@@ -848,14 +848,17 @@ const Products = () => {
     )
   );
 
-  // A folder matches a kind by its own product_type, else when any product inside it does.
+  // The kinds a folder counts as: its own product_type, else the types of what it holds.
+  // An untyped, empty folder is [null], which the kind filter reads as "Other".
+  const templateKinds = (template: ProductTemplate): (string | null)[] => {
+    if (template.product_type) return [template.product_type];
+    const inside = products.filter(p => p.template_id === template.id).map(p => p.product_type ?? null);
+    return inside.length > 0 ? inside : [null];
+  };
+
   const filteredTemplates = templates.filter(template =>
     matchesBrand(template.brand_id) &&
-    matchesAnyKind(
-      template.product_type
-        ? [template.product_type]
-        : products.filter(p => p.template_id === template.id).map(p => p.product_type)
-    ) && (
+    matchesAnyKind(templateKinds(template)) && (
       template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (template.description && template.description.toLowerCase().includes(searchQuery.toLowerCase()))
     )

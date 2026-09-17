@@ -2050,7 +2050,7 @@ const Artwork = () => {
           {templates
             .filter(t =>
               matchesBrand(t.brand_id) &&
-              matchesAnyKind(t.product_type ? [t.product_type] : templateProductTypes[t.id] || []) &&
+              matchesAnyKind(t.product_type ? [t.product_type] : (templateProductTypes[t.id]?.length ? templateProductTypes[t.id] : [null])) &&
               t.name.toLowerCase().includes(searchQuery.toLowerCase())
             )
             .map((template) => {
