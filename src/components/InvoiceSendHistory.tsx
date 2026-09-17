@@ -12,6 +12,8 @@ interface LogRow {
   subject: string | null;
   sent_by_email: string | null;
   sent_at: string;
+  /** 'app' = logged at send time; 'status_history' = inferred from the billed status change. */
+  source: string;
 }
 
 interface InvoiceSendHistoryProps {
@@ -40,7 +42,7 @@ export function InvoiceSendHistory({ invoiceId, firstSentAt, isPaid = false, ref
       const [{ data, error }, paid] = await Promise.all([
         supabase
           .from("invoice_email_log")
-          .select("id, email_kind, recipients, subject, sent_by_email, sent_at")
+          .select("id, email_kind, recipients, subject, sent_by_email, sent_at, source")
           .eq("invoice_id", invoiceId)
           .order("sent_at", { ascending: false }),
         isPaid
@@ -106,7 +108,11 @@ export function InvoiceSendHistory({ invoiceId, firstSentAt, isPaid = false, ref
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground truncate" title={r.recipients.join(", ")}>
-                  To {r.recipients.join(", ")}
+                  {r.source === "status_history"
+                    ? "Inferred from the date the invoice was marked billed; recipients not recorded"
+                    : r.recipients.length > 0
+                      ? `To ${r.recipients.join(", ")}`
+                      : "Recipients not recorded"}
                   {r.sent_by_email ? ` · by ${r.sent_by_email}` : ""}
                 </p>
               </div>

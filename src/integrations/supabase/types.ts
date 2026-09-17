@@ -1224,6 +1224,7 @@ export type Database = {
           sent_at: string
           sent_by: string | null
           sent_by_email: string | null
+          source: string
           subject: string | null
         }
         Insert: {
@@ -1237,6 +1238,7 @@ export type Database = {
           sent_at?: string
           sent_by?: string | null
           sent_by_email?: string | null
+          source?: string
           subject?: string | null
         }
         Update: {
@@ -1250,6 +1252,7 @@ export type Database = {
           sent_at?: string
           sent_by?: string | null
           sent_by_email?: string | null
+          source?: string
           subject?: string | null
         }
         Relationships: [
