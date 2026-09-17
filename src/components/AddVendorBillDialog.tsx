@@ -206,11 +206,11 @@ export function AddVendorBillDialog({ open, onOpenChange, vendorPO, bill, onSave
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            {bill?.id ? 'Edit' : 'Attach'} Vendor Bill — {vendorPO.po_number}
+            {bill?.id ? 'Edit' : 'Attach'} Vendor Bill â€” {vendorPO.po_number}
           </DialogTitle>
           <DialogDescription>
             The vendor's own invoice. Once attached, this drives what we owe, what we pay and
-            project profit — the PO itself stays as originally ordered.
+            project profit â€” the PO itself stays as originally ordered.
           </DialogDescription>
         </DialogHeader>
 
@@ -242,7 +242,7 @@ export function AddVendorBillDialog({ open, onOpenChange, vendorPO, bill, onSave
               <label className="flex cursor-pointer flex-col items-center gap-2 py-4 text-center">
                 <Upload className="h-6 w-6 text-muted-foreground" />
                 <span className="text-sm font-medium">Attach their invoice</span>
-                <span className="text-xs text-muted-foreground">PDF, Excel or CSV — optional, you can just type the total</span>
+                <span className="text-xs text-muted-foreground">PDF, Excel or CSV â€” optional, you can just type the total</span>
                 <input
                   type="file"
                   className="hidden"
@@ -255,10 +255,10 @@ export function AddVendorBillDialog({ open, onOpenChange, vendorPO, bill, onSave
           </div>
 
           {readConfidence && (
-            <p className={`text-xs ${readConfidence === 'high' ? 'text-muted-foreground' : 'text-orange-600'}`}>
+            <p className={`text-xs ${readConfidence === 'high' ? 'text-muted-foreground' : 'text-warning'}`}>
               {readConfidence === 'high'
-                ? 'Figures read from the document — confirm them against the invoice before saving.'
-                : `Read with ${readConfidence} confidence — check every figure carefully.`}
+                ? 'Figures read from the document â€” confirm them against the invoice before saving.'
+                : `Read with ${readConfidence} confidence â€” check every figure carefully.`}
             </p>
           )}
 
@@ -302,7 +302,7 @@ export function AddVendorBillDialog({ open, onOpenChange, vendorPO, bill, onSave
           {partsDisagree && (
             <p className="text-xs text-muted-foreground">
               Subtotal + freight is ${partsSum.toFixed(2)}, but the bill total says ${totalValue.toFixed(2)}.
-              The total is what we will owe — leave it as the invoice states it.
+              The total is what we will owe â€” leave it as the invoice states it.
             </p>
           )}
 

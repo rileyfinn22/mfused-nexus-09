@@ -346,9 +346,9 @@ const BulkArtworkUploadDialog = ({
   const getConfidenceBadge = (confidence: string) => {
     switch (confidence) {
       case 'high':
-        return <Badge className="bg-green-600 text-white">High Match</Badge>;
+        return <Badge className="bg-success text-success-foreground">High Match</Badge>;
       case 'medium':
-        return <Badge className="bg-yellow-500 text-white">Medium Match</Badge>;
+        return <Badge className="bg-warning text-warning-foreground">Medium Match</Badge>;
       case 'low':
         return <Badge variant="secondary">Low Match</Badge>;
       default:
@@ -545,7 +545,7 @@ const BulkArtworkUploadDialog = ({
         {/* Step: Done */}
         {step === 'done' && (
           <div className="py-8 space-y-6 text-center">
-            <CheckCircle className="h-12 w-12 mx-auto text-green-600" />
+            <CheckCircle className="h-12 w-12 mx-auto text-success" />
             <div className="space-y-2">
               <p className="font-medium text-lg">Upload Complete!</p>
               <p className="text-sm text-muted-foreground">

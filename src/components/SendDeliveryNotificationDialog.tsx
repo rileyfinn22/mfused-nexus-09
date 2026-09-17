@@ -60,8 +60,8 @@ export function SendDeliveryNotificationDialog({
     });
 
     // Pre-populate defaults
-    const descPart = orderDescription ? ` — ${orderDescription}` : "";
-    setSubject(`Order ${orderNumber}${descPart} — Shipment Delivered`);
+    const descPart = orderDescription ? ` â€” ${orderDescription}` : "";
+    setSubject(`Order ${orderNumber}${descPart} â€” Shipment Delivered`);
 
     // Fix timezone: parse date parts to avoid UTC shift
     let arrivalStr = "recently";
@@ -155,7 +155,7 @@ export function SendDeliveryNotificationDialog({
 
           if (orderData) {
             // Child invoices bill from their own allocation lines with a prorated
-            // blanket-payment credit (src/lib/invoiceBalance.ts) — the emailed PDF
+            // blanket-payment credit (src/lib/invoiceBalance.ts) â€” the emailed PDF
             // must match the portal and downloaded PDFs exactly.
             const { itemsOverride, credit } = await fetchChildPdfInputs(supabase, inv);
             const invForPdf = credit.amount > 0
@@ -220,7 +220,7 @@ export function SendDeliveryNotificationDialog({
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Truck className="h-5 w-5 text-green-600" />
+            <Truck className="h-5 w-5 text-success" />
             Send Delivery Notification
           </DialogTitle>
         </DialogHeader>
@@ -260,14 +260,14 @@ export function SendDeliveryNotificationDialog({
 
           {/* Tracking info summary */}
           {(leg.carrier || leg.tracking_number) && (
-            <div className="rounded-lg border border-green-200 bg-green-50/50 dark:bg-green-950/20 p-3 space-y-1 text-sm">
-              <p className="font-medium text-green-700 dark:text-green-400 text-xs uppercase tracking-wider">
+            <div className="rounded-lg border border-success bg-green-50/50 dark:bg-success/20 p-3 space-y-1 text-sm">
+              <p className="font-medium text-success dark:text-success text-xs uppercase tracking-wider">
                 Tracking Info (auto-included in email)
               </p>
               {leg.carrier && <p className="text-foreground">Carrier: <strong>{leg.carrier}</strong></p>}
               {leg.tracking_number && <p className="text-foreground font-mono text-xs">{leg.tracking_number}</p>}
               {(leg.origin || leg.destination) && (
-                <p className="text-muted-foreground">{leg.origin || "—"} → {leg.destination || "—"}</p>
+                <p className="text-muted-foreground">{leg.origin || "â€”"} â†’ {leg.destination || "â€”"}</p>
               )}
             </div>
           )}
@@ -291,7 +291,7 @@ export function SendDeliveryNotificationDialog({
 
           {/* Auto-attach note */}
           <p className="text-xs text-muted-foreground">
-            📎 Invoice PDF will be attached automatically if available for this order.
+            ðŸ“Ž Invoice PDF will be attached automatically if available for this order.
           </p>
         </div>
 

@@ -754,14 +754,14 @@ const PullShipOrderDetail = () => {
               <Button 
                 onClick={handleApproveOrder}
                 disabled={approving || !order.order_items || order.order_items.length === 0}
-                className="bg-green-600 hover:bg-green-700"
+                className="bg-success hover:bg-success"
               >
                 {approving ? "Approving..." : "Approve & Send to Fulfillment"}
               </Button>
             </>
           )}
           {isAdmin && order?.vibe_approved && (
-            <Badge className="bg-green-500 text-white px-4 py-2">
+            <Badge className="bg-success text-success-foreground px-4 py-2">
               Approved {order.vibe_approved_at && `on ${new Date(order.vibe_approved_at).toLocaleDateString()}`}
             </Badge>
           )}
@@ -824,7 +824,7 @@ const PullShipOrderDetail = () => {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="flex items-center gap-3">
-              <CheckCircle2 className="h-6 w-6 text-green-600" />
+              <CheckCircle2 className="h-6 w-6 text-success" />
               <div>
                 <p className="font-medium">Order Created</p>
                 <p className="text-sm text-muted-foreground">PO uploaded and processed</p>
@@ -833,7 +833,7 @@ const PullShipOrderDetail = () => {
             
             <div className="flex items-center gap-3">
               {isPicked ? (
-                <CheckCircle2 className="h-6 w-6 text-green-600" />
+                <CheckCircle2 className="h-6 w-6 text-success" />
               ) : (
                 <Circle className="h-6 w-6 text-muted-foreground" />
               )}
@@ -852,7 +852,7 @@ const PullShipOrderDetail = () => {
             
             <div className="flex items-center gap-3">
               {isShipped ? (
-                <CheckCircle2 className="h-6 w-6 text-green-600" />
+                <CheckCircle2 className="h-6 w-6 text-success" />
               ) : (
                 <Circle className="h-6 w-6 text-muted-foreground" />
               )}
@@ -925,7 +925,7 @@ const PullShipOrderDetail = () => {
                 </div>
                 <div className="flex items-center gap-4 text-sm text-muted-foreground">
                   <span>Created: {new Date(order.created_at).toLocaleDateString()}</span>
-                  <span>•</span>
+                  <span>â€¢</span>
                   <span>Due: {order.due_date ? formatDocDate(order.due_date, 'numeric') : 'Not set'}</span>
                 </div>
               </div>

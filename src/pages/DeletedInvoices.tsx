@@ -174,7 +174,7 @@ const DeletedInvoices = () => {
             size="sm"
             onClick={() => navigate('/invoices')}
           >
-            ← Back to Invoices
+            â† Back to Invoices
           </Button>
         </div>
         <h1 className="text-2xl font-semibold">Deleted Invoices Archive</h1>
@@ -259,7 +259,7 @@ const DeletedInvoices = () => {
                   </div>
                 </div>
                 <div className="col-span-1">
-                  <Badge className={invoice.invoice_type === 'full' ? 'bg-purple-500 text-white' : 'bg-blue-500 text-white'}>
+                  <Badge className={invoice.invoice_type === 'full' ? 'bg-info text-info-foreground' : 'bg-info text-info-foreground'}>
                     {invoice.invoice_type || 'full'}
                   </Badge>
                 </div>
@@ -278,7 +278,7 @@ const DeletedInvoices = () => {
                       size="sm"
                       onClick={() => handleRestore(invoice.id)}
                       title="Restore"
-                      className="text-green-600 hover:text-green-700"
+                      className="text-success hover:text-success"
                     >
                       <RotateCcw className="h-4 w-4" />
                     </Button>
@@ -290,7 +290,7 @@ const DeletedInvoices = () => {
                         setDeleteDialogOpen(true);
                       }}
                       title="Permanently Delete"
-                      className="text-red-600 hover:text-red-700"
+                      className="text-danger hover:text-danger"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -313,7 +313,7 @@ const DeletedInvoices = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handlePermanentDelete} className="bg-red-600 hover:bg-red-700">
+            <AlertDialogAction onClick={handlePermanentDelete} className="bg-danger hover:bg-danger">
               Delete Permanently
             </AlertDialogAction>
           </AlertDialogFooter>

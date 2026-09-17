@@ -70,14 +70,14 @@ const PullShipOrders = () => {
   const getApprovalBadge = (order: any) => {
     if (order.vibe_approved) {
       return (
-        <Badge className="bg-green-500 text-white">
+        <Badge className="bg-success text-success-foreground">
           <CheckCircle className="h-3 w-3 mr-1" />
           Approved
         </Badge>
       );
     }
     return (
-      <Badge variant="outline" className="text-yellow-600 border-yellow-600">
+      <Badge variant="outline" className="text-warning border-warning">
         <Clock className="h-3 w-3 mr-1" />
         Pending Approval
       </Badge>
@@ -378,7 +378,7 @@ const PullShipOrders = () => {
               <div className="col-span-2 text-sm font-medium">{order.companies?.name || '-'}</div>
               <div className="col-span-2 text-sm">{order.customer_name || '-'}</div>
               <div className="col-span-2 text-sm">
-                {order.vendors?.name || <span className="text-yellow-600">Not Assigned</span>}
+                {order.vendors?.name || <span className="text-warning">Not Assigned</span>}
               </div>
               <div className="col-span-1 text-sm">${order.total?.toFixed(2) || '0.00'}</div>
               <div className="col-span-1">
@@ -388,7 +388,7 @@ const PullShipOrders = () => {
                 {!order.vibe_approved && (
                   <Button 
                     size="sm" 
-                    className="bg-green-600 hover:bg-green-700 text-white h-8 px-3"
+                    className="bg-success hover:bg-success text-success-foreground h-8 px-3"
                     onClick={(e) => handleApproveOrder(order.id, order.order_number, order, e)}
                   >
                     <CheckCircle className="h-3 w-3 mr-1" />

@@ -195,11 +195,11 @@ export function FinanceConfirmationsTab({ isVibeAdmin, isFinanceUser, lang: lang
                 </thead>
                 <tbody>
                   {repaymentGroups.map((g, idx) => {
-                    // Singleton (unbatched legacy row) — render as before.
+                    // Singleton (unbatched legacy row) â€” render as before.
                     if (!g.batched) {
                       const r = g.rows[0];
                       const fi = r.financed_invoices as any;
-                      const desc = fi?.description || fi?.vendor_pos?.description || "—";
+                      const desc = fi?.description || fi?.vendor_pos?.description || "â€”";
                       const rate = fi?.exchange_rate || 7.2;
                       const principal = fi?.financed_amount || 0;
                       const fee = Math.max(0, r.amount - principal);
@@ -216,14 +216,14 @@ export function FinanceConfirmationsTab({ isVibeAdmin, isFinanceUser, lang: lang
                               </div>
                             )}
                           </td>
-                          <td className="px-2 py-1.5 capitalize">{r.payment_method || "—"}</td>
-                          <td className="px-2 py-1.5 font-mono text-muted-foreground">{r.reference_number || "—"}</td>
+                          <td className="px-2 py-1.5 capitalize">{r.payment_method || "â€”"}</td>
+                          <td className="px-2 py-1.5 font-mono text-muted-foreground">{r.reference_number || "â€”"}</td>
                           <td className="px-2 py-1.5 text-center">{statusBadge(r.confirmation_status, r.dispute_note)}</td>
                           {isFinanceUser && (
                             <td className="px-2 py-1.5">
                               {r.confirmation_status === "pending" && (
                                 <div className="flex gap-1">
-                                  <Button size="sm" variant="outline" className="h-6 text-[10px] px-2 text-green-600 border-green-600/30 hover:bg-green-500/10" onClick={() => handleConfirm(r.id, "finance_repayments")}>
+                                  <Button size="sm" variant="outline" className="h-6 text-[10px] px-2 text-success border-success/30 hover:bg-success/10" onClick={() => handleConfirm(r.id, "finance_repayments")}>
                                     <CheckCircle2 className="h-3 w-3 mr-1" />{t("confirm")}
                                   </Button>
                                   <Button size="sm" variant="outline" className="h-6 text-[10px] px-2 text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => { setDisputeId(r.id); setDisputeType("repayment"); setDisputeBatch(false); setDisputeNote(""); }}>
@@ -236,12 +236,12 @@ export function FinanceConfirmationsTab({ isVibeAdmin, isFinanceUser, lang: lang
                         </tr>
                       );
                     }
-                    // Batched group — collapsible parent row + child allocations.
+                    // Batched group â€” collapsible parent row + child allocations.
                     const isOpen = expanded.has(g.key);
                     return (
                       <Fragment key={g.key}>
                         <tr className={`border-b border-border ${idx % 2 === 1 ? "bg-muted/50" : ""} ${g.status === "disputed" ? "bg-destructive/5" : ""} cursor-pointer hover:bg-muted/70`} onClick={() => toggleExpand(g.key)}>
-                          <td className="px-2 py-1.5 whitespace-nowrap">{g.date ? new Date(g.date + "T00:00:00").toLocaleDateString() : "—"}</td>
+                          <td className="px-2 py-1.5 whitespace-nowrap">{g.date ? new Date(g.date + "T00:00:00").toLocaleDateString() : "â€”"}</td>
                           <td className="px-2 py-1.5 text-muted-foreground">
                             <span className="inline-flex items-center gap-1 font-medium text-foreground">
                               {isOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
@@ -250,14 +250,14 @@ export function FinanceConfirmationsTab({ isVibeAdmin, isFinanceUser, lang: lang
                             <span className="ml-1 text-[10px] text-muted-foreground">({g.rows.length} {g.rows.length === 1 ? "allocation" : "allocations"})</span>
                           </td>
                           <td className="px-2 py-1.5 text-right font-semibold whitespace-nowrap">{formatUSD(g.total)}</td>
-                          <td className="px-2 py-1.5 capitalize">{g.method || "—"}</td>
-                          <td className="px-2 py-1.5 font-mono text-muted-foreground truncate max-w-[140px]">{g.reference || "—"}</td>
+                          <td className="px-2 py-1.5 capitalize">{g.method || "â€”"}</td>
+                          <td className="px-2 py-1.5 font-mono text-muted-foreground truncate max-w-[140px]">{g.reference || "â€”"}</td>
                           <td className="px-2 py-1.5 text-center">{statusBadge(g.status)}</td>
                           {isFinanceUser && (
                             <td className="px-2 py-1.5" onClick={(e) => e.stopPropagation()}>
                               {g.status === "pending" && (
                                 <div className="flex gap-1">
-                                  <Button size="sm" variant="outline" className="h-6 text-[10px] px-2 text-green-600 border-green-600/30 hover:bg-green-500/10" onClick={() => handleConfirmBatch(g.batchId!)}>
+                                  <Button size="sm" variant="outline" className="h-6 text-[10px] px-2 text-success border-success/30 hover:bg-success/10" onClick={() => handleConfirmBatch(g.batchId!)}>
                                     <CheckCircle2 className="h-3 w-3 mr-1" />Confirm batch
                                   </Button>
                                   <Button size="sm" variant="outline" className="h-6 text-[10px] px-2 text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => { setDisputeId(g.batchId!); setDisputeType("repayment"); setDisputeBatch(true); setDisputeNote(""); }}>
@@ -270,14 +270,14 @@ export function FinanceConfirmationsTab({ isVibeAdmin, isFinanceUser, lang: lang
                         </tr>
                         {isOpen && g.rows.map((r: any) => {
                           const fi = r.financed_invoices as any;
-                          const desc = fi?.description || fi?.vendor_pos?.description || fi?.vendor_pos?.po_number || "—";
+                          const desc = fi?.description || fi?.vendor_pos?.description || fi?.vendor_pos?.po_number || "â€”";
                           const rate = fi?.exchange_rate || 7.2;
                           return (
                             <tr key={r.id} className="border-b border-border/50 bg-muted/20 text-muted-foreground">
                               <td className="px-2 py-1"></td>
-                              <td className="px-2 py-1 pl-6 max-w-[200px] truncate">↳ {desc}</td>
+                              <td className="px-2 py-1 pl-6 max-w-[200px] truncate">â†³ {desc}</td>
                               <td className="px-2 py-1 text-right whitespace-nowrap"><DualCurrency usd={r.amount} rmb={r.amount * rate} lang={lang} /></td>
-                              <td className="px-2 py-1 capitalize text-[10px]">{r.payment_method || "—"}</td>
+                              <td className="px-2 py-1 capitalize text-[10px]">{r.payment_method || "â€”"}</td>
                               <td className="px-2 py-1"></td>
                               <td className="px-2 py-1 text-center">{statusBadge(r.confirmation_status, r.dispute_note)}</td>
                               {isFinanceUser && <td className="px-2 py-1"></td>}
@@ -317,13 +317,13 @@ export function FinanceConfirmationsTab({ isVibeAdmin, isFinanceUser, lang: lang
                     <tr key={d.id} className={`border-b border-border ${idx % 2 === 1 ? "bg-muted/50" : ""} ${d.confirmation_status === "disputed" ? "bg-destructive/5" : ""}`}>
                       <td className="px-2 py-1.5 whitespace-nowrap">{new Date(d.payment_date.split("T")[0] + "T00:00:00").toLocaleDateString()}</td>
                       <td className="px-2 py-1.5 text-right font-medium whitespace-nowrap">{formatUSD(d.amount)}</td>
-                      <td className="px-2 py-1.5 text-muted-foreground max-w-[200px] truncate">{d.notes || "—"}</td>
+                      <td className="px-2 py-1.5 text-muted-foreground max-w-[200px] truncate">{d.notes || "â€”"}</td>
                       <td className="px-2 py-1.5 text-center">{statusBadge(d.confirmation_status, d.dispute_note)}</td>
                       {isFinanceUser && (
                         <td className="px-2 py-1.5">
                           {d.confirmation_status === "pending" && (
                             <div className="flex gap-1">
-                              <Button size="sm" variant="outline" className="h-6 text-[10px] px-2 text-green-600 border-green-600/30 hover:bg-green-500/10" onClick={() => handleConfirm(d.id, "finance_deposits")}>
+                              <Button size="sm" variant="outline" className="h-6 text-[10px] px-2 text-success border-success/30 hover:bg-success/10" onClick={() => handleConfirm(d.id, "finance_deposits")}>
                                 <CheckCircle2 className="h-3 w-3 mr-1" />{t("confirm")}
                               </Button>
                               <Button size="sm" variant="outline" className="h-6 text-[10px] px-2 text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => { setDisputeId(d.id); setDisputeType("deposit"); setDisputeNote(""); }}>

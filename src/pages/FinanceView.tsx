@@ -90,7 +90,7 @@ export default function FinanceView() {
           </Card>
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">{t("totalOutstanding")}</CardTitle></CardHeader>
-            <CardContent><CardCurrency usd={totalOutstandingUSD} rmb={totalOutstandingRMB} lang={lang} colorClass="text-amber-500" /></CardContent>
+            <CardContent><CardCurrency usd={totalOutstandingUSD} rmb={totalOutstandingRMB} lang={lang} colorClass="text-warning" /></CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">{t("requiredDeposit")}</CardTitle></CardHeader>
@@ -98,7 +98,7 @@ export default function FinanceView() {
           </Card>
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">{t("depositBalance")}</CardTitle></CardHeader>
-            <CardContent><CardCurrency usd={totalDeposited} rmb={totalDeposited * avgRate} lang={lang} colorClass="text-green-500" /></CardContent>
+            <CardContent><CardCurrency usd={totalDeposited} rmb={totalDeposited * avgRate} lang={lang} colorClass="text-success" /></CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground flex items-center gap-1">
@@ -108,7 +108,7 @@ export default function FinanceView() {
               {depositShortfall > 0 ? (
                 <CardCurrency usd={depositShortfall} rmb={depositShortfall * avgRate} lang={lang} colorClass="text-destructive" />
               ) : (
-                <p className="text-2xl font-bold text-green-500">—</p>
+                <p className="text-2xl font-bold text-success">â€”</p>
               )}
             </CardContent>
           </Card>
@@ -116,7 +116,7 @@ export default function FinanceView() {
 
         {/* Invoices Table */}
         <Card>
-          <CardHeader><CardTitle>{lang === "zh" ? "融资发票明细" : "Financed Invoice Details"}</CardTitle></CardHeader>
+          <CardHeader><CardTitle>{lang === "zh" ? "èžèµ„å‘ç¥¨æ˜Žç»†" : "Financed Invoice Details"}</CardTitle></CardHeader>
           <CardContent className="p-0">
             {invoices.length === 0 ? (
               <p className="text-muted-foreground text-center py-8">{t("noFinanceRecords")}</p>
@@ -140,10 +140,10 @@ export default function FinanceView() {
                     {invoices.map((inv: any, idx: number) => {
                       const fee = calculateFinanceFee(inv.financed_amount, inv.financed_date, inv.paid_back_amount, inv.paid_back_date);
                       const rate = inv.exchange_rate || 7.2;
-                      const desc = inv.vendor_po_description || inv.customer_name || "—";
+                      const desc = inv.vendor_po_description || inv.customer_name || "â€”";
                       return (
                         <tr key={inv.id} className={`border-b border-border ${idx % 2 === 1 ? "bg-muted/50" : ""}`}>
-                          <td className="px-2 py-1.5 font-mono whitespace-nowrap">{inv.invoice_number || inv.vendor_po_number ? `PO #${inv.vendor_po_number}` : "—"}</td>
+                          <td className="px-2 py-1.5 font-mono whitespace-nowrap">{inv.invoice_number || inv.vendor_po_number ? `PO #${inv.vendor_po_number}` : "â€”"}</td>
                           <td className="px-2 py-1.5 max-w-[180px] truncate text-muted-foreground">{desc}</td>
                           <td className="px-2 py-1.5 text-right whitespace-nowrap">
                             <DualCurrency usd={inv.financed_amount} rmb={inv.financed_amount_rmb} lang={lang} />

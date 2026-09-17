@@ -286,7 +286,7 @@ export function CreateCustomVendorPODialog({
       const action = existingPO ? "updated" : "created";
       toast({
         title: "Success",
-        description: `Vendor PO ${targetPO.po_number} ${action} — ${validItems.length} line item(s) added for Order ${orderNumber}`,
+        description: `Vendor PO ${targetPO.po_number} ${action} â€” ${validItems.length} line item(s) added for Order ${orderNumber}`,
       });
 
       onCreated();
@@ -402,7 +402,7 @@ export function CreateCustomVendorPODialog({
             </div>
 
             {existingPO && (
-              <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-3 space-y-2">
+              <div className="rounded-md border border-warning bg-amber-50 dark:bg-warning/30 p-3 space-y-2">
                 <div className="text-sm font-medium">
                   This vendor already has PO <span className="font-mono">{existingPO.po_number}</span> on this order.
                 </div>

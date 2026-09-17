@@ -148,15 +148,15 @@ const Quotes = () => {
   const getStatusColor = (status: string, forCustomer: boolean = false) => {
     // For customers, internal workflow statuses should show as "In Review" style
     if (forCustomer && ['in_progress', 'vendor_pending', 'vendor_received'].includes(status)) {
-      return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
+      return 'bg-info text-info dark:bg-info/30 dark:text-info';
     }
     switch (status) {
       case 'draft': return 'bg-muted text-muted-foreground';
       case 'sent': return 'bg-primary/10 text-primary';
       case 'pending_review': return 'bg-warning/10 text-warning';
-      case 'in_progress': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
-      case 'vendor_pending': return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400';
-      case 'vendor_received': return 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400';
+      case 'in_progress': return 'bg-info text-info dark:bg-info/30 dark:text-info';
+      case 'vendor_pending': return 'bg-warning text-warning dark:bg-warning/30 dark:text-warning';
+      case 'vendor_received': return 'bg-info text-info dark:bg-info/30 dark:text-info';
       case 'approved': return 'bg-success/10 text-success';
       case 'rejected': return 'bg-danger/10 text-danger';
       case 'expired': return 'bg-muted text-muted-foreground';

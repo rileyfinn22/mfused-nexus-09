@@ -100,11 +100,11 @@ export default function ForwarderOrders() {
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
-      case "pending": return "bg-yellow-500/10 text-yellow-600";
-      case "in production": return "bg-blue-500/10 text-blue-600";
+      case "pending": return "bg-warning/10 text-warning";
+      case "in production": return "bg-info/10 text-info";
       case "shipped":
       case "delivered":
-      case "completed": return "bg-green-500/10 text-green-600";
+      case "completed": return "bg-success/10 text-success";
       default: return "bg-muted text-muted-foreground";
     }
   };
@@ -167,12 +167,12 @@ export default function ForwarderOrders() {
                 onClick={() => navigate(`/forwarder/orders/${order.id}`)}
               >
                 <TableCell className="font-mono font-medium">{order.order_number}</TableCell>
-                <TableCell className="whitespace-pre-wrap">{order.description || "—"}</TableCell>
+                <TableCell className="whitespace-pre-wrap">{order.description || "â€”"}</TableCell>
                 <TableCell>{order.customer_name}</TableCell>
                 <TableCell>
                   {order.financed_invoice_number ? (
                     <Badge variant="outline" className="font-mono">{order.financed_invoice_number}</Badge>
-                  ) : "—"}
+                  ) : "â€”"}
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   {order.shipping_city}, {order.shipping_state}

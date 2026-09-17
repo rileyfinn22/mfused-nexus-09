@@ -33,36 +33,36 @@ export function VendorBillsSummary({
       label: 'Total Outstanding',
       amount: totalOutstanding,
       icon: DollarSign,
-      color: 'text-blue-600 dark:text-blue-400',
-      bgColor: 'bg-blue-500/10',
-      borderColor: 'border-blue-500/30'
+      color: 'text-info dark:text-info',
+      bgColor: 'bg-info/10',
+      borderColor: 'border-info/30'
     },
     {
       key: 'unpaid',
       label: 'Unpaid',
       amount: unpaidAmount,
       icon: AlertTriangle,
-      color: 'text-red-600 dark:text-red-400',
-      bgColor: 'bg-red-500/10',
-      borderColor: 'border-red-500/30'
+      color: 'text-danger dark:text-danger',
+      bgColor: 'bg-danger/10',
+      borderColor: 'border-danger/30'
     },
     {
       key: 'partial',
       label: 'Partially Paid',
       amount: partialAmount,
       icon: Clock,
-      color: 'text-amber-600 dark:text-amber-400',
-      bgColor: 'bg-amber-500/10',
-      borderColor: 'border-amber-500/30'
+      color: 'text-warning dark:text-warning',
+      bgColor: 'bg-warning/10',
+      borderColor: 'border-warning/30'
     },
     {
       key: 'paid',
       label: 'Paid',
       amount: paidAmount,
       icon: CheckCircle,
-      color: 'text-green-600 dark:text-green-400',
-      bgColor: 'bg-green-500/10',
-      borderColor: 'border-green-500/30'
+      color: 'text-success dark:text-success',
+      bgColor: 'bg-success/10',
+      borderColor: 'border-success/30'
     }
   ];
 

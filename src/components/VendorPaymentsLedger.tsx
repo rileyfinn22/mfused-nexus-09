@@ -242,7 +242,7 @@ export function VendorPaymentsLedger() {
                     <TableCell className="text-muted-foreground">
                       {payment.reference_number || '-'}
                     </TableCell>
-                    <TableCell className="text-right font-medium text-green-600">
+                    <TableCell className="text-right font-medium text-success">
                       {formatCurrency(payment.amount)}
                     </TableCell>
                   </TableRow>

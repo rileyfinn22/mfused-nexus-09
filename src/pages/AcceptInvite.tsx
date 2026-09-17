@@ -200,8 +200,8 @@ export default function AcceptInvite() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <div className="flex items-center gap-2 mb-2">
-            <CheckCircle className="h-5 w-5 text-green-500" />
-            <span className="text-sm text-green-500 font-medium">Valid Invitation</span>
+            <CheckCircle className="h-5 w-5 text-success" />
+            <span className="text-sm text-success font-medium">Valid Invitation</span>
           </div>
           <CardTitle>{isLoginMode ? "Accept Invitation" : "Create Your Account"}</CardTitle>
           <CardDescription>

@@ -280,15 +280,15 @@ const QuoteDetail = () => {
   const getStatusColor = (status: string, forCustomer: boolean = false) => {
     // For customers, internal workflow statuses should show as "In Review" style
     if (forCustomer && ['in_progress', 'vendor_pending', 'vendor_received'].includes(status)) {
-      return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
+      return 'bg-info text-info dark:bg-info/30 dark:text-info';
     }
     switch (status) {
       case 'draft': return 'bg-muted text-muted-foreground';
       case 'sent': return 'bg-primary/10 text-primary';
       case 'pending_review': return 'bg-warning/10 text-warning';
-      case 'in_progress': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
-      case 'vendor_pending': return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400';
-      case 'vendor_received': return 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400';
+      case 'in_progress': return 'bg-info text-info dark:bg-info/30 dark:text-info';
+      case 'vendor_pending': return 'bg-warning text-warning dark:bg-warning/30 dark:text-warning';
+      case 'vendor_received': return 'bg-info text-info dark:bg-info/30 dark:text-info';
       case 'approved': return 'bg-success/10 text-success';
       case 'rejected': return 'bg-danger/10 text-danger';
       case 'expired': return 'bg-muted text-muted-foreground';
@@ -711,7 +711,7 @@ const QuoteDetail = () => {
             </div>
             <p className="page-subtitle">
               Created {new Date(quote.created_at).toLocaleDateString()}
-              {quote.valid_until && ` • Valid until ${new Date(quote.valid_until).toLocaleDateString()}`}
+              {quote.valid_until && ` â€¢ Valid until ${new Date(quote.valid_until).toLocaleDateString()}`}
               {isVibeAdmin && quote.parent_quote_id && (
                 <Button 
                   variant="link" 
@@ -721,7 +721,7 @@ const QuoteDetail = () => {
                     navigate(`/quotes/${quote.parent_quote_id}`);
                   }}
                 >
-                  ← View Original Request
+                  â† View Original Request
                 </Button>
               )}
             </p>
@@ -1235,21 +1235,21 @@ const QuoteDetail = () => {
                   </div>
                   <div className={cn(
                     "flex items-center gap-2 p-2 rounded",
-                    quote.status === 'in_progress' && "bg-blue-100 dark:bg-blue-900/30 font-medium"
+                    quote.status === 'in_progress' && "bg-info dark:bg-info/30 font-medium"
                   )}>
                     <div className={cn(
                       "w-2 h-2 rounded-full",
-                      quote.status === 'in_progress' ? "bg-blue-500" : "bg-muted"
+                      quote.status === 'in_progress' ? "bg-info" : "bg-muted"
                     )} />
                     Working on Quote
                   </div>
                   <div className={cn(
                     "flex items-center gap-2 p-2 rounded",
-                    quote.status === 'vendor_pending' && "bg-orange-100 dark:bg-orange-900/30 font-medium"
+                    quote.status === 'vendor_pending' && "bg-warning dark:bg-warning/30 font-medium"
                   )}>
                     <div className={cn(
                       "w-2 h-2 rounded-full",
-                      quote.status === 'vendor_pending' ? "bg-orange-500" : "bg-muted"
+                      quote.status === 'vendor_pending' ? "bg-warning" : "bg-muted"
                     )} />
                     Sent to Vendor
                     {quote.vendor_sent_at && (
@@ -1260,11 +1260,11 @@ const QuoteDetail = () => {
                   </div>
                   <div className={cn(
                     "flex items-center gap-2 p-2 rounded",
-                    quote.status === 'vendor_received' && "bg-cyan-100 dark:bg-cyan-900/30 font-medium"
+                    quote.status === 'vendor_received' && "bg-info dark:bg-info/30 font-medium"
                   )}>
                     <div className={cn(
                       "w-2 h-2 rounded-full",
-                      quote.status === 'vendor_received' ? "bg-cyan-500" : "bg-muted"
+                      quote.status === 'vendor_received' ? "bg-info" : "bg-muted"
                     )} />
                     Vendor Response Received
                     {quote.vendor_response_received_at && (
@@ -1292,7 +1292,7 @@ const QuoteDetail = () => {
               )}
               <div>
                 <p className="text-sm text-muted-foreground">Terms</p>
-                <p className="font-medium">{quote.terms || '—'}</p>
+                <p className="font-medium">{quote.terms || 'â€”'}</p>
               </div>
               {quote.valid_until && (
                 <div>
@@ -1335,10 +1335,10 @@ const QuoteDetail = () => {
 
           {/* Vendor Status (Vibe Admin only) */}
           {isVibeAdmin && quote.vendor_id && (
-            <Card className="border-orange-500/50">
+            <Card className="border-warning/50">
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
-                  <Truck className="h-4 w-4 text-orange-500" />
+                  <Truck className="h-4 w-4 text-warning" />
                   Vendor Quote Status
                 </CardTitle>
               </CardHeader>

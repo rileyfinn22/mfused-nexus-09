@@ -620,7 +620,7 @@ export const VendorPOPackingListSection = ({
                         <div>
                           <p className="font-medium">{packingList.file_name}</p>
                           <p className="text-xs text-muted-foreground">
-                            Generated {format(new Date(packingList.created_at), 'MMM d, yyyy h:mm a')} • {formatFileSize(packingList.file_size)}
+                            Generated {format(new Date(packingList.created_at), 'MMM d, yyyy h:mm a')} â€¢ {formatFileSize(packingList.file_size)}
                           </p>
                         </div>
                         <Badge variant="secondary" className="ml-2">
@@ -676,7 +676,7 @@ export const VendorPOPackingListSection = ({
                         <div>
                           <p className="font-medium">{packingList.file_name}</p>
                           <p className="text-xs text-muted-foreground">
-                            Uploaded {format(new Date(packingList.created_at), 'MMM d, yyyy h:mm a')} • {formatFileSize(packingList.file_size)}
+                            Uploaded {format(new Date(packingList.created_at), 'MMM d, yyyy h:mm a')} â€¢ {formatFileSize(packingList.file_size)}
                           </p>
                           {packingList.notes && (
                             <p className="text-xs text-muted-foreground mt-1">{packingList.notes}</p>
@@ -767,7 +767,7 @@ export const VendorPOPackingListSection = ({
               {parsedItems.length > 0 && (
                 <div className="border rounded-lg p-4 bg-muted/50">
                   <h4 className="font-medium mb-2 flex items-center gap-2">
-                    <FileCheck className="h-4 w-4 text-green-500" />
+                    <FileCheck className="h-4 w-4 text-success" />
                     Parsed {parsedItems.length} Items
                   </h4>
                   <div className="max-h-48 overflow-y-auto space-y-1 text-sm">

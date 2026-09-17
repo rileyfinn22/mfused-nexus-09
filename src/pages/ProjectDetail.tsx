@@ -248,8 +248,8 @@ const ProjectDetail = () => {
   };
 
   const getProfitColor = (profit: number) => {
-    if (profit > 0) return "text-green-600";
-    if (profit < 0) return "text-red-600";
+    if (profit > 0) return "text-success";
+    if (profit < 0) return "text-danger";
     return "text-muted-foreground";
   };
 
@@ -307,7 +307,7 @@ const ProjectDetail = () => {
             </Badge>
           </div>
           <p className="text-muted-foreground">
-            {order.customer_name} • {(order.companies as any)?.name}
+            {order.customer_name} â€¢ {(order.companies as any)?.name}
           </p>
         </div>
         <Button variant="outline" onClick={() => navigate(`/orders/${projectId}`)}>
@@ -516,7 +516,7 @@ const ProjectDetail = () => {
                         id: vp.id,
                         reference: vp.reference_number || `Payment for ${po?.po_number || '-'}`,
                         date: new Date(vp.payment_date),
-                        details: `${po?.vendors?.name || 'Vendor'} • ${vp.payment_method?.replace('_', ' ')}`,
+                        details: `${po?.vendors?.name || 'Vendor'} â€¢ ${vp.payment_method?.replace('_', ' ')}`,
                         status: 'paid',
                         amount: vp.amount,
                         isOrder: false,
@@ -633,10 +633,10 @@ const ProjectDetail = () => {
                         <TableCell className="text-right">
                           {formatCurrency(invoice.total)}
                         </TableCell>
-                        <TableCell className="text-right text-green-600">
+                        <TableCell className="text-right text-success">
                           {formatCurrency(invoice.total_paid || 0)}
                         </TableCell>
-                        <TableCell className={`text-right ${balance > 0 ? 'text-orange-600' : ''}`}>
+                        <TableCell className={`text-right ${balance > 0 ? 'text-warning' : ''}`}>
                           {formatCurrency(balance)}
                         </TableCell>
                       </TableRow>
@@ -660,11 +660,11 @@ const ProjectDetail = () => {
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">Total Paid</p>
-                      <p className="text-lg font-bold text-green-600">{formatCurrency(totalPaid)}</p>
+                      <p className="text-lg font-bold text-success">{formatCurrency(totalPaid)}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">Outstanding</p>
-                      <p className="text-lg font-bold text-orange-600">{formatCurrency(totalRevenue - totalPaid)}</p>
+                      <p className="text-lg font-bold text-warning">{formatCurrency(totalRevenue - totalPaid)}</p>
                     </div>
                   </div>
                 </div>
@@ -699,7 +699,7 @@ const ProjectDetail = () => {
                         <TableCell className="font-medium">{invoice?.invoice_number || '-'}</TableCell>
                         <TableCell>{payment.payment_method}</TableCell>
                         <TableCell className="text-muted-foreground">{payment.reference_number || '-'}</TableCell>
-                        <TableCell className="text-right text-green-600 font-medium">
+                        <TableCell className="text-right text-success font-medium">
                           {formatCurrency(payment.amount)}
                         </TableCell>
                       </TableRow>
@@ -719,7 +719,7 @@ const ProjectDetail = () => {
                   <div className="flex justify-end">
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">Total Received</p>
-                      <p className="text-lg font-bold text-green-600">{formatCurrency(totalPaid)}</p>
+                      <p className="text-lg font-bold text-success">{formatCurrency(totalPaid)}</p>
                     </div>
                   </div>
                 </div>
@@ -840,13 +840,13 @@ const ProjectDetail = () => {
                              po.status === 'paid' ? 'Paid' : po.status}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right text-red-600 font-medium">
+                        <TableCell className="text-right text-danger font-medium">
                           {formatCurrency(poBilled)}
                         </TableCell>
-                        <TableCell className="text-right text-green-600">
+                        <TableCell className="text-right text-success">
                           {formatCurrency(po.total_paid || 0)}
                         </TableCell>
-                        <TableCell className="text-right text-orange-600 font-medium">
+                        <TableCell className="text-right text-warning font-medium">
                           {formatCurrency(poOwed)}
                         </TableCell>
                       </TableRow>
@@ -866,15 +866,15 @@ const ProjectDetail = () => {
                   <div className="flex justify-end gap-8">
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">Total Costs</p>
-                      <p className="text-lg font-bold text-red-600">{formatCurrency(totalCosts)}</p>
+                      <p className="text-lg font-bold text-danger">{formatCurrency(totalCosts)}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">Total Paid</p>
-                      <p className="text-lg font-bold text-green-600">{formatCurrency(totalCostsPaid)}</p>
+                      <p className="text-lg font-bold text-success">{formatCurrency(totalCostsPaid)}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">Total Owed</p>
-                      <p className="text-lg font-bold text-orange-600">{formatCurrency(totalCosts - totalCostsPaid)}</p>
+                      <p className="text-lg font-bold text-warning">{formatCurrency(totalCosts - totalCostsPaid)}</p>
                     </div>
                   </div>
                 </div>
@@ -927,7 +927,7 @@ const ProjectDetail = () => {
                         <div className="p-3 space-y-2">
                           <p className="text-sm font-medium truncate" title={doc.file_name}>{doc.file_name}</p>
                           <p className="text-xs text-muted-foreground">
-                            {formatFileSize(doc.file_size)} • {new Date(doc.created_at).toLocaleDateString()}
+                            {formatFileSize(doc.file_size)} â€¢ {new Date(doc.created_at).toLocaleDateString()}
                           </p>
                           <div className="flex gap-2">
                             <Button
@@ -979,7 +979,7 @@ const ProjectDetail = () => {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Costs (Vendor POs)</span>
-                  <span className="text-red-600">-{formatCurrency(totalCosts)}</span>
+                  <span className="text-danger">-{formatCurrency(totalCosts)}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between font-semibold">
@@ -1006,7 +1006,7 @@ const ProjectDetail = () => {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Costs Paid (Vendor POs)</span>
-                  <span className="text-red-600">-{formatCurrency(totalCostsPaid)}</span>
+                  <span className="text-danger">-{formatCurrency(totalCostsPaid)}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between font-semibold">

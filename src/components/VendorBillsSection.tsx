@@ -184,10 +184,10 @@ export function VendorBillsSection({ vendorPO, vendorName, onChanged }: VendorBi
           ) : (
             <>
               {drafts.length > 0 && (
-                <p className="mb-3 rounded-md border border-amber-500/40 bg-amber-50/60 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950/20 dark:text-amber-200">
+                <p className="mb-3 rounded-md border border-warning/40 bg-amber-50/60 px-3 py-2 text-xs text-warning dark:bg-warning/20 dark:text-warning">
                   {drafts.length === 1 ? 'A bill was' : `${drafts.length} bills were`} read automatically from
                   what the vendor uploaded. Nothing is costed at {drafts.length === 1 ? 'it' : 'them'} until you
-                  confirm — check the figures against the document first, and edit if the read is off.
+                  confirm â€” check the figures against the document first, and edit if the read is off.
                   {finalBills.some((b) => b.source === 'reconstructed') &&
                     ' Confirming replaces the bill migrated from this PO.'}
                 </p>
@@ -206,19 +206,19 @@ export function VendorBillsSection({ vendorPO, vendorName, onChanged }: VendorBi
                 </TableHeader>
                 <TableBody>
                   {bills.map((bill) => (
-                    <TableRow key={bill.id} className={bill.status === 'draft' ? 'bg-amber-50/60 dark:bg-amber-950/20' : undefined}>
+                    <TableRow key={bill.id} className={bill.status === 'draft' ? 'bg-amber-50/60 dark:bg-warning/20' : undefined}>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
-                          {bill.invoice_number || <span className="text-muted-foreground">—</span>}
+                          {bill.invoice_number || <span className="text-muted-foreground">â€”</span>}
                           {bill.status === 'draft' && (
-                            <Badge variant="outline" className="border-amber-500 text-amber-700 dark:text-amber-400">
-                              Draft{bill.parse_confidence != null && Number(bill.parse_confidence) < 0.7 ? ' · check' : ''}
+                            <Badge variant="outline" className="border-warning text-warning dark:text-warning">
+                              Draft{bill.parse_confidence != null && Number(bill.parse_confidence) < 0.7 ? ' Â· check' : ''}
                             </Badge>
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>{bill.bill_date ? formatDocDate(bill.bill_date, 'numeric') : '—'}</TableCell>
-                      <TableCell>{bill.due_date ? formatDocDate(bill.due_date, 'numeric') : '—'}</TableCell>
+                      <TableCell>{bill.bill_date ? formatDocDate(bill.bill_date, 'numeric') : 'â€”'}</TableCell>
+                      <TableCell>{bill.due_date ? formatDocDate(bill.due_date, 'numeric') : 'â€”'}</TableCell>
                       <TableCell className="text-right">{formatCurrency(Number(bill.subtotal || 0))}</TableCell>
                       <TableCell className="text-right">{formatCurrency(Number(bill.freight || 0))}</TableCell>
                       <TableCell className="text-right font-semibold">{formatCurrency(Number(bill.total || 0))}</TableCell>
@@ -287,12 +287,12 @@ export function VendorBillsSection({ vendorPO, vendorName, onChanged }: VendorBi
                     <span>{formatCurrency(billedTotal)}</span>
                   </div>
                   {variance !== 0 && (
-                    <div className={`flex justify-between ${variance > 0 ? 'text-destructive' : 'text-green-600'}`}>
+                    <div className={`flex justify-between ${variance > 0 ? 'text-destructive' : 'text-success'}`}>
                       <span>{variance > 0 ? 'Over the PO' : 'Under the PO'}</span>
                       <span>{variance > 0 ? '+' : ''}{formatCurrency(variance)}</span>
                     </div>
                   )}
-                  <div className="flex justify-between text-green-600">
+                  <div className="flex justify-between text-success">
                     <span>Paid</span>
                     <span>{formatCurrency(paid)}</span>
                   </div>

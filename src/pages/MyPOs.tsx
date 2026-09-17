@@ -96,13 +96,13 @@ export default function MyPOs() {
       case 'draft':
         return 'bg-muted text-muted-foreground';
       case 'pending':
-        return 'bg-yellow-500/10 text-yellow-600';
+        return 'bg-warning/10 text-warning';
       case 'in production':
-        return 'bg-blue-500/10 text-blue-600';
+        return 'bg-info/10 text-info';
       case 'shipped':
       case 'delivered':
       case 'completed':
-        return 'bg-green-500/10 text-green-600';
+        return 'bg-success/10 text-success';
       default:
         return 'bg-muted text-muted-foreground';
     }
@@ -169,13 +169,13 @@ export default function MyPOs() {
                       </span>
                       {order.invoices && order.invoices.length > 0 && (
                         <>
-                          <span>•</span>
+                          <span>â€¢</span>
                           <span>Invoice #{order.invoices[0].invoice_number}</span>
                         </>
                       )}
-                      <span>•</span>
+                      <span>â€¢</span>
                       <span>{order.customer_name}</span>
-                      <span>•</span>
+                      <span>â€¢</span>
                       <span>{new Date(order.created_at).toLocaleDateString()}</span>
                       <Badge className={`ml-auto ${getStatusColor(order.status)}`}>
                         {order.status}

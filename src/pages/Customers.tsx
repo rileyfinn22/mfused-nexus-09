@@ -382,7 +382,7 @@ const Customers = () => {
                 </div>
                 <div className="col-span-2">
                   {customer.quickbooks_id ? (
-                    <Badge variant="outline" className="bg-green-500/10 text-green-700 border-green-500/20">
+                    <Badge variant="outline" className="bg-success/10 text-success border-success/20">
                       Synced
                     </Badge>
                   ) : (

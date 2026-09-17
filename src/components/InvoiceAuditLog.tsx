@@ -46,23 +46,23 @@ export const InvoiceAuditLog = ({ invoiceId }: InvoiceAuditLogProps) => {
 
   const getActionIcon = (action: string) => {
     switch (action) {
-      case 'created': return <FileText className="h-4 w-4 text-green-600" />;
-      case 'updated': return <Edit className="h-4 w-4 text-blue-600" />;
-      case 'deleted': return <Trash2 className="h-4 w-4 text-red-600" />;
-      case 'restored': return <RotateCcw className="h-4 w-4 text-green-600" />;
-      case 'payment_added': return <DollarSign className="h-4 w-4 text-green-600" />;
-      default: return <Clock className="h-4 w-4 text-gray-600" />;
+      case 'created': return <FileText className="h-4 w-4 text-success" />;
+      case 'updated': return <Edit className="h-4 w-4 text-info" />;
+      case 'deleted': return <Trash2 className="h-4 w-4 text-danger" />;
+      case 'restored': return <RotateCcw className="h-4 w-4 text-success" />;
+      case 'payment_added': return <DollarSign className="h-4 w-4 text-success" />;
+      default: return <Clock className="h-4 w-4 text-muted-foreground" />;
     }
   };
 
   const getActionColor = (action: string) => {
     switch (action) {
-      case 'created': return 'text-green-600 dark:text-green-400';
-      case 'updated': return 'text-blue-600 dark:text-blue-400';
-      case 'deleted': return 'text-red-600 dark:text-red-400';
-      case 'restored': return 'text-green-600 dark:text-green-400';
-      case 'payment_added': return 'text-green-600 dark:text-green-400';
-      default: return 'text-gray-600 dark:text-gray-400';
+      case 'created': return 'text-success dark:text-success';
+      case 'updated': return 'text-info dark:text-info';
+      case 'deleted': return 'text-danger dark:text-danger';
+      case 'restored': return 'text-success dark:text-success';
+      case 'payment_added': return 'text-success dark:text-success';
+      default: return 'text-muted-foreground dark:text-muted-foreground';
     }
   };
 
@@ -122,8 +122,8 @@ export const InvoiceAuditLog = ({ invoiceId }: InvoiceAuditLogProps) => {
           {changedFields.map(field => (
             <div key={field} className="flex gap-2">
               <span className="font-medium">{field}:</span>
-              <span className="text-red-600 line-through">{String(old[field])}</span>
-              <span className="text-green-600">{String(newData[field])}</span>
+              <span className="text-danger line-through">{String(old[field])}</span>
+              <span className="text-success">{String(newData[field])}</span>
             </div>
           ))}
         </div>

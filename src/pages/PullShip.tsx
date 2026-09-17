@@ -218,7 +218,7 @@ const PullShip = () => {
     switch (status.toLowerCase()) {
       case 'pending': return 'text-warning';
       case 'picked': return 'text-primary';
-      case 'shipped': return 'text-blue-500';
+      case 'shipped': return 'text-info';
       case 'delivered': return 'text-success';
       case 'cancelled': return 'text-danger';
       default: return 'text-muted-foreground';
@@ -291,7 +291,7 @@ const PullShip = () => {
       doc,
       doc.internal.pageSize.getWidth() / 2 + 4,
       yPos,
-      [['Destination', orderData.state || '—']],
+      [['Destination', orderData.state || 'â€”']],
       { valueOffset: 30 }
     );
 
@@ -603,7 +603,7 @@ const PullShip = () => {
         .from('po-documents')
         .getPublicUrl(fileName);
 
-      // Submit against whichever company the switcher is on — reading user_roles
+      // Submit against whichever company the switcher is on â€” reading user_roles
       // directly threw for anyone in more than one company.
       if (!activeCompanyId) {
         throw new Error('User not associated with a company');
@@ -1078,7 +1078,7 @@ const PullShip = () => {
                                 <div className="text-xs text-muted-foreground">
                                   {item.products?.name || 'No name'}
                                   {item.orders?.order_number && (
-                                    <span className="ml-1 text-primary font-medium">• Linked to #{item.orders.order_number}</span>
+                                    <span className="ml-1 text-primary font-medium">â€¢ Linked to #{item.orders.order_number}</span>
                                   )}
                                 </div>
                               </div>
@@ -1261,12 +1261,12 @@ const PullShip = () => {
                       <div className="font-medium font-mono">{order.order_number}</div>
                       <Badge variant="outline" className="text-xs">{order.companies?.name || 'N/A'}</Badge>
                       {order.vibe_approved ? (
-                        <Badge className="bg-green-500 text-white text-xs">
+                        <Badge className="bg-success text-success-foreground text-xs">
                           <CheckCircle className="h-3 w-3 mr-1" />
                           Approved
                         </Badge>
                       ) : (
-                        <Badge variant="outline" className="text-yellow-600 border-yellow-600 text-xs">
+                        <Badge variant="outline" className="text-warning border-warning text-xs">
                           <Clock className="h-3 w-3 mr-1" />
                           Pending
                         </Badge>

@@ -27,7 +27,7 @@ import { CardCurrency, DualCurrency } from "@/components/DualCurrency";
 // Click to edit; Enter or blur saves; Escape cancels. Stops row-navigation clicks.
 function EditableTextCell({
   value,
-  placeholder = "—",
+  placeholder = "â€”",
   editable = true,
   mono = false,
   className = "",
@@ -287,15 +287,15 @@ export default function Financing() {
         {isVibeAdmin && (
           <td className="px-2 py-1.5 font-mono whitespace-nowrap">
             {vendorPO?.po_number ? `PO #${vendorPO.po_number}` : needsPOLink ? (
-              <Tooltip><TooltipTrigger asChild><span className="inline-flex items-center gap-1 text-amber-500"><AlertCircle className="h-3 w-3" /><span className="text-[10px]">{t("needsPO")}</span></span></TooltipTrigger><TooltipContent><p className="text-xs">{t("addedByFinance")}</p></TooltipContent></Tooltip>
-            ) : "—"}
+              <Tooltip><TooltipTrigger asChild><span className="inline-flex items-center gap-1 text-warning"><AlertCircle className="h-3 w-3" /><span className="text-[10px]">{t("needsPO")}</span></span></TooltipTrigger><TooltipContent><p className="text-xs">{t("addedByFinance")}</p></TooltipContent></Tooltip>
+            ) : "â€”"}
           </td>
         )}
         <td className="px-2 py-1.5 min-w-[220px] max-w-[340px] align-top text-muted-foreground">
           <EditableTextCell
             value={inv.description}
             editable={isVibeAdmin}
-            placeholder={isVibeAdmin ? "Add description" : "—"}
+            placeholder={isVibeAdmin ? "Add description" : "â€”"}
             className="whitespace-normal break-words leading-snug"
             onSave={(v) => saveInvoiceField(inv.id, "description", v)}
           />
@@ -305,7 +305,7 @@ export default function Financing() {
             value={inv.invoice_number}
             editable={isVibeAdmin}
             mono
-            placeholder={invoice?.invoice_number || (isVibeAdmin ? "Add invoice #" : "—")}
+            placeholder={invoice?.invoice_number || (isVibeAdmin ? "Add invoice #" : "â€”")}
             onSave={(v) => saveInvoiceField(inv.id, "invoice_number", v)}
           />
         </td>
@@ -334,14 +334,14 @@ export default function Financing() {
       <tr key={inv.id} className={`border-b border-border ${idx % 2 === 1 ? "bg-muted/50" : ""} hover:bg-muted/70 cursor-pointer`} onClick={() => navigate(`/financing/${inv.id}`)}>
         {isVibeAdmin && (
           <td className="px-2 py-1.5 font-mono whitespace-nowrap">
-            {vendorPO?.po_number ? `PO #${vendorPO.po_number}` : "—"}
+            {vendorPO?.po_number ? `PO #${vendorPO.po_number}` : "â€”"}
           </td>
         )}
         <td className="px-2 py-1.5 min-w-[220px] max-w-[340px] align-top text-muted-foreground">
           <EditableTextCell
             value={inv.description}
             editable={isVibeAdmin}
-            placeholder={isVibeAdmin ? "Add description" : "—"}
+            placeholder={isVibeAdmin ? "Add description" : "â€”"}
             className="whitespace-normal break-words leading-snug"
             onSave={(v) => saveInvoiceField(inv.id, "description", v)}
           />
@@ -349,7 +349,7 @@ export default function Financing() {
         <td className="px-2 py-1.5 text-right whitespace-nowrap">{renderDualAmount(inv.financed_amount, rate)}</td>
         <td className="px-2 py-1.5 whitespace-nowrap">{new Date(String(inv.created_at || inv.financed_date).split("T")[0] + "T00:00:00").toLocaleDateString()}</td>
         <td className="px-2 py-1.5 text-center">
-          <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-amber-500 border-amber-500/30">
+          <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-warning border-warning/30">
             <Clock className="h-2.5 w-2.5 mr-1" /> {t("waiting")}
           </Badge>
         </td>
@@ -385,14 +385,14 @@ export default function Financing() {
       <tr key={inv.id} className={`border-b border-border ${idx % 2 === 1 ? "bg-muted/50" : ""} hover:bg-muted/70 cursor-pointer opacity-70`} onClick={() => navigate(`/financing/${inv.id}`)}>
         {isVibeAdmin && (
           <td className="px-2 py-1.5 font-mono whitespace-nowrap">
-            {vendorPO?.po_number ? `PO #${vendorPO.po_number}` : "—"}
+            {vendorPO?.po_number ? `PO #${vendorPO.po_number}` : "â€”"}
           </td>
         )}
         <td className="px-2 py-1.5 min-w-[220px] max-w-[340px] align-top text-muted-foreground">
           <EditableTextCell
             value={inv.description}
             editable={isVibeAdmin}
-            placeholder={isVibeAdmin ? "Add description" : "—"}
+            placeholder={isVibeAdmin ? "Add description" : "â€”"}
             className="whitespace-normal break-words leading-snug"
             onSave={(v) => saveInvoiceField(inv.id, "description", v)}
           />
@@ -402,18 +402,18 @@ export default function Financing() {
             value={inv.invoice_number}
             editable={isVibeAdmin}
             mono
-            placeholder={invoice?.invoice_number || (isVibeAdmin ? "Add invoice #" : "—")}
+            placeholder={invoice?.invoice_number || (isVibeAdmin ? "Add invoice #" : "â€”")}
             onSave={(v) => saveInvoiceField(inv.id, "invoice_number", v)}
           />
         </td>
         <td className="px-2 py-1.5 text-right whitespace-nowrap">{renderDualAmount(inv.financed_amount, rate)}</td>
         <td className={`px-2 py-1.5 text-right whitespace-nowrap ${getAgingColor(fee.daysAging)}`}>
-          {feeAmount > 0.01 ? <>+{renderDualAmount(feeAmount, rate)} <span className="text-[10px] opacity-75">(5%)</span></> : <span className="text-muted-foreground">—</span>}
+          {feeAmount > 0.01 ? <>+{renderDualAmount(feeAmount, rate)} <span className="text-[10px] opacity-75">(5%)</span></> : <span className="text-muted-foreground">â€”</span>}
         </td>
         <td className="px-2 py-1.5 whitespace-nowrap">{new Date(String(inv.financed_date).split("T")[0] + "T00:00:00").toLocaleDateString()}</td>
-        <td className="px-2 py-1.5 text-right font-semibold whitespace-nowrap text-green-600">{renderDualAmount(inv.paid_back_amount, rate)}</td>
+        <td className="px-2 py-1.5 text-right font-semibold whitespace-nowrap text-success">{renderDualAmount(inv.paid_back_amount, rate)}</td>
         <td className="px-2 py-1.5 text-center">
-          <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-green-500 border-green-500/30">
+          <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-success border-success/30">
             <CheckCircle2 className="h-2.5 w-2.5 mr-1" /> {t("paid")}
           </Badge>
         </td>
@@ -461,7 +461,7 @@ export default function Financing() {
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">{t("armorpakOutstanding")}</CardTitle></CardHeader>
-          <CardContent>{loading ? <Skeleton className="h-8 w-24" /> : <CardCurrency usd={totalOutstanding} rmb={totalOutstandingRMB} lang={lang} colorClass="text-amber-500" />}</CardContent>
+          <CardContent>{loading ? <Skeleton className="h-8 w-24" /> : <CardCurrency usd={totalOutstanding} rmb={totalOutstandingRMB} lang={lang} colorClass="text-warning" />}</CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">{t("requiredDeposit")}</CardTitle></CardHeader>
@@ -473,15 +473,15 @@ export default function Financing() {
             <Popover>
               <PopoverTrigger asChild>
                 <button className="flex items-center gap-1 hover:underline cursor-pointer">
-                  <CardCurrency usd={currentDeposit} rmb={currentDepositRMB} lang={lang} colorClass="text-green-500" />
+                  <CardCurrency usd={currentDeposit} rmb={currentDepositRMB} lang={lang} colorClass="text-success" />
                   <ChevronDown className="h-4 w-4 opacity-60" />
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-72 p-0" align="start">
                 <div className="p-3 border-b border-border space-y-1">
                   <div className="flex justify-between text-xs"><span className="text-muted-foreground">Total Deposited</span><span className="font-medium">{formatUSD(totalDeposited)}</span></div>
-                  <div className="flex justify-between text-xs"><span className="text-muted-foreground">Pulled to Repayments</span><span className="font-medium text-amber-500">−{formatUSD(depositPulled)}</span></div>
-                  <div className="flex justify-between text-xs border-t border-border pt-1 mt-1"><span className="font-semibold">Available</span><span className="font-semibold text-green-500">{formatUSD(currentDeposit)}</span></div>
+                  <div className="flex justify-between text-xs"><span className="text-muted-foreground">Pulled to Repayments</span><span className="font-medium text-warning">âˆ’{formatUSD(depositPulled)}</span></div>
+                  <div className="flex justify-between text-xs border-t border-border pt-1 mt-1"><span className="font-semibold">Available</span><span className="font-semibold text-success">{formatUSD(currentDeposit)}</span></div>
                 </div>
                 <div className="p-3 border-b border-border"><p className="text-xs font-semibold text-muted-foreground">{t("depositHistory")}</p></div>
                 {deposits.length === 0 ? (
@@ -502,7 +502,7 @@ export default function Financing() {
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">{t("totalRepaid")}</CardTitle></CardHeader>
-          <CardContent>{loading ? <Skeleton className="h-8 w-24" /> : <CardCurrency usd={totalRepaidUSD} rmb={totalRepaidRMB} lang={lang} colorClass="text-green-500" />}</CardContent>
+          <CardContent>{loading ? <Skeleton className="h-8 w-24" /> : <CardCurrency usd={totalRepaidUSD} rmb={totalRepaidRMB} lang={lang} colorClass="text-success" />}</CardContent>
         </Card>
       </div>
 

@@ -317,9 +317,9 @@ export default function FinancedInvoiceDetail() {
           </h1>
           <p className="text-sm text-muted-foreground">
             {isFinanceUser
-              ? (record.description || "—")
-              : (vendorPO?.description || poOrder?.description || poOrder?.customer_name || "—")}
-            {!isFinanceUser && vendorPO?.vendors?.name && ` • ${vendorPO.vendors.name}`}
+              ? (record.description || "â€”")
+              : (vendorPO?.description || poOrder?.description || poOrder?.customer_name || "â€”")}
+            {!isFinanceUser && vendorPO?.vendors?.name && ` â€¢ ${vendorPO.vendors.name}`}
           </p>
         </div>
         <div className="ml-auto flex gap-2">
@@ -353,7 +353,7 @@ export default function FinancedInvoiceDetail() {
 
       {/* Pending banner for finance users */}
       {record.finance_status === "pending" && isFinanceUser && (
-        <Card className="border-amber-500/30 bg-amber-500/5">
+        <Card className="border-warning/30 bg-warning/5">
           <CardContent className="flex items-center justify-between py-4">
             <div>
               <p className="text-sm font-medium">This request is pending your review</p>
@@ -368,10 +368,10 @@ export default function FinancedInvoiceDetail() {
       )}
 
       {record.finance_status === "pending" && isVibeAdmin && !isFinanceUser && (
-        <Card className="border-amber-500/30 bg-amber-500/5">
+        <Card className="border-warning/30 bg-warning/5">
           <CardContent className="flex items-center justify-between py-4">
             <div>
-              <p className="text-sm font-medium text-amber-600">Pending — awaiting finance company review</p>
+              <p className="text-sm font-medium text-warning">Pending â€” awaiting finance company review</p>
               <p className="text-xs text-muted-foreground">As admin, you can manually activate this request with the existing amounts.</p>
             </div>
             <Button onClick={async () => {
@@ -395,7 +395,7 @@ export default function FinancedInvoiceDetail() {
               <span className="text-sm font-medium">Linked Vendor PO:</span>
               {vendorPO ? (
                 <span className="text-sm">
-                  PO #{vendorPO.po_number} — {vendorPO.description || "No description"} ({formatUSD(vendorPO.total || 0)})
+                  PO #{vendorPO.po_number} â€” {vendorPO.description || "No description"} ({formatUSD(vendorPO.total || 0)})
                 </span>
               ) : (
                 <span className="text-sm text-muted-foreground">None</span>
@@ -458,7 +458,7 @@ export default function FinancedInvoiceDetail() {
                   className="h-8 text-sm"
                 />
               ) : (
-                <p className="h-8 flex items-center text-sm font-medium">¥{parseFloat(rmbAmount || "0").toLocaleString()}</p>
+                <p className="h-8 flex items-center text-sm font-medium">Â¥{parseFloat(rmbAmount || "0").toLocaleString()}</p>
               )}
             </div>
             <div>
@@ -490,7 +490,7 @@ export default function FinancedInvoiceDetail() {
                   className="h-8 text-sm"
                 />
               ) : (
-                <p className="h-8 flex items-center text-sm font-medium">{financedDate ? new Date(financedDate + "T00:00:00").toLocaleDateString() : "—"}</p>
+                <p className="h-8 flex items-center text-sm font-medium">{financedDate ? new Date(financedDate + "T00:00:00").toLocaleDateString() : "â€”"}</p>
               )}
             </div>
             <div>
@@ -536,7 +536,7 @@ export default function FinancedInvoiceDetail() {
                   className="h-8 text-sm"
                 />
               ) : (
-                <p className="text-sm font-medium py-1">{description || "—"}</p>
+                <p className="text-sm font-medium py-1">{description || "â€”"}</p>
               )}
             </div>
             <div>
@@ -549,7 +549,7 @@ export default function FinancedInvoiceDetail() {
                   className="h-8 text-sm"
                 />
               ) : (
-                <p className="text-sm font-medium py-1">{invoiceNumber || "—"}</p>
+                <p className="text-sm font-medium py-1">{invoiceNumber || "â€”"}</p>
               )}
             </div>
             <div>
@@ -562,7 +562,7 @@ export default function FinancedInvoiceDetail() {
                   className="min-h-[80px] text-sm"
                 />
               ) : (
-                <p className="text-sm text-muted-foreground py-1 whitespace-pre-wrap">{notes || "—"}</p>
+                <p className="text-sm text-muted-foreground py-1 whitespace-pre-wrap">{notes || "â€”"}</p>
               )}
             </div>
           </CardContent>
@@ -585,7 +585,7 @@ export default function FinancedInvoiceDetail() {
                     className="h-8 text-sm"
                   />
                 ) : (
-                  <p className="text-sm font-medium py-1">{carrier || "—"}</p>
+                  <p className="text-sm font-medium py-1">{carrier || "â€”"}</p>
                 )}
               </div>
               <div>
@@ -598,7 +598,7 @@ export default function FinancedInvoiceDetail() {
                     className="h-8 text-sm"
                   />
                 ) : (
-                  <p className="text-sm font-medium py-1">{trackingNumber || "—"}</p>
+                  <p className="text-sm font-medium py-1">{trackingNumber || "â€”"}</p>
                 )}
               </div>
             </div>
@@ -623,11 +623,11 @@ export default function FinancedInvoiceDetail() {
               ) : (
                 trackingUrl ? (
                   <a href={trackingUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline py-1 inline-flex items-center gap-1">
-                    {trackingUrl.length > 50 ? trackingUrl.slice(0, 50) + "…" : trackingUrl}
+                    {trackingUrl.length > 50 ? trackingUrl.slice(0, 50) + "â€¦" : trackingUrl}
                     <ExternalLink className="h-3 w-3" />
                   </a>
                 ) : (
-                  <p className="text-sm text-muted-foreground py-1">—</p>
+                  <p className="text-sm text-muted-foreground py-1">â€”</p>
                 )
               )}
             </div>
@@ -641,7 +641,7 @@ export default function FinancedInvoiceDetail() {
                   className="min-h-[60px] text-sm"
                 />
               ) : (
-                <p className="text-sm text-muted-foreground py-1 whitespace-pre-wrap">{shipmentNotes || "—"}</p>
+                <p className="text-sm text-muted-foreground py-1 whitespace-pre-wrap">{shipmentNotes || "â€”"}</p>
               )}
             </div>
           </CardContent>
@@ -677,7 +677,7 @@ export default function FinancedInvoiceDetail() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{doc.file_name}</p>
                     <p className="text-[10px] text-muted-foreground">
-                      {doc.file_size ? `${(doc.file_size / 1024).toFixed(0)} KB` : ""} • {new Date(doc.created_at).toLocaleDateString()}
+                      {doc.file_size ? `${(doc.file_size / 1024).toFixed(0)} KB` : ""} â€¢ {new Date(doc.created_at).toLocaleDateString()}
                     </p>
                   </div>
                   <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => handleViewDocument(doc.file_path)}>
@@ -720,9 +720,9 @@ export default function FinancedInvoiceDetail() {
                     <tr key={r.id} className={`border-b border-border ${idx % 2 === 1 ? "bg-muted/50" : ""} ${r.confirmation_status === "disputed" ? "bg-destructive/5" : ""}`}>
                       <td className="px-2 py-1.5 whitespace-nowrap">{new Date(r.payment_date + "T00:00:00").toLocaleDateString()}</td>
                       <td className="px-2 py-1.5 text-right font-medium whitespace-nowrap">{formatUSD(r.amount)}</td>
-                      <td className="px-2 py-1.5 capitalize">{r.payment_method || "—"}</td>
-                      <td className="px-2 py-1.5 font-mono text-muted-foreground">{r.reference_number || "—"}</td>
-                      <td className="px-2 py-1.5 text-muted-foreground max-w-[200px] truncate">{r.notes || "—"}</td>
+                      <td className="px-2 py-1.5 capitalize">{r.payment_method || "â€”"}</td>
+                      <td className="px-2 py-1.5 font-mono text-muted-foreground">{r.reference_number || "â€”"}</td>
+                      <td className="px-2 py-1.5 text-muted-foreground max-w-[200px] truncate">{r.notes || "â€”"}</td>
                       <td className="px-2 py-1.5 text-center">
                         {r.confirmation_status === "confirmed" ? (
                           <Badge variant="success" className="text-[10px] px-1.5 py-0 gap-1"><CheckCircle2 className="h-2.5 w-2.5" />Confirmed</Badge>
@@ -774,8 +774,8 @@ export default function FinancedInvoiceDetail() {
                       {fieldNames.map((f) => {
                         const label = f.replace(/_/g, " ");
                         const c = changes[f];
-                        return `${label}: ${c.from ?? "—"} → ${c.to ?? "—"}`;
-                      }).join(" · ")}
+                        return `${label}: ${c.from ?? "â€”"} â†’ ${c.to ?? "â€”"}`;
+                      }).join(" Â· ")}
                     </span>
                   </div>
                 );
@@ -828,8 +828,8 @@ export default function FinancedInvoiceDetail() {
                   </div>
                   <p className="text-xs text-muted-foreground truncate">
                     {po.description || "No description"}
-                    {po.vendors?.name && ` • ${po.vendors.name}`}
-                    {po.orders?.customer_name && ` • ${po.orders.customer_name}`}
+                    {po.vendors?.name && ` â€¢ ${po.vendors.name}`}
+                    {po.orders?.customer_name && ` â€¢ ${po.orders.customer_name}`}
                   </p>
                 </button>
               ))}

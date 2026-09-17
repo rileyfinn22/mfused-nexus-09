@@ -382,7 +382,7 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
           name: finalName,
           description: selectedTemplate?.description || productDescription || null,
           state: selectedTemplate?.state || productState || null,
-          // Cost moved to companion table product_costs — kept here transiently for the companion upsert below
+          // Cost moved to companion table product_costs â€” kept here transiently for the companion upsert below
           _cost: productCost || selectedTemplate?.cost || null,
           price: selectedTemplate?.price || null,
           product_type: productType || null,
@@ -600,13 +600,13 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
                 <span className="text-sm">Select all</span>
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Badge variant="outline" className="bg-green-500/10 text-green-700 border-green-300 dark:text-green-400 dark:border-green-700">
+                <Badge variant="outline" className="bg-success/10 text-success border-success dark:text-success dark:border-success">
                   {existingCount} existing
                 </Badge>
-                <Badge variant="outline" className="bg-orange-500/10 text-orange-700 border-orange-300 dark:text-orange-400 dark:border-orange-700">
+                <Badge variant="outline" className="bg-warning/10 text-warning border-warning dark:text-warning dark:border-warning">
                   {newCount} new
                 </Badge>
-                <span>· {selectedCount} selected</span>
+                <span>Â· {selectedCount} selected</span>
               </div>
             </div>
 
@@ -618,7 +618,7 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
                     className={`p-3 transition-colors ${
                       product.selected 
                         ? product.matchStatus === 'existing' 
-                          ? 'border-green-300 bg-green-500/5 dark:border-green-700' 
+                          ? 'border-success bg-success/5 dark:border-success' 
                           : 'border-primary/50 bg-primary/5' 
                         : 'opacity-60'
                     }`}
@@ -634,11 +634,11 @@ export function AnalyzePOProductsDialog({ onProductsAdded, selectedCompanyId }: 
                           <Package className="h-4 w-4 text-muted-foreground shrink-0" />
                           <span className="font-medium text-sm truncate">{product.name}</span>
                           {product.matchStatus === 'existing' ? (
-                            <Badge variant="outline" className="bg-green-500/10 text-green-700 border-green-300 dark:text-green-400 dark:border-green-700 shrink-0 text-[10px] px-1.5 py-0">
+                            <Badge variant="outline" className="bg-success/10 text-success border-success dark:text-success dark:border-success shrink-0 text-[10px] px-1.5 py-0">
                               Existing
                             </Badge>
                           ) : (
-                            <Badge variant="outline" className="bg-orange-500/10 text-orange-700 border-orange-300 dark:text-orange-400 dark:border-orange-700 shrink-0 text-[10px] px-1.5 py-0">
+                            <Badge variant="outline" className="bg-warning/10 text-warning border-warning dark:text-warning dark:border-warning shrink-0 text-[10px] px-1.5 py-0">
                               New
                             </Badge>
                           )}

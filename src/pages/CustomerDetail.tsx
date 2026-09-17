@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1046,7 +1046,7 @@ const CustomerDetail = () => {
       {customer.quickbooks_id && (
         <Card>
           <CardContent className="flex items-center gap-4 py-4">
-            <Badge variant="outline" className="bg-green-500/10 text-green-700 border-green-500/20">
+            <Badge variant="outline" className="bg-success/10 text-success border-success/20">
               QuickBooks Synced
             </Badge>
             <span className="text-sm text-muted-foreground">
@@ -2038,7 +2038,7 @@ const CustomerDetail = () => {
                           <p className="text-sm font-medium truncate">{artwork.filename}</p>
                           <div className="flex items-center gap-2 mt-1">
                             {artwork.is_approved ? (
-                              <Badge variant="default" className="text-xs bg-green-600">
+                              <Badge variant="default" className="text-xs bg-success">
                                 <CheckCircle className="h-3 w-3 mr-1" />
                                 Approved
                               </Badge>
