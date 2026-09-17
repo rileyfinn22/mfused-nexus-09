@@ -801,7 +801,7 @@ const Invoices = () => {
                   </div>
                   <div className="col-span-1 font-semibold text-sm">{formatCurrency(Number(invoice.total))}</div>
                   <div className="col-span-1 text-sm">
-                    <StatusDot tone={getStatusTone(displayStatus)}>
+                    <StatusDot pill tone={getStatusTone(displayStatus)}>
                       {displayStatus.charAt(0) + displayStatus.slice(1).toLowerCase()}
                     </StatusDot>
                   </div>
