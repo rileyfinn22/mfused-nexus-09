@@ -746,18 +746,6 @@ const Invoices = () => {
                         </div>
                       );
                     })()}
-                    {/* When the invoice was first emailed; the clock start for days-to-pay. */}
-                    {isVibeAdmin && !isChild && (
-                      invoice.first_sent_at ? (
-                        <div className="text-[11px] text-muted-foreground whitespace-nowrap mt-0.5" title={`First sent ${new Date(invoice.first_sent_at).toLocaleString()}${invoice.last_sent_at && invoice.last_sent_at !== invoice.first_sent_at ? `; last sent ${new Date(invoice.last_sent_at).toLocaleDateString()}` : ''}`}>
-                          Sent {new Date(invoice.first_sent_at).toLocaleDateString()}
-                        </div>
-                      ) : (
-                        <div className="text-[11px] text-warning whitespace-nowrap mt-0.5" title="No email has been logged for this invoice">
-                          Not sent
-                        </div>
-                      )
-                    )}
                   </div>
                   <div className="col-span-2 min-w-0">
                     {isVibeAdmin ? (
@@ -828,6 +816,25 @@ const Invoices = () => {
                     <StatusDot pill tone={getStatusTone(displayStatus)}>
                       {displayStatus.charAt(0) + displayStatus.slice(1).toLowerCase()}
                     </StatusDot>
+                    {/* When the invoice was first emailed: the clock start for days-to-pay.
+                        Quiet, under the status, and dropped once the invoice is paid. */}
+                    {isVibeAdmin && !isChild && displayStatus !== 'PAID' && (
+                      invoice.first_sent_at ? (
+                        <div
+                          className="mt-1 text-[11px] leading-none text-muted-foreground whitespace-nowrap"
+                          title={`First emailed ${new Date(invoice.first_sent_at).toLocaleString()}${invoice.last_sent_at && invoice.last_sent_at !== invoice.first_sent_at ? `; last emailed ${formatDocDate(invoice.last_sent_at, 'numeric')}` : ''}`}
+                        >
+                          Sent {formatDocDate(invoice.first_sent_at, 'numeric')}
+                        </div>
+                      ) : (
+                        <div
+                          className="mt-1 text-[11px] leading-none text-muted-foreground/60 whitespace-nowrap"
+                          title="No email has been logged for this invoice"
+                        >
+                          Not sent
+                        </div>
+                      )
+                    )}
                   </div>
                   <div className={cn("text-sm text-muted-foreground", isVibeAdmin ? 'col-span-1' : 'col-span-2')}>
                     {invoice.invoice_type === 'full' || !invoice.invoice_type ? 'Blanket' : invoice.invoice_type === 'partial' ? 'Shipped' : (invoice.invoice_type.charAt(0).toUpperCase() + invoice.invoice_type.slice(1))}
