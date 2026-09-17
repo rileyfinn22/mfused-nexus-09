@@ -473,18 +473,14 @@ Thank you for your business.`;
     try {
       const pdfBase64 = await generatePdfBase64();
       
-      // Convert plain text message to HTML
-      const htmlMessage = message
-        .split('\n')
-        .map(line => line.trim() === '' ? '<br/>' : `<p style="margin: 8px 0;">${line}</p>`)
-        .join('');
-      
       // Build additional attachments array
       const additionalAttachmentsData = additionalAttachments.map(a => ({
         filename: a.file.name,
         content: a.base64,
       }));
 
+      // The function renders the shared house email (masthead, details card, portal button);
+      // we only pass the typed message. Sending our own `html` here used to bypass all of that.
       const { data, error } = await supabase.functions.invoke("send-invoice-email", {
         body: {
           invoiceId: invoice.id,
@@ -492,17 +488,7 @@ Thank you for your business.`;
           senderName,
           senderEmail,
           subject,
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              ${htmlMessage}
-              <br/>
-              <p style="color: #666; margin-top: 24px; padding-top: 16px; border-top: 1px solid #eee;">
-                ${VIBE_COMPANY.name}<br/>
-                ${VIBE_COMPANY.address.street}<br/>
-                ${VIBE_COMPANY.address.city}, ${VIBE_COMPANY.address.state} ${VIBE_COMPANY.address.zip}
-              </p>
-            </div>
-          `,
+          intro: message,
           pdfBase64,
           pdfFilename: `Invoice-${invoice.invoice_number}.pdf`,
           invoiceNumber: invoice.invoice_number,
