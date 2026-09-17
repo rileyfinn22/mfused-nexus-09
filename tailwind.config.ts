@@ -52,6 +52,10 @@ export default {
 					DEFAULT: 'hsl(var(--card))',
 					foreground: 'hsl(var(--card-foreground))'
 				},
+				brand: {
+					DEFAULT: 'hsl(var(--brand))',
+					foreground: 'hsl(var(--brand-foreground))'
+				},
 				sidebar: {
 					DEFAULT: 'hsl(var(--sidebar-background))',
 					foreground: 'hsl(var(--sidebar-foreground))',
@@ -110,8 +114,8 @@ export default {
 				'2xl': 'calc(var(--radius) + 8px)'
 			},
 			fontFamily: {
-				sans: ['Inter', 'system-ui', 'sans-serif'],
-				mono: ['JetBrains Mono', 'Menlo', 'monospace']
+				sans: ['Geist', 'Inter', 'system-ui', 'sans-serif'],
+				mono: ['Geist Mono', 'JetBrains Mono', 'Menlo', 'monospace']
 			},
 			keyframes: {
 				'accordion-down': {

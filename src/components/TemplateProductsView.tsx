@@ -594,7 +594,7 @@ export function TemplateProductsView({
               {/* Product Image */}
               <div 
                 className={cn(
-                  "aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative",
+                  "aspect-square bg-muted/40 flex items-center justify-center relative",
                   isVibeAdmin && "cursor-pointer"
                 )}
                 onClick={() => isVibeAdmin && openEditDialog(product)}

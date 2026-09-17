@@ -1183,7 +1183,7 @@ const Artwork = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {artworkFiles.map((file) => (
-              <Card key={file.id} className="overflow-hidden hover:shadow-lg transition-shadow group">
+              <Card key={file.id} className="overflow-hidden hover:border-foreground/25 transition-colors group">
                 <div 
                   className="relative w-full aspect-square bg-muted overflow-hidden cursor-pointer"
                   onClick={() => {
@@ -1277,7 +1277,7 @@ const Artwork = () => {
                     <span>{new Date(file.created_at).toLocaleDateString()}</span>
                     {file.is_approved && file.approved_at && (
                       <span className="text-green-600">
-                        ✓ {new Date(file.approved_at).toLocaleDateString()}
+                        âœ“ {new Date(file.approved_at).toLocaleDateString()}
                       </span>
                     )}
                   </div>
@@ -1401,7 +1401,7 @@ const Artwork = () => {
                       <div className="font-medium truncate" title={f.filename}>{f.filename}</div>
                       <div className="text-xs text-muted-foreground">
                         Rejected {new Date(f.rejected_at).toLocaleDateString()}
-                        {f.rejection_reason ? ` — ${f.rejection_reason}` : ''}
+                        {f.rejection_reason ? ` â€” ${f.rejection_reason}` : ''}
                       </div>
                     </div>
                     {f.artwork_url && (
@@ -1696,10 +1696,10 @@ const Artwork = () => {
               return (
                 <Card
                   key={product.id}
-                  className="group cursor-pointer overflow-hidden transition-all hover:shadow-lg hover:border-primary/50"
+                  className="group cursor-pointer overflow-hidden transition-all hover:border-foreground/25"
                   onClick={() => handleSelectProduct(product)}
                 >
-                  <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative">
+                  <div className="aspect-square bg-muted/40 flex items-center justify-center relative">
                     {/* Priority: artwork thumbnail > PDF thumbnail > product image > package icon */}
                     {skuArtworkThumbnails[product.item_id || ''] ? (
                       <SignedImage 
@@ -1996,10 +1996,10 @@ const Artwork = () => {
               return (
                 <Card
                   key={`single-${product.id}`}
-                  className="group cursor-pointer overflow-hidden transition-all hover:shadow-lg hover:border-primary/50"
+                  className="group cursor-pointer overflow-hidden transition-all hover:border-foreground/25"
                   onClick={() => handleSelectProduct(product)}
                 >
-                  <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative overflow-hidden">
+                  <div className="aspect-square bg-muted/40 flex items-center justify-center relative overflow-hidden">
                     {skuArtworkThumbnails[product.item_id || ''] ? (
                       <SignedImage
                         src={skuArtworkThumbnails[product.item_id || '']!}
@@ -2059,10 +2059,10 @@ const Artwork = () => {
               return (
             <Card
               key={template.id}
-              className="group cursor-pointer overflow-hidden transition-all hover:shadow-lg hover:border-primary/50"
+              className="group cursor-pointer overflow-hidden transition-all hover:border-foreground/25"
               onClick={() => setSelectedTemplate(template)}
             >
-              <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative overflow-hidden">
+              <div className="aspect-square bg-muted/40 flex items-center justify-center relative overflow-hidden">
                 {templateThumbnail ? (
                   <SignedImage src={templateThumbnail} alt={template.name} className="w-full h-full object-cover" />
                 ) : (

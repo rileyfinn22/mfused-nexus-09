@@ -9,7 +9,9 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "rounded-xl border border-border bg-card text-card-foreground shadow-sm hover:shadow-md transition-all duration-200",
+      // A bordered panel on paper. No shadow, no lift: cards that move on hover are the
+      // quickest way for a business tool to look like a template.
+      "rounded-lg border border-border bg-card text-card-foreground",
       className
     )}
     {...props}

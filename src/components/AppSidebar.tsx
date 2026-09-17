@@ -12,7 +12,6 @@ import {
   Factory,
   Settings,
   BarChart3,
-  ChevronRight,
   Calculator,
   MessageSquare,
   Printer,
@@ -252,16 +251,17 @@ export function AppSidebar() {
                       <NavLink 
                         to={item.url} 
                         className={cn(
-                          "relative flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-150 group",
-                          active 
-                            ? "bg-primary/10 text-primary" 
+                          "relative flex items-center gap-3 px-3 py-2 rounded-md transition-colors duration-150 group",
+                          // Active: ink text on the accent tint, with a thin brand-green bar at the edge.
+                          active
+                            ? "bg-sidebar-accent text-foreground before:absolute before:left-0 before:top-2 before:bottom-2 before:w-0.5 before:rounded-full before:bg-brand"
                             : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                           isCollapsed && "justify-center px-2"
                         )}
                       >
                         <item.icon className={cn(
                           "h-4 w-4 shrink-0 transition-colors",
-                          active ? "text-primary" : "text-muted-foreground group-hover:text-sidebar-accent-foreground"
+                          active ? "text-foreground" : "text-muted-foreground group-hover:text-sidebar-accent-foreground"
                         )} />
                         {!isCollapsed && (
                           <>
@@ -270,9 +270,6 @@ export function AppSidebar() {
                               <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold text-destructive-foreground">
                                 {unreadChatCount > 99 ? '99+' : unreadChatCount}
                               </span>
-                            )}
-                            {active && item.url !== '/chat' && (
-                              <ChevronRight className="h-4 w-4 text-primary" />
                             )}
                           </>
                         )}

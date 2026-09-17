@@ -3,8 +3,10 @@ import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
+// Status labels, not pills: small, square-cornered, tinted lightly so a page of them
+// stays quiet. Colour carries meaning (success / warning / danger / info) and nothing else.
 const badgeVariants = cva(
-  "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+  "inline-flex items-center rounded border px-1.5 py-px text-xs font-medium leading-5 transition-colors focus:outline-none focus:ring-2 focus:ring-ring/40 focus:ring-offset-1",
   {
     variants: {
       variant: {
@@ -13,17 +15,17 @@ const badgeVariants = cva(
         secondary:
           "border-transparent bg-secondary text-secondary-foreground",
         destructive:
-          "border-transparent bg-destructive/15 text-destructive",
-        outline: 
-          "border-border bg-transparent text-foreground",
+          "border-danger/25 bg-danger/8 text-danger",
+        outline:
+          "border-border bg-transparent text-muted-foreground",
         success:
-          "border-transparent bg-success/15 text-success font-semibold",
+          "border-success/25 bg-success/8 text-success",
         warning:
-          "border-transparent bg-warning/15 text-warning font-semibold",
+          "border-warning/25 bg-warning/8 text-warning",
         danger:
-          "border-transparent bg-danger/15 text-danger font-semibold",
+          "border-danger/25 bg-danger/8 text-danger",
         info:
-          "border-transparent bg-info/15 text-info font-semibold",
+          "border-info/25 bg-info/8 text-info",
       },
     },
     defaultVariants: {

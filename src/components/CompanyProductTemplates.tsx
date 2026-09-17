@@ -767,11 +767,11 @@ export function CompanyProductTemplates({
                 )}
 
                 <div 
-                  className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative cursor-pointer"
+                  className="aspect-square bg-muted/40 flex items-center justify-center relative cursor-pointer"
                   onClick={() => openEditProduct(product)}
                 >
                   {product.item_id && artworkThumbnails[product.item_id] ? (
-                    // Private bucket — a bare <img> on the stored public URL 400s.
+                    // Private bucket â€” a bare <img> on the stored public URL 400s.
                     <SignedImage
                       src={artworkThumbnails[product.item_id]}
                       alt={product.name}
@@ -855,11 +855,11 @@ export function CompanyProductTemplates({
                     />
                   )}
                   <div 
-                    className="w-12 h-12 rounded bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center flex-shrink-0 cursor-pointer"
+                    className="w-12 h-12 rounded bg-muted/40 flex items-center justify-center flex-shrink-0 cursor-pointer"
                     onClick={() => openEditProduct(product)}
                   >
                     {product.item_id && artworkThumbnails[product.item_id] ? (
-                      // Private bucket — a bare <img> on the stored public URL 400s.
+                      // Private bucket â€” a bare <img> on the stored public URL 400s.
                       <SignedImage
                         src={artworkThumbnails[product.item_id]}
                         alt={product.name}
@@ -1107,7 +1107,7 @@ export function CompanyProductTemplates({
               >
                 <Pencil className="h-3 w-3" />
               </Button>
-              <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative">
+              <div className="aspect-square bg-muted/40 flex items-center justify-center relative">
                 <Package className="h-12 w-12 text-muted-foreground/30" />
                 <Badge 
                   variant="secondary" 
@@ -1136,7 +1136,7 @@ export function CompanyProductTemplates({
                 className="flex items-center gap-4 p-4 hover:bg-muted/50 transition-colors cursor-pointer"
                 onClick={() => setSelectedTemplate(template)}
               >
-                <div className="w-12 h-12 rounded bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center flex-shrink-0">
+                <div className="w-12 h-12 rounded bg-muted/40 flex items-center justify-center flex-shrink-0">
                   <Package className="h-5 w-5 text-muted-foreground/30" />
                 </div>
                 <div className="flex-1 min-w-0">

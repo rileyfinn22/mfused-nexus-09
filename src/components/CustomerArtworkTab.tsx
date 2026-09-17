@@ -681,7 +681,7 @@ export function CustomerArtworkTab({
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {artworkFiles.map((file) => (
-              <Card key={file.id} className="overflow-hidden hover:shadow-lg transition-shadow group">
+              <Card key={file.id} className="overflow-hidden hover:border-foreground/25 transition-colors group">
                 <div 
                   className="relative w-full aspect-square bg-muted overflow-hidden cursor-pointer"
                   onClick={() => {
@@ -936,10 +936,10 @@ export function CustomerArtworkTab({
               return (
                 <Card
                   key={product.id}
-                  className="group cursor-pointer overflow-hidden transition-all hover:shadow-lg hover:border-primary/50"
+                  className="group cursor-pointer overflow-hidden transition-all hover:border-foreground/25"
                   onClick={() => setSelectedProduct(product)}
                 >
-                  <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative">
+                  <div className="aspect-square bg-muted/40 flex items-center justify-center relative">
                     {tileImage ? (
                       <SignedImage src={tileImage} alt={product.name} className="w-full h-full object-cover" />
                     ) : artPdf ? (
@@ -1146,10 +1146,10 @@ export function CustomerArtworkTab({
             return (
             <Card
               key={template.id}
-              className="group cursor-pointer overflow-hidden transition-all hover:shadow-lg hover:border-primary/50"
+              className="group cursor-pointer overflow-hidden transition-all hover:border-foreground/25"
               onClick={() => setSelectedTemplate(template)}
             >
-              <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative overflow-hidden">
+              <div className="aspect-square bg-muted/40 flex items-center justify-center relative overflow-hidden">
                 {templateThumbnail ? (
                   <SignedImage src={templateThumbnail} alt={template.name} className="w-full h-full object-cover" />
                 ) : (

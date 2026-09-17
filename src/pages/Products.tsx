@@ -393,7 +393,7 @@ const Products = () => {
 
       let countsByTemplate = new Map<string, number>();
       if (templateIds.length > 0) {
-        // Exact per-template counts via HEAD requests — a bulk select is capped by
+        // Exact per-template counts via HEAD requests â€” a bulk select is capped by
         // PostgREST's max-rows, which silently under-counts large templates.
         const countOne = async (templateId: string) => {
           let q = supabase
@@ -1090,7 +1090,7 @@ const Products = () => {
               {filteredTemplates.map((template) => (
                 <Card
                   key={`tmpl-${template.id}`}
-                  className="group cursor-pointer overflow-hidden transition-all hover:shadow-lg hover:border-primary/50 relative"
+                  className="group cursor-pointer overflow-hidden transition-all hover:border-foreground/25 relative"
                   onClick={() => setSelectedTemplate(template)}
                 >
                   {/* Count badge (top-left) */}
@@ -1151,7 +1151,7 @@ const Products = () => {
                   )}
 
                   {/* Template Image/Icon Area */}
-                  <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative overflow-hidden">
+                  <div className="aspect-square bg-muted/40 flex items-center justify-center relative overflow-hidden">
                     {getTemplateDisplayThumbnail(template) ? (
                       <SignedImage
                         src={getTemplateDisplayThumbnail(template) || undefined}
@@ -1180,11 +1180,11 @@ const Products = () => {
               {filteredProducts.filter(p => !p.template_id).map((product) => (
                 <Card
                   key={`prod-${product.id}`}
-                  className="group cursor-pointer overflow-hidden transition-all hover:shadow-lg hover:border-primary/50 relative"
+                  className="group cursor-pointer overflow-hidden transition-all hover:border-foreground/25 relative"
                   onClick={() => navigate(`/products/edit/${product.id}`)}
                 >
                   {/* Product Image/Icon Area */}
-                  <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative overflow-hidden">
+                  <div className="aspect-square bg-muted/40 flex items-center justify-center relative overflow-hidden">
                     {(product.item_id && artworkThumbnails[product.item_id]) || (product.sku && artworkThumbnails[product.sku]) ? (
                       <SignedImage src={(product.item_id && artworkThumbnails[product.item_id]) || artworkThumbnails[product.sku!]} alt={product.name} className="w-full h-full object-cover" />
 
@@ -1254,8 +1254,8 @@ const Products = () => {
                     )}
                     <p className="text-sm font-medium">
                       {isVibeAdmin
-                        ? (product.cost ? `$${product.cost.toFixed(3)}` : '—')
-                        : (product.price ? `$${product.price.toFixed(3)}` : '—')}
+                        ? (product.cost ? `$${product.cost.toFixed(3)}` : 'â€”')
+                        : (product.price ? `$${product.price.toFixed(3)}` : 'â€”')}
                     </p>
                   </div>
                 </Card>
@@ -1368,8 +1368,8 @@ const Products = () => {
                       </div>
                       <div className="col-span-1 text-sm font-medium">
                         {isVibeAdmin 
-                          ? (product.cost ? `$${product.cost.toFixed(3)}` : '—')
-                          : (product.price ? `$${product.price.toFixed(3)}` : '—')}
+                          ? (product.cost ? `$${product.cost.toFixed(3)}` : 'â€”')
+                          : (product.price ? `$${product.price.toFixed(3)}` : 'â€”')}
                       </div>
                       {!isEditMode && (
                         <div className="col-span-1 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>

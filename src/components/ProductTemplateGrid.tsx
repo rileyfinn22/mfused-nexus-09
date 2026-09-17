@@ -434,7 +434,7 @@ export function ProductTemplateGrid({
           <Card
             key={template.id}
             className={cn(
-              "group cursor-pointer overflow-hidden transition-all hover:shadow-lg hover:border-primary/50 relative",
+              "group cursor-pointer overflow-hidden transition-all hover:border-foreground/25 relative",
               selectedTemplate?.id === template.id && "ring-2 ring-primary"
             )}
             onClick={() => onSelectTemplate(template)}
@@ -473,7 +473,7 @@ export function ProductTemplateGrid({
             )}
 
             {/* Template Image/Icon Area */}
-            <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center relative overflow-hidden">
+            <div className="aspect-square bg-muted/40 flex items-center justify-center relative overflow-hidden">
               {template.thumbnail_url ? (
                 <img 
                   src={template.thumbnail_url} 
