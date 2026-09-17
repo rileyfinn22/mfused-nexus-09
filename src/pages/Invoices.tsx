@@ -734,6 +734,18 @@ const Invoices = () => {
                         </div>
                       );
                     })()}
+                    {/* When the invoice was first emailed; the clock start for days-to-pay. */}
+                    {isVibeAdmin && !isChild && (
+                      invoice.first_sent_at ? (
+                        <div className="text-[11px] text-muted-foreground whitespace-nowrap mt-0.5" title={`First sent ${new Date(invoice.first_sent_at).toLocaleString()}${invoice.last_sent_at && invoice.last_sent_at !== invoice.first_sent_at ? `; last sent ${new Date(invoice.last_sent_at).toLocaleDateString()}` : ''}`}>
+                          Sent {new Date(invoice.first_sent_at).toLocaleDateString()}
+                        </div>
+                      ) : (
+                        <div className="text-[11px] text-warning whitespace-nowrap mt-0.5" title="No email has been logged for this invoice">
+                          Not sent
+                        </div>
+                      )
+                    )}
                   </div>
                   <div className="col-span-2 min-w-0">
                     {isVibeAdmin ? (

@@ -24,6 +24,7 @@ import { CreateShipmentInvoiceDialog } from "@/components/CreateShipmentInvoiceD
 import { InvoiceAuditLog } from "@/components/InvoiceAuditLog";
 import { SendInvoiceEmailDialog } from "@/components/SendInvoiceEmailDialog";
 import { SendInvoiceNoticeDialog } from "@/components/SendInvoiceNoticeDialog";
+import { InvoiceSendHistory } from "@/components/InvoiceSendHistory";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -2991,6 +2992,16 @@ const InvoiceDetail = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* When this invoice was emailed, and how long payment took from the first send */}
+      {invoice?.id && (
+        <InvoiceSendHistory
+          invoiceId={invoice.id}
+          firstSentAt={invoice.first_sent_at}
+          isPaid={String(invoice.status || '').toLowerCase() === 'paid'}
+          refreshToken={Number(!showSendEmailDialog) + Number(!showNoticeDialog)}
+        />
+      )}
 
       {/* Payment History */}
       <Card className="shadow-lg">

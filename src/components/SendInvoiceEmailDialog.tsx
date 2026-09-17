@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { X, Mail, Plus, Send, Loader2, Eye, FileText, Paperclip, Upload, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { invoiceSendKind, logInvoiceEmail } from "@/lib/invoiceEmailLog";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { VIBE_COMPANY } from "@/lib/pdfBranding";
@@ -507,10 +508,21 @@ Thank you for your business.`;
       });
       
       if (error) throw error;
-      
+
+      // Record the send so the invoice shows when it went out (and days-to-pay later).
+      await logInvoiceEmail({
+        invoiceId: invoice.id,
+        companyId: invoice.company_id,
+        kind: invoiceSendKind(invoice),
+        recipients: emails,
+        subject,
+        senderEmail,
+        resendMessageId: (data as { messageId?: string } | null)?.messageId ?? null,
+      });
+
       // Save emails to history after successful send
       await saveEmailsToHistory(emails);
-      
+
       toast({
         title: "Invoice sent!",
         description: `Invoice ${invoice.invoice_number} has been emailed to ${emails.length} recipient${emails.length > 1 ? "s" : ""}`,

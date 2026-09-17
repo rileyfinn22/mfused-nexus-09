@@ -1212,6 +1212,63 @@ export type Database = {
           },
         ]
       }
+      invoice_email_log: {
+        Row: {
+          company_id: string
+          created_at: string
+          email_kind: string
+          id: string
+          invoice_id: string
+          recipients: string[]
+          resend_message_id: string | null
+          sent_at: string
+          sent_by: string | null
+          sent_by_email: string | null
+          subject: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          email_kind: string
+          id?: string
+          invoice_id: string
+          recipients?: string[]
+          resend_message_id?: string | null
+          sent_at?: string
+          sent_by?: string | null
+          sent_by_email?: string | null
+          subject?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          email_kind?: string
+          id?: string
+          invoice_id?: string
+          recipients?: string[]
+          resend_message_id?: string | null
+          sent_at?: string
+          sent_by?: string | null
+          sent_by_email?: string | null
+          subject?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_email_log_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_email_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           billed_percentage: number | null
@@ -1229,6 +1286,8 @@ export type Database = {
           deleted_at: string | null
           description: string | null
           due_date: string | null
+          first_sent_at: string | null
+          last_sent_at: string | null
           id: string
           invoice_date: string
           invoice_number: string
@@ -1278,6 +1337,8 @@ export type Database = {
           deleted_at?: string | null
           description?: string | null
           due_date?: string | null
+          first_sent_at?: string | null
+          last_sent_at?: string | null
           id?: string
           invoice_date?: string
           invoice_number: string
@@ -1327,6 +1388,8 @@ export type Database = {
           deleted_at?: string | null
           description?: string | null
           due_date?: string | null
+          first_sent_at?: string | null
+          last_sent_at?: string | null
           id?: string
           invoice_date?: string
           invoice_number?: string

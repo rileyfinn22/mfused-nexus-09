@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { X, Mail, Plus, Send, Loader2, Eye, FileText, Bell, AlertCircle, Paperclip, Upload, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { logInvoiceEmail } from "@/lib/invoiceEmailLog";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { VIBE_COMPANY } from "@/lib/pdfBranding";
@@ -395,6 +396,17 @@ export function SendInvoiceNoticeDialog({
 
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
+
+      // Record the send so the invoice shows when notices went out.
+      await logInvoiceEmail({
+        invoiceId: invoice.id,
+        companyId: invoice.company_id,
+        kind: isBilled ? "billed_notice" : "payment_due",
+        recipients: emails,
+        subject: editableSubject,
+        senderEmail,
+        resendMessageId: (data as { messageId?: string } | null)?.messageId ?? null,
+      });
 
       await saveEmailsToHistory(emails);
 
