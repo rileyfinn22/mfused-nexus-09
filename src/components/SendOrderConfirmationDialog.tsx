@@ -10,7 +10,6 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { X, Mail, Plus, Send, Loader2, Eye, Download } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,6 +18,7 @@ import { generateOrderConfirmationPdf } from "@/lib/orderConfirmationPdf";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { formatDocDate } from "@/lib/utils";
+import { buildBrandedEmailPreview } from "@/lib/emailPreview";
 
 interface SendOrderConfirmationDialogProps {
   open: boolean;
@@ -165,6 +165,17 @@ Thank you for your business!`;
     return result.slice(0, 10);
   })();
 
+  const previewHtml = buildBrandedEmailPreview({
+    documentLabel: "ORDER CONFIRMATION",
+    subject,
+    message,
+    details: [
+      { label: "Order number", value: order?.order_number || "", emphasis: true },
+    ],
+    contactEmail: senderEmail,
+    closingText: "The confirmation PDF is attached for your records.",
+  });
+
   const handleDownloadPdf = async () => {
     setDownloadingPdf(true);
     try {
@@ -237,7 +248,7 @@ Thank you for your business!`;
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid grid-cols-2 w-full">
             <TabsTrigger value="compose">Compose</TabsTrigger>
-            <TabsTrigger value="preview">Preview Items</TabsTrigger>
+            <TabsTrigger value="preview">Preview Email</TabsTrigger>
           </TabsList>
 
           <TabsContent value="compose" className="space-y-4 mt-4">
@@ -327,45 +338,15 @@ Thank you for your business!`;
           </TabsContent>
 
           <TabsContent value="preview" className="mt-4">
-            <div className="rounded-lg border bg-card p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-semibold">Order #{order?.order_number}</h3>
-                  <p className="text-sm text-muted-foreground">{order?.customer_name}</p>
-                </div>
+            <div className="space-y-3">
+              <div className="flex justify-end">
                 <Button variant="outline" size="sm" onClick={handleDownloadPdf} disabled={downloadingPdf}>
-                  {downloadingPdf ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Download className="h-4 w-4 mr-1" />}
+                  {downloadingPdf ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Download className="mr-1 h-4 w-4" />}
                   Download PDF
                 </Button>
               </div>
-
-              <Separator />
-
-              <ScrollArea className="max-h-[300px]">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-xs">Product</TableHead>
-                      <TableHead className="text-xs">SKU</TableHead>
-                      <TableHead className="text-xs text-center">Qty</TableHead>
-                      <TableHead className="text-xs">Description</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {items.map((item, i) => (
-                      <TableRow key={item.id || i}>
-                        <TableCell className="text-sm font-medium">{item.name}</TableCell>
-                        <TableCell className="text-sm font-mono">{item.sku}</TableCell>
-                        <TableCell className="text-sm text-center">{item.quantity}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{item.description || "—"}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </ScrollArea>
-
-              <div className="text-sm font-medium text-right">
-                Total Items: {items.length} | Total Qty: {items.reduce((s, i) => s + i.quantity, 0).toLocaleString()}
+              <div className="h-[440px] overflow-hidden rounded-lg border">
+                <iframe srcDoc={previewHtml} title="Order confirmation email preview" className="h-full w-full border-0" sandbox="allow-same-origin" />
               </div>
             </div>
           </TabsContent>

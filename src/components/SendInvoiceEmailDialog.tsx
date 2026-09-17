@@ -32,6 +32,7 @@ import {
 } from "@/lib/pdfDocument";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { buildBrandedEmailPreview } from "@/lib/emailPreview";
 
 interface AdditionalAttachment {
   file: File;
@@ -531,13 +532,26 @@ Thank you for your business.`;
     }
   };
 
-  // Convert message to HTML for preview
-  const messageToHtml = (text: string) => {
-    return text
-      .split('\n')
-      .map(line => line.trim() === '' ? '<br/>' : `<p style="margin: 8px 0;">${line}</p>`)
-      .join('');
-  };
+  const previewAmount = (() => {
+    const pct = invoice?.billed_percentage;
+    const isDeposit = pct != null && pct > 0 && pct < 100;
+    const effectiveTotal = isDeposit ? Number(invoice?.total || 0) * (pct / 100) : Number(invoice?.total || 0);
+    return formatCurrency(effectiveTotal - Number(invoice?.total_paid || 0));
+  })();
+
+  const previewHtml = buildBrandedEmailPreview({
+    documentLabel: "INVOICE",
+    subject,
+    message,
+    details: [
+      { label: "Invoice number", value: invoice?.invoice_number || "", emphasis: true },
+      { label: "Due date", value: invoice?.due_date ? formatDocDate(invoice.due_date, "long") : "Upon Receipt" },
+      { label: "Amount due", value: previewAmount, emphasis: true },
+    ],
+    contactEmail: senderEmail,
+    actionLabel: "View in the VibePKG portal",
+    closingText: "The invoice PDF is attached for your records.",
+  });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -744,57 +758,9 @@ Thank you for your business.`;
           </TabsContent>
 
           <TabsContent value="preview" className="mt-4">
-            <ScrollArea className="h-[400px] rounded-lg border bg-background">
-              <div className="p-6">
-                {/* Email Header Preview */}
-                <div className="space-y-3 pb-4 border-b">
-                  <div className="flex items-start gap-3">
-                    <span className="text-sm text-muted-foreground w-16">To:</span>
-                    <div className="flex flex-wrap gap-1">
-                      {emails.length > 0 ? (
-                        emails.map((email) => (
-                          <span key={email} className="text-sm font-medium">{email}</span>
-                        ))
-                      ) : (
-                        <span className="text-sm text-muted-foreground italic">No recipients added</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <span className="text-sm text-muted-foreground w-16">Subject:</span>
-                    <span className="text-sm font-medium">{subject || "(No subject)"}</span>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <span className="text-sm text-muted-foreground w-16">Attach:</span>
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center gap-2">
-                        <Paperclip className="h-3 w-3" />
-                        <span className="text-sm">Invoice-{invoice?.invoice_number}.pdf</span>
-                      </div>
-                      {additionalAttachments.map((attachment) => (
-                        <div key={attachment.file.name} className="flex items-center gap-2">
-                          <Paperclip className="h-3 w-3" />
-                          <span className="text-sm">{attachment.file.name}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Email Body Preview */}
-                <div className="pt-4">
-                  <div 
-                    className="prose prose-sm max-w-none dark:prose-invert"
-                    dangerouslySetInnerHTML={{ __html: messageToHtml(message) }}
-                  />
-                  <div className="mt-6 pt-4 border-t text-sm text-muted-foreground">
-                    <p>{VIBE_COMPANY.name}</p>
-                    <p>{VIBE_COMPANY.address.street}</p>
-                    <p>{VIBE_COMPANY.address.city}, {VIBE_COMPANY.address.state} {VIBE_COMPANY.address.zip}</p>
-                  </div>
-                </div>
-              </div>
-            </ScrollArea>
+            <div className="h-[440px] overflow-hidden rounded-lg border">
+              <iframe srcDoc={previewHtml} title="Invoice email preview" className="h-full w-full border-0" sandbox="allow-same-origin" />
+            </div>
           </TabsContent>
         </Tabs>
 

@@ -29,6 +29,7 @@ import {
   ensureRoom,
   type TotalsRow,
 } from "@/lib/pdfDocument";
+import { buildBrandedEmailPreview } from "@/lib/emailPreview";
 
 interface AdditionalAttachment {
   file: File;
@@ -334,6 +335,20 @@ export function SendInvoiceNoticeDialog({
 
   const formattedAmount = formatCurrency(invoice?.total || 0);
 
+  const previewHtml = buildBrandedEmailPreview({
+    documentLabel: isBilled ? "INVOICE" : "PAYMENT DUE",
+    subject: editableSubject,
+    message: editableBody,
+    details: [
+      { label: "Invoice number", value: invoice?.invoice_number || "", emphasis: true },
+      { label: "Due date", value: formattedDueDate, danger: !isBilled },
+      { label: "Amount due", value: formattedAmount, emphasis: true, danger: !isBilled },
+    ],
+    contactEmail: senderEmail,
+    actionLabel: isBilled ? "View invoice and pay" : "Pay now",
+    labelDanger: !isBilled,
+  });
+
 
   const handleSend = async () => {
     if (emails.length === 0) {
@@ -602,95 +617,9 @@ export function SendInvoiceNoticeDialog({
           </TabsContent>
 
           <TabsContent value="preview" className="mt-4 min-h-0 flex-1 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">
-            <ScrollArea className="min-h-0 flex-1 rounded-lg border bg-background">
-              <div className="p-6">
-                {/* Email Header Preview */}
-                <div className="space-y-3 pb-4 border-b">
-                  <div className="flex items-start gap-3">
-                    <span className="text-sm text-muted-foreground w-16">To:</span>
-                    <div className="flex flex-wrap gap-1">
-                      {emails.length > 0 ? (
-                        emails.map((email) => (
-                          <span key={email} className="text-sm font-medium">{email}</span>
-                        ))
-                      ) : (
-                        <span className="text-sm text-muted-foreground italic">No recipients added</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <span className="text-sm text-muted-foreground w-16">Subject:</span>
-                    <span className="text-sm font-medium">{editableSubject}</span>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <span className="text-sm text-muted-foreground w-16">Attach:</span>
-                    <div className="flex flex-col gap-1">
-                      {attachPdf && (
-                        <div className="flex items-center gap-2">
-                          <Paperclip className="h-3 w-3" />
-                          <span className="text-sm">Invoice-{invoice?.invoice_number}.pdf</span>
-                        </div>
-                      )}
-                      {additionalAttachments.map((attachment) => (
-                        <div key={attachment.file.name} className="flex items-center gap-2">
-                          <Paperclip className="h-3 w-3" />
-                          <span className="text-sm">{attachment.file.name}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Email Body Preview */}
-                <div className="pt-4">
-                  {/* Header Banner */}
-                  <div className={`rounded-t-lg p-6 text-center ${isBilled ? 'bg-info' : 'bg-danger'} text-white`}>
-                    <h2 className="text-lg font-bold">
-                      {isBilled ? "Invoice Ready for Payment" : "Payment Due Reminder"}
-                    </h2>
-                  </div>
-
-                  {/* Body */}
-                  <div className="p-6 space-y-4 border-x">
-                    {editableBody.split('\n').map((line, i) => (
-                      <p key={i} className="text-sm">{line || '\u00A0'}</p>
-                    ))}
-
-                    {/* Invoice Card Preview */}
-                    <div className="bg-muted/50 rounded-lg p-4 space-y-3">
-                      <div>
-                        <p className="text-xs text-muted-foreground uppercase tracking-wide">Invoice Number</p>
-                        <p className="font-semibold">{invoice?.invoice_number}</p>
-                      </div>
-                      <div className="flex justify-between">
-                        <div>
-                          <p className="text-xs text-muted-foreground uppercase tracking-wide">Due Date</p>
-                          <p className={`font-medium ${!isBilled ? 'text-destructive' : ''}`}>{formattedDueDate}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xs text-muted-foreground uppercase tracking-wide">Amount Due</p>
-                          <p className={`text-xl font-bold ${isBilled ? 'text-info' : 'text-destructive'}`}>{formattedAmount}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* CTA */}
-                    <div className="text-center py-2">
-                      <span className={`inline-block px-6 py-3 rounded-lg text-white font-semibold ${isBilled ? 'bg-info' : 'bg-danger'}`}>
-                        {isBilled ? "View Invoice & Pay" : "Pay Now"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Footer */}
-                  <div className="bg-muted/50 rounded-b-lg p-4 border-x border-b space-y-2">
-                    <p className="text-xs text-destructive font-semibold">⚠️ Please do not reply to this email — this mailbox is not monitored.</p>
-                    <p className="text-sm text-muted-foreground">Questions? Contact us at <span className="text-primary">{senderEmail}</span></p>
-                    <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} VibePKG. All rights reserved.</p>
-                  </div>
-                </div>
-              </div>
-            </ScrollArea>
+            <div className="min-h-0 flex-1 overflow-hidden rounded-lg border">
+              <iframe srcDoc={previewHtml} title="Invoice notice preview" className="h-full min-h-[440px] w-full border-0" sandbox="allow-same-origin" />
+            </div>
           </TabsContent>
         </Tabs>
 
