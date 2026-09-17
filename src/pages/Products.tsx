@@ -52,6 +52,7 @@ import { useToast } from "@/hooks/use-toast";
 import { isLegacyGeneratedTemplateMockupUrl, isUsableArtworkPreviewUrl } from "@/lib/artworkPreview";
 import { cn } from "@/lib/utils";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
+import { getCached, setCached } from "@/lib/pageCache";
 import { useBrandFilter } from "@/hooks/useBrandFilter";
 import { BrandSelect } from "@/components/BrandSelect";
 import { ManageBrandsDialog } from "@/components/ManageBrandsDialog";
@@ -240,9 +241,19 @@ const Products = () => {
     }
   };
 
+  // Cache scope: the company being viewed. Hydrating from the cache means a return visit
+  // shows the last result at once while the fetch below refreshes it.
+  const cacheScope = isVibeAdmin ? `admin:${companyFilter}` : `company:${activeCompanyId ?? ''}`;
+
   const fetchProducts = async () => {
     // Don't fetch until we have an active company (prevents showing all companies' data)
     if (!isVibeAdmin && !activeCompanyId) return;
+
+    const cachedProducts = getCached<Product[]>(`products:list:${cacheScope}`);
+    if (cachedProducts) {
+      setProducts(cachedProducts);
+      setLoading(false);
+    }
 
     try {
       let query = supabase
@@ -336,6 +347,7 @@ const Products = () => {
       }));
 
       setProducts(productsWithStates);
+      setCached(`products:list:${cacheScope}`, productsWithStates);
     } catch (error) {
       console.error('Error fetching products:', error);
     } finally {
@@ -345,6 +357,9 @@ const Products = () => {
 
   const fetchTemplates = async () => {
     if (!isVibeAdmin && !activeCompanyId) return;
+
+    const cachedTemplates = getCached<ProductTemplate[]>(`products:templates:${cacheScope}`);
+    if (cachedTemplates) setTemplates(cachedTemplates);
 
     try {
       let templatesQuery = supabase
@@ -391,43 +406,16 @@ const Products = () => {
         });
       }
 
-      let countsByTemplate = new Map<string, number>();
-      if (templateIds.length > 0) {
-        // Exact per-template counts via HEAD requests — a bulk select is capped by
-        // PostgREST's max-rows, which silently under-counts large templates.
-        const countOne = async (templateId: string) => {
-          let q = supabase
-            .from('products')
-            .select('id', { count: 'exact', head: true })
-            .eq('template_id', templateId);
-          if (isVibeAdmin) {
-            if (companyFilter !== 'all') q = q.eq('company_id', companyFilter);
-          } else if (activeCompanyId) {
-            q = q.eq('company_id', activeCompanyId);
-          }
-          const { count, error } = await q;
-          if (error) {
-            console.error('Error counting template products:', error);
-            return [templateId, 0] as const;
-          }
-          return [templateId, count || 0] as const;
-        };
-        // Limited concurrency to avoid hammering the API with hundreds of parallel requests.
-        for (const batch of chunkIds(templateIds, 12)) {
-          const results = await Promise.all(batch.map(countOne));
-          results.forEach(([id, count]) => countsByTemplate.set(id, count));
-        }
-      }
-
-
-
+      // Per-folder SKU counts used to be one HEAD request per template (146 of them for the
+      // admin view). fetchProducts already loads every product in scope, so the counts are
+      // derived from that list at render time instead (see templateCounts below).
       const templatesWithCounts = (templatesData || []).map((template: any) => ({
         ...template,
         cost: templateCostMap[template.id] ?? null,
-        product_count: countsByTemplate.get(template.id) || 0,
       }));
 
       setTemplates(templatesWithCounts);
+      setCached(`products:templates:${cacheScope}`, templatesWithCounts);
 
     } catch (error) {
       console.error('Error fetching templates:', error);
@@ -435,13 +423,25 @@ const Products = () => {
   };
 
   const fetchArtworkMetadata = async () => {
+    const cachedArt = getCached<{ status: Record<string, boolean>; thumbs: Record<string, string> }>(`products:art:${cacheScope}`);
+    if (cachedArt) {
+      setArtworkStatus(cachedArt.status);
+      setArtworkThumbnails(cachedArt.thumbs);
+    }
     try {
-      const { data, error } = await supabase
+      let artQuery = supabase
         .from('artwork_files')
         .select('sku, filename, preview_url, artwork_url, is_approved')
         .order('is_approved', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(50000);
+      // Only the company being viewed; this used to pull every company's rows on each visit.
+      if (isVibeAdmin) {
+        if (companyFilter !== 'all') artQuery = artQuery.eq('company_id', companyFilter);
+      } else if (activeCompanyId) {
+        artQuery = artQuery.eq('company_id', activeCompanyId);
+      }
+      const { data, error } = await artQuery;
 
       if (error) throw error;
 
@@ -465,6 +465,7 @@ const Products = () => {
       });
       setArtworkStatus(statusMap);
       setArtworkThumbnails(thumbnailMap);
+      setCached(`products:art:${cacheScope}`, { status: statusMap, thumbs: thumbnailMap });
     } catch (error) {
       console.error('Error fetching artwork metadata:', error);
     }
@@ -848,6 +849,12 @@ const Products = () => {
     )
   );
 
+  // SKUs per folder, from the products already loaded (replaces a query per folder).
+  const templateCounts = products.reduce<Record<string, number>>((acc, p) => {
+    if (p.template_id) acc[p.template_id] = (acc[p.template_id] || 0) + 1;
+    return acc;
+  }, {});
+
   // The kinds a folder counts as: its own product_type, else the types of what it holds.
   // An untyped, empty folder is [null], which the kind filter reads as "Other".
   const templateKinds = (template: ProductTemplate): (string | null)[] => {
@@ -1095,10 +1102,10 @@ const Products = () => {
                   <Badge
                     variant="secondary"
                     className="absolute top-2 left-2 z-10 bg-background/90 backdrop-blur-sm shadow-sm"
-                    title={`${template.product_count} SKU${template.product_count !== 1 ? 's' : ''} in this template`}
+                    title={`${templateCounts[template.id] || 0} SKU${(templateCounts[template.id] || 0) !== 1 ? 's' : ''} in this template`}
                   >
                     <Layers className="h-3 w-3 mr-1" />
-                    {template.product_count}
+                    {templateCounts[template.id] || 0}
                   </Badge>
 
                   {/* Buyer: add a product straight into this folder */}

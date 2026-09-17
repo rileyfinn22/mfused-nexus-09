@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { brandsForItems, fetchBrandsByProductId, recordMatchesBrandFilter } from "@/lib/productBrands";
+import { getCached, setCached } from "@/lib/pageCache";
 import { useBrandFilter } from "@/hooks/useBrandFilter";
 import { BrandSelect } from "@/components/BrandSelect";
 import { toast } from "@/hooks/use-toast";
@@ -117,7 +118,16 @@ const Orders = () => {
   };
 
   const fetchOrders = async () => {
-    setLoading(true);
+    // Show the last result for this scope at once; the fetch below refreshes it in place.
+    const cacheKey = `orders:${isVibeAdmin ? `admin:${companyFilter}` : `company:${activeCompanyId ?? ''}`}`;
+    const cached = getCached<{ orders: any[]; hasBrands: boolean }>(cacheKey);
+    if (cached) {
+      setOrders(cached.orders);
+      setHasBrands(cached.hasBrands);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     let query = supabase
       .from('orders')
       .select('*, order_items(*), companies(name)')
@@ -182,7 +192,9 @@ const Orders = () => {
       });
 
       setOrders(ordersWithChecklist);
-      setHasBrands(ordersWithChecklist.some((o: any) => o.brandNames.length > 0));
+      const anyBrands = ordersWithChecklist.some((o: any) => o.brandNames.length > 0);
+      setHasBrands(anyBrands);
+      setCached(cacheKey, { orders: ordersWithChecklist, hasBrands: anyBrands });
 
     }
     setLoading(false);

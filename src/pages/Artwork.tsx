@@ -39,6 +39,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { downloadStorageObject, normalizeStorageObjectPath } from "@/lib/storageUrl";
 import { useToast } from "@/hooks/use-toast";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
+import { getCached, setCached } from "@/lib/pageCache";
 import { useBrandFilter } from "@/hooks/useBrandFilter";
 import { BrandSelect } from "@/components/BrandSelect";
 import { ManageBrandsDialog } from "@/components/ManageBrandsDialog";
@@ -301,7 +302,46 @@ const Artwork = () => {
     }
   };
 
+  // Everything fetchTemplates derives, so a return visit can paint the last result at once.
+  type TemplateSnapshot = {
+    templateProductTypes: Record<string, (string | null)[]>;
+    brandCounts: Record<string, number>;
+    singleProducts: any[];
+    customerPendingCount: number;
+    artworkFiles: any[];
+    artworkCounts: Record<string, { total: number; approved: number; pending: number }>;
+    skuThumbnails: Record<string, string | null>;
+    skuPdfUrls: Record<string, string>;
+    templateStatus: Record<string, ArtworkStatus>;
+    templateArtworkCounts: Record<string, number>;
+    derivedThumbs: Record<string, string>;
+    templates: any[];
+  };
+
+  const templateCacheKey = `artwork:templates:${isVibeAdmin ? `admin:${companyFilter}` : `company:${userCompanyId ?? ''}`}:${stateFilter}`;
+
+  const applyTemplateSnapshot = (snap: TemplateSnapshot) => {
+    setTemplateProductTypes(snap.templateProductTypes);
+    setBrandCounts(snap.brandCounts);
+    setSingleProducts(snap.singleProducts);
+    setCustomerPendingCount(snap.customerPendingCount);
+    if (!selectedProductIdRef.current) setArtworkFiles(snap.artworkFiles);
+    setArtworkCounts(snap.artworkCounts);
+    setSkuArtworkThumbnails(snap.skuThumbnails);
+    setSkuPdfArtworkUrls(snap.skuPdfUrls);
+    setTemplateStatus(snap.templateStatus);
+    setTemplateArtworkCounts(snap.templateArtworkCounts);
+    setTemplateDerivedThumbnails(snap.derivedThumbs);
+    setTemplates(snap.templates);
+  };
+
   const fetchTemplates = async () => {
+    const cachedSnapshot = getCached<TemplateSnapshot>(templateCacheKey);
+    if (cachedSnapshot) {
+      applyTemplateSnapshot(cachedSnapshot);
+      setLoading(false);
+    }
+
     try {
       // Get all products
       let productsQuery = supabase
@@ -317,19 +357,17 @@ const Artwork = () => {
 
       const { data: productsData } = await productsQuery;
 
-      setTemplateProductTypes(
-        (productsData || []).reduce<Record<string, (string | null)[]>>((acc, p) => {
-          if (p.template_id) (acc[p.template_id] ||= []).push(p.product_type ?? null);
-          return acc;
-        }, {})
-      );
-      setBrandCounts(
-        (productsData || []).reduce<Record<string, number>>((acc, p) => {
-          const key = p.brand_id || 'none';
-          acc[key] = (acc[key] || 0) + 1;
-          return acc;
-        }, {})
-      );
+      const productTypesByTemplate = (productsData || []).reduce<Record<string, (string | null)[]>>((acc, p) => {
+        if (p.template_id) (acc[p.template_id] ||= []).push(p.product_type ?? null);
+        return acc;
+      }, {});
+      const countsByBrand = (productsData || []).reduce<Record<string, number>>((acc, p) => {
+        const key = p.brand_id || 'none';
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+      }, {});
+      setTemplateProductTypes(productTypesByTemplate);
+      setBrandCounts(countsByBrand);
 
       // If state filter is active, get product IDs for that state and filter
       let filteredProductsData = productsData || [];
@@ -392,9 +430,8 @@ const Artwork = () => {
       // Customer-supplied art belongs to the Customer Art tab only. Track how
       // many are still awaiting a VibePKG proof, then drop them entirely from
       // the Vibe Proofs data set.
-      setCustomerPendingCount(
-        artworkData.filter(a => a.artwork_type === 'customer' && !a.is_approved).length
-      );
+      const pendingCustomerCount = artworkData.filter(a => a.artwork_type === 'customer' && !a.is_approved).length;
+      setCustomerPendingCount(pendingCustomerCount);
       artworkData = artworkData.filter(a => a.artwork_type !== 'customer');
 
       // Populate the flat artwork list used by the "All Artwork" tab.
@@ -493,8 +530,23 @@ const Artwork = () => {
         }
       });
       setTemplateDerivedThumbnails(derivedThumbs);
-      
+
       setTemplates(templatesData || []);
+
+      setCached<TemplateSnapshot>(templateCacheKey, {
+        templateProductTypes: productTypesByTemplate,
+        brandCounts: countsByBrand,
+        singleProducts: singleProds,
+        customerPendingCount: pendingCustomerCount,
+        artworkFiles: artworkData,
+        artworkCounts: counts,
+        skuThumbnails,
+        skuPdfUrls,
+        templateStatus: templateStatusMap,
+        templateArtworkCounts: templateArtCountMap,
+        derivedThumbs,
+        templates: templatesData || [],
+      });
     } catch (error) {
       console.error('Error fetching templates:', error);
     } finally {

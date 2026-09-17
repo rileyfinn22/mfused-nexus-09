@@ -35,6 +35,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { FilterBar } from "@/components/layout/FilterBar";
 import { SummaryStrip } from "@/components/layout/SummaryStrip";
 import { brandsForItems, fetchBrandsByProductId, recordMatchesBrandFilter } from "@/lib/productBrands";
+import { getCached, setCached } from "@/lib/pageCache";
 import { useBrandFilter } from "@/hooks/useBrandFilter";
 import { BrandSelect } from "@/components/BrandSelect";
 import { ExpandToggleButton, ExpandDetailsPanel, useInvoiceItems, useInvoicePayments } from "@/components/RowExpandPanel";
@@ -111,13 +112,22 @@ const Invoices = () => {
   };
 
   const fetchInvoices = async () => {
-    setLoading(true);
-
     // For non-admin users we must have an active company before querying.
     if (!isVibeAdmin && !activeCompanyId) {
       setInvoices([]);
       setLoading(false);
       return;
+    }
+
+    // Show the last result for this scope at once; the fetch below refreshes it in place.
+    const cacheKey = `invoices:${isVibeAdmin ? `admin:${companyFilter}` : `company:${activeCompanyId ?? ''}`}`;
+    const cached = getCached<{ invoices: any[]; hasBrands: boolean }>(cacheKey);
+    if (cached) {
+      setInvoices(cached.invoices);
+      setHasBrands(cached.hasBrands);
+      setLoading(false);
+    } else {
+      setLoading(true);
     }
 
     let query = supabase
@@ -155,7 +165,9 @@ const Invoices = () => {
         return { ...inv, brands: invoiceBrands, brandNames: invoiceBrands.map((b) => b.name) };
       });
       setInvoices(withBrands);
-      setHasBrands(withBrands.some((inv: any) => inv.brandNames.length > 0));
+      const anyBrands = withBrands.some((inv: any) => inv.brandNames.length > 0);
+      setHasBrands(anyBrands);
+      setCached(cacheKey, { invoices: withBrands, hasBrands: anyBrands });
     }
     setLoading(false);
   };

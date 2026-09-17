@@ -2,62 +2,73 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { CompanyProvider } from "./contexts/CompanyContext";
 import { DashboardLayout } from "./components/DashboardLayout";
 import Index from "./pages/Index";
-import Dashboard from "./pages/Dashboard";
-import Products from "./pages/Products";
-import EditProduct from "./pages/EditProduct";
-import Inventory from "./pages/Inventory";
-import Orders from "./pages/Orders";
-import OrderDetail from "./pages/OrderDetail";
-import CreateOrder from "./pages/CreateOrder";
-import Invoices from "./pages/Invoices";
-import InvoiceDetail from "./pages/InvoiceDetail";
-import InvoiceShippedEdit from "./pages/InvoiceShippedEdit";
-import DeletedInvoices from "./pages/DeletedInvoices";
-import Artwork from "./pages/Artwork";
-import RejectedArchive from "./pages/RejectedArchive";
-import PullShip from "./pages/PullShip";
-import PullShipOrderDetail from "./pages/PullShipOrderDetail";
-import PullShipOrders from "./pages/PullShipOrders";
-import MyPOs from "./pages/MyPOs";
-import Vendors from "./pages/Vendors";
-import VendorPOs from "./pages/VendorPOs";
-import VendorPODetail from "./pages/VendorPODetail";
-import VendorPortal from "./pages/VendorPortal";
-import VendorPortalPODetail from "./pages/VendorPortalPODetail";
-import VendorStatus from "./pages/VendorStatus";
-import Production from "./pages/Production";
-import ProductionDetail from "./pages/ProductionDetail";
-import CustomerProductionPODetail from "./pages/CustomerProductionPODetail";
 import Login from "./pages/Login";
-import VendorSignup from "./pages/VendorSignup";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import AcceptInvite from "./pages/AcceptInvite";
-import ArtworkReconcile from "./pages/ArtworkReconcile";
-import Settings from "./pages/Settings";
-import Reports from "./pages/Reports";
-import Projects from "./pages/Projects";
-import ProjectDetail from "./pages/ProjectDetail";
-
-import Customers from "./pages/Customers";
-import CustomerDetail from "./pages/CustomerDetail";
-import Quotes from "./pages/Quotes";
-import QuoteDetail from "./pages/QuoteDetail";
-import CreateQuote from "./pages/CreateQuote";
 import NotFound from "./pages/NotFound";
-import ShipmentUpdate from "./pages/ShipmentUpdate";
-import Chat from "./pages/Chat";
-import Financing from "./pages/Financing";
-import FinanceView from "./pages/FinanceView";
-import FinancedInvoiceDetail from "./pages/FinancedInvoiceDetail";
-import Demo from "./pages/Demo";
-import ForwarderOrders from "./pages/ForwarderOrders";
-import ForwarderOrderDetail from "./pages/ForwarderOrderDetail";
+
+// Every page used to be in one 4 MB bundle, together with the PDF, spreadsheet and image
+// libraries, so the first load pulled everything. Pages now load on demand; the shell,
+// the landing page and login stay in the main chunk.
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Products = lazy(() => import("./pages/Products"));
+const EditProduct = lazy(() => import("./pages/EditProduct"));
+const Inventory = lazy(() => import("./pages/Inventory"));
+const Orders = lazy(() => import("./pages/Orders"));
+const OrderDetail = lazy(() => import("./pages/OrderDetail"));
+const CreateOrder = lazy(() => import("./pages/CreateOrder"));
+const Invoices = lazy(() => import("./pages/Invoices"));
+const InvoiceDetail = lazy(() => import("./pages/InvoiceDetail"));
+const InvoiceShippedEdit = lazy(() => import("./pages/InvoiceShippedEdit"));
+const DeletedInvoices = lazy(() => import("./pages/DeletedInvoices"));
+const Artwork = lazy(() => import("./pages/Artwork"));
+const RejectedArchive = lazy(() => import("./pages/RejectedArchive"));
+const PullShip = lazy(() => import("./pages/PullShip"));
+const PullShipOrderDetail = lazy(() => import("./pages/PullShipOrderDetail"));
+const PullShipOrders = lazy(() => import("./pages/PullShipOrders"));
+const MyPOs = lazy(() => import("./pages/MyPOs"));
+const Vendors = lazy(() => import("./pages/Vendors"));
+const VendorPOs = lazy(() => import("./pages/VendorPOs"));
+const VendorPODetail = lazy(() => import("./pages/VendorPODetail"));
+const VendorPortal = lazy(() => import("./pages/VendorPortal"));
+const VendorPortalPODetail = lazy(() => import("./pages/VendorPortalPODetail"));
+const VendorStatus = lazy(() => import("./pages/VendorStatus"));
+const Production = lazy(() => import("./pages/Production"));
+const ProductionDetail = lazy(() => import("./pages/ProductionDetail"));
+const CustomerProductionPODetail = lazy(() => import("./pages/CustomerProductionPODetail"));
+const VendorSignup = lazy(() => import("./pages/VendorSignup"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const AcceptInvite = lazy(() => import("./pages/AcceptInvite"));
+const ArtworkReconcile = lazy(() => import("./pages/ArtworkReconcile"));
+const Settings = lazy(() => import("./pages/Settings"));
+const Reports = lazy(() => import("./pages/Reports"));
+const Projects = lazy(() => import("./pages/Projects"));
+const ProjectDetail = lazy(() => import("./pages/ProjectDetail"));
+const Customers = lazy(() => import("./pages/Customers"));
+const CustomerDetail = lazy(() => import("./pages/CustomerDetail"));
+const Quotes = lazy(() => import("./pages/Quotes"));
+const QuoteDetail = lazy(() => import("./pages/QuoteDetail"));
+const CreateQuote = lazy(() => import("./pages/CreateQuote"));
+const ShipmentUpdate = lazy(() => import("./pages/ShipmentUpdate"));
+const Chat = lazy(() => import("./pages/Chat"));
+const Financing = lazy(() => import("./pages/Financing"));
+const FinanceView = lazy(() => import("./pages/FinanceView"));
+const FinancedInvoiceDetail = lazy(() => import("./pages/FinancedInvoiceDetail"));
+const Demo = lazy(() => import("./pages/Demo"));
+const ForwarderOrders = lazy(() => import("./pages/ForwarderOrders"));
+const ForwarderOrderDetail = lazy(() => import("./pages/ForwarderOrderDetail"));
+
+/** Thin progress line while a page chunk loads; the layout stays put. */
+const RouteFallback = () => (
+  <div className="fixed left-0 right-0 top-0 z-50 h-0.5 overflow-hidden bg-transparent" aria-hidden>
+    <div className="h-full w-1/3 animate-pulse bg-foreground/40" />
+  </div>
+);
 
 const queryClient = new QueryClient();
 
@@ -69,6 +80,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <Suspense fallback={<RouteFallback />}>
             <Routes>
           <Route path="/shipment-update" element={<ShipmentUpdate />} />
           <Route path="/demo" element={<Demo />} />
@@ -127,6 +139,7 @@ const App = () => (
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
+            </Suspense>
           </BrowserRouter>
         </CompanyProvider>
       </TooltipProvider>
