@@ -439,9 +439,9 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
                   const OrderIcon = orderTypeInfo.icon;
                   
                   return (
-                    <div 
-                      key={order.id} 
-                      className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-muted/50 transition-colors even:bg-muted/40"
+                    <div
+                      key={order.id}
+                      className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-accent/60 transition-colors even:bg-muted/60"
                     >
                       <div className="col-span-2 space-y-1">
                         <div className="font-medium font-mono text-sm">{order.order_number}</div>
@@ -550,7 +550,7 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
                 {awaitingApprovalOrders.map((order) => (
                   <div
                     key={order.id}
-                    className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-muted/50 transition-colors"
+                    className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-accent/60 transition-colors even:bg-muted/60"
                   >
                     <div className="col-span-2 space-y-1">
                       <div className="font-medium font-mono text-sm">{order.order_number}</div>
@@ -662,9 +662,11 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
                 
                 const isExpanded = expandedRows.has(order.id);
                 return (
-                  <div key={order.id}>
-                  <div 
-                    className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-muted/50 transition-colors even:bg-muted/40"
+                  // Stripe on the wrapper: the row is wrapped with its expand panel, so even:
+                  // on the row itself never fires (it is always the first child).
+                  <div key={order.id} className="even:bg-muted/60">
+                  <div
+                    className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-accent/60 transition-colors"
                   >
                     <div className="col-span-2 space-y-1">
                       <div className="font-medium font-mono text-base">{order.order_number}</div>

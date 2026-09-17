@@ -678,11 +678,12 @@ const Invoices = () => {
               
               const detailExpanded = expandedDetailRows.has(invoice.id);
               return (
-                <div key={invoice.id}>
-                <div 
+                // Stripe on the wrapper (row + detail panel share it), so even: actually fires.
+                <div key={invoice.id} className={isChild ? '' : 'even:bg-muted/60'}>
+                <div
                   className={`grid grid-cols-12 gap-4 px-4 py-3 transition-colors cursor-pointer ${
-                    isChild ? 'bg-muted/60 border-l-4 border-l-primary/50' : 'hover:bg-muted/50'
-                   } ${isChild ? '' : 'even:bg-muted/40'}`}
+                    isChild ? 'bg-muted/70 border-l-2 border-l-foreground/30' : 'hover:bg-accent/60'
+                   }`}
                   onClick={() => navigate(`/invoices/${invoice.id}`)}
                 >
                   <div className="col-span-2">
