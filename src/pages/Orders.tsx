@@ -130,7 +130,9 @@ const Orders = () => {
     }
     let query = supabase
       .from('orders')
-      .select('*, order_items(*), companies(name)')
+      // Only the line-item fields the list actually renders; `order_items(*)` made this
+      // response several times larger than it needed to be.
+      .select('*, order_items(id, sku, product_id, product_name, quantity, shipped_quantity, unit_price), companies(name)')
       .is('deleted_at', null)
       .order('created_at', { ascending: false });
 

@@ -290,7 +290,7 @@ const Artwork = () => {
     try {
       let query = supabase
         .from('product_states')
-        .select('state, product_id');
+        .select('state');
       
       const { data: statesData } = await query;
       if (statesData) {
