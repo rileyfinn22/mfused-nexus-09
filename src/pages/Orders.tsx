@@ -59,6 +59,8 @@ const Orders = () => {
   // Read company filter from URL, default to "all" (only for vibe admins)
   const companyFilter = searchParams.get("company") || "all";
   const [orders, setOrders] = useState<any[]>([]);
+  // Identifies the newest in-flight paged fetch so a stale one can't overwrite the list.
+  const ordersRequestRef = useRef(0);
   // True when any listed order contains branded products; customers then get a Brand column.
   const [hasBrands, setHasBrands] = useState(false);
   const [loading, setLoading] = useState(true);
