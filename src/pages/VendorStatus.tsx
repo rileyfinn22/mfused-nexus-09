@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Search, Factory } from "lucide-react";
 import OrdersSheet, { parseTracking, parseShipTo, parseDateInput, type SheetItem, type SheetPo } from "@/components/vendor/OrdersSheet";
+import { getCached, setCached } from "@/lib/pageCache";
 
 interface Row {
   id: string;
