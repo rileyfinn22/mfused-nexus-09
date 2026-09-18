@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { fetchTemplateProductCounts } from "@/lib/templateProductCounts";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
