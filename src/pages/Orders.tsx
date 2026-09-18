@@ -155,18 +155,30 @@ const Orders = () => {
         ? data 
         : data.filter(order => order.status !== 'draft');
       
-      // Batch-fetch artwork approval status for ALL orders in ONE query (was N+1)
+      // Artwork approval status for every SKU on screen. SKUs are chunked because a single
+      // `in.(...)` filter with thousands of values overflows the request URL (HTTP 400).
       const allSkus = Array.from(new Set(
         filteredData.flatMap((o: any) => (o.order_items || []).map((i: any) => i.sku).filter(Boolean))
       ));
       let approvedSkus = new Set<string>();
       if (allSkus.length > 0) {
-        const { data: artworkData } = await supabase
-          .from('artwork_files')
-          .select('sku, is_approved')
-          .in('sku', allSkus)
-          .eq('is_approved', true);
-        approvedSkus = new Set((artworkData || []).map((a: any) => a.sku));
+        const skuChunks: string[][] = [];
+        for (let i = 0; i < allSkus.length; i += 150) skuChunks.push(allSkus.slice(i, i + 150));
+        const chunkResults = await Promise.all(
+          skuChunks.map(async (skus) => {
+            const { data, error } = await supabase
+              .from('artwork_files')
+              .select('sku')
+              .in('sku', skus)
+              .eq('is_approved', true);
+            if (error) {
+              console.error('Error fetching artwork approvals:', error);
+              return [] as any[];
+            }
+            return data || [];
+          })
+        );
+        approvedSkus = new Set(chunkResults.flat().map((a: any) => a.sku));
       }
 
       // Brand per line item, so each order can be labelled by the brands it contains.
