@@ -132,7 +132,7 @@ const Orders = () => {
       .from('orders')
       // Only the line-item fields the list actually renders; `order_items(*)` made this
       // response several times larger than it needed to be.
-      .select('*, order_items(id, sku, product_id, product_name, quantity, shipped_quantity, unit_price), companies(name)')
+      .select('*, order_items(id, sku, product_id, name, quantity, shipped_quantity, unit_price), companies(name)')
       .is('deleted_at', null)
       .order('created_at', { ascending: false });
 
@@ -813,7 +813,7 @@ const estDelivery = order.estimated_delivery_date ? parseDateAsLocal(order.estim
                       items={order.order_items || []}
                       itemColumns={[
                         { key: "sku", label: "SKU", className: "font-mono text-xs" },
-                        { key: "product_name", label: "Product" },
+                        { key: "name", label: "Product" },
                         { key: "quantity", label: "Qty", render: (r) => Number(r.quantity || 0).toLocaleString() },
                         { key: "shipped_quantity", label: "Shipped", render: (r) => Number(r.shipped_quantity || 0).toLocaleString() },
                         { key: "unit_price", label: "Unit $", render: (r) => `$${Number(r.unit_price || 0).toFixed(2)}` },
