@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Loader2, Search, Factory } from "lucide-react";
 import OrdersSheet, { type SheetPo } from "@/components/vendor/OrdersSheet";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
+import { getCached, setCached } from "@/lib/pageCache";
 
 /** Customer-safe production row from customer_production_sheet(). */
 interface Row {
