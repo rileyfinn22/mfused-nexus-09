@@ -158,22 +158,13 @@ export function CompanyProductTemplates({
         });
       }
 
-      // Fetch product counts for this company
-      const templatesWithCounts = await Promise.all(
-        (templatesData || []).map(async (template) => {
-          const { count } = await supabase
-            .from('products')
-            .select('id', { count: 'exact', head: true })
-            .eq('template_id', template.id)
-            .eq('company_id', companyId);
-
-          return {
-            ...template,
-            cost: costMap[template.id] ?? null,
-            product_count: count || 0
-          };
-        })
-      );
+      // Product counts for this company in batched requests (was one request per template)
+      const countMap = await fetchTemplateProductCounts(templateIds, companyId);
+      const templatesWithCounts = (templatesData || []).map((template) => ({
+        ...template,
+        cost: costMap[template.id] ?? null,
+        product_count: countMap[template.id] || 0,
+      }));
 
       // Show all templates owned by this company (even with 0 products)
       // For global templates (no company_id), only show if they have products

@@ -121,27 +121,18 @@ export function ProductTemplateGrid({
         });
       }
 
-      // Fetch product counts for each template (scoped to selected company when filtered)
-      const templatesWithCounts = await Promise.all(
-        (templatesData || []).map(async (template) => {
-          let query = supabase
-            .from('products')
-            .select('id', { count: 'exact', head: true })
-            .eq('template_id', template.id);
-
-          if (companyFilter !== 'all') {
-            query = query.eq('company_id', companyFilter);
-          }
-
-          const { count } = await query;
-
-          return {
-            ...template,
-            cost: costMap[template.id] ?? null,
-            product_count: count || 0
-          };
-        })
+      // Product counts for every template in a couple of batched requests
+      // (previously one count request per template).
+      const countMap = await fetchTemplateProductCounts(
+        templateIds,
+        companyFilter !== 'all' ? companyFilter : null
       );
+
+      const templatesWithCounts = (templatesData || []).map((template) => ({
+        ...template,
+        cost: costMap[template.id] ?? null,
+        product_count: countMap[template.id] || 0,
+      }));
 
       setTemplates(templatesWithCounts);
     } catch (error) {
