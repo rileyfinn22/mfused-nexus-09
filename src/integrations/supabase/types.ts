@@ -1151,6 +1151,80 @@ export type Database = {
         }
         Relationships: []
       }
+      invoice_email_log: {
+        Row: {
+          company_id: string
+          created_at: string
+          email_kind: string
+          id: string
+          invoice_id: string
+          recipients: string[]
+          resend_message_id: string | null
+          sent_at: string
+          sent_by: string | null
+          sent_by_email: string | null
+          source: string
+          subject: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          email_kind: string
+          id?: string
+          invoice_id: string
+          recipients?: string[]
+          resend_message_id?: string | null
+          sent_at?: string
+          sent_by?: string | null
+          sent_by_email?: string | null
+          source?: string
+          subject?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          email_kind?: string
+          id?: string
+          invoice_id?: string
+          recipients?: string[]
+          resend_message_id?: string | null
+          sent_at?: string
+          sent_by?: string | null
+          sent_by_email?: string | null
+          source?: string
+          subject?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_email_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_email_log_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_receivables"
+            referencedColumns: ["invoice_id"]
+          },
+          {
+            foreignKeyName: "invoice_email_log_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_subtotal_reconciliation"
+            referencedColumns: ["invoice_id"]
+          },
+          {
+            foreignKeyName: "invoice_email_log_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_packing_lists: {
         Row: {
           created_at: string
@@ -1212,66 +1286,6 @@ export type Database = {
           },
         ]
       }
-      invoice_email_log: {
-        Row: {
-          company_id: string
-          created_at: string
-          email_kind: string
-          id: string
-          invoice_id: string
-          recipients: string[]
-          resend_message_id: string | null
-          sent_at: string
-          sent_by: string | null
-          sent_by_email: string | null
-          source: string
-          subject: string | null
-        }
-        Insert: {
-          company_id: string
-          created_at?: string
-          email_kind: string
-          id?: string
-          invoice_id: string
-          recipients?: string[]
-          resend_message_id?: string | null
-          sent_at?: string
-          sent_by?: string | null
-          sent_by_email?: string | null
-          source?: string
-          subject?: string | null
-        }
-        Update: {
-          company_id?: string
-          created_at?: string
-          email_kind?: string
-          id?: string
-          invoice_id?: string
-          recipients?: string[]
-          resend_message_id?: string | null
-          sent_at?: string
-          sent_by?: string | null
-          sent_by_email?: string | null
-          source?: string
-          subject?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "invoice_email_log_invoice_id_fkey"
-            columns: ["invoice_id"]
-            isOneToOne: false
-            referencedRelation: "invoices"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "invoice_email_log_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       invoices: {
         Row: {
           billed_percentage: number | null
@@ -1290,11 +1304,11 @@ export type Database = {
           description: string | null
           due_date: string | null
           first_sent_at: string | null
-          last_sent_at: string | null
           id: string
           invoice_date: string
           invoice_number: string
           invoice_type: string | null
+          last_sent_at: string | null
           notes: string | null
           order_id: string
           parent_invoice_id: string | null
@@ -1341,11 +1355,11 @@ export type Database = {
           description?: string | null
           due_date?: string | null
           first_sent_at?: string | null
-          last_sent_at?: string | null
           id?: string
           invoice_date?: string
           invoice_number: string
           invoice_type?: string | null
+          last_sent_at?: string | null
           notes?: string | null
           order_id: string
           parent_invoice_id?: string | null
@@ -1392,11 +1406,11 @@ export type Database = {
           description?: string | null
           due_date?: string | null
           first_sent_at?: string | null
-          last_sent_at?: string | null
           id?: string
           invoice_date?: string
           invoice_number?: string
           invoice_type?: string | null
+          last_sent_at?: string | null
           notes?: string | null
           order_id?: string
           parent_invoice_id?: string | null

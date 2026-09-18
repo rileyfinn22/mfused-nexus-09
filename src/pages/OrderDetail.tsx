@@ -1032,7 +1032,30 @@ const OrderDetail = () => {
     }
   };
 
+  const handleApproveCustomerOrder = async () => {
+    if (!isVibeAdmin) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('orders')
+      .update({
+        vibe_approved: true,
+        vibe_approved_by: user.id,
+        vibe_approved_at: new Date().toISOString(),
+      })
+      .eq('id', orderId);
+
+    if (error) {
+      toast({ title: "Couldn't approve the order", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Order approved", description: "It's moved into the main order list." });
+    fetchOrder();
+  };
+
   const handleVibeProcessed = async () => {
+
     if (!isAdmin) return;
     
     const { data: { user } } = await supabase.auth.getUser();
@@ -1775,22 +1798,35 @@ const OrderDetail = () => {
       {/* Process Order Banner for Draft/Pending Orders */}
       {isVibeAdmin && (order.status === 'draft' || order.status === 'pending' || order.status === 'pending_pull') && (
         <div className="mb-6 p-4 bg-info/10 border-2 border-info rounded-lg">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4">
             <div>
               <h3 className="text-lg font-semibold text-info">Order Ready to Process</h3>
-              <p className="text-sm text-muted-foreground">This order is pending and ready to be moved to production</p>
+              <p className="text-sm text-muted-foreground">
+                {(order as any).submitted_by_customer && !(order as any).vibe_approved
+                  ? "Customer-placed order awaiting your approval"
+                  : "This order is pending and ready to be moved to production"}
+              </p>
             </div>
-            <Button 
-              size="lg"
-              className="bg-info hover:bg-info text-info-foreground"
-              onClick={() => handleStatusChange('in production')}
-            >
-              <CheckCircle2 className="h-5 w-5 mr-2" />
-              Process Order → Production
-            </Button>
+            <div className="flex gap-3">
+              {(order as any).submitted_by_customer && !(order as any).vibe_approved && (
+                <Button size="lg" variant="outline" onClick={handleApproveCustomerOrder}>
+                  <CheckCircle2 className="h-5 w-5 mr-2" />
+                  Approve Order
+                </Button>
+              )}
+              <Button 
+                size="lg"
+                className="bg-info hover:bg-info text-info-foreground"
+                onClick={() => handleStatusChange('in production')}
+              >
+                <CheckCircle2 className="h-5 w-5 mr-2" />
+                Process Order → Production
+              </Button>
+            </div>
           </div>
         </div>
       )}
+
       
       {/* Header with Back Button and Action Buttons */}
       <div className="mb-6 flex items-center justify-between">
