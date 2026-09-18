@@ -41,9 +41,12 @@ interface Row {
 
 const ALL = "__all__";
 
+const CACHE_KEY = "vendor-status:rows";
+
 export default function VendorStatus() {
-  const [rows, setRows] = useState<Row[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cached = getCached<Row[]>(CACHE_KEY);
+  const [rows, setRows] = useState<Row[]>(cached || []);
+  const [loading, setLoading] = useState(!cached);
   const [search, setSearch] = useState("");
   const [vendorFilter, setVendorFilter] = useState<string>(ALL);
   const [companyFilter, setCompanyFilter] = useState<string>(ALL);
