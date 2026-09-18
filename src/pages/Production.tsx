@@ -188,11 +188,17 @@ export default function Production() {
     }
   }, [roleChecked, isVibeAdmin]);
 
+  // Vibe admins render <VendorStatus /> and everyone else <CustomerProduction />,
+  // so the heavy all-orders fetch below is only ever used by vendors. Running it for
+  // the other roles just made the tab wait on data nothing rendered.
   useEffect(() => {
-    if (roleChecked) {
-      fetchProductionOrders();
+    if (!roleChecked) return;
+    if (hasVibeAdminRole || !isVendor) {
+      setLoading(false);
+      return;
     }
-  }, [roleChecked, isVibeAdmin, isVendor, vendorId, selectedCompanyId, activeCompanyId]);
+    fetchProductionOrders();
+  }, [roleChecked, hasVibeAdminRole, isVibeAdmin, isVendor, vendorId, selectedCompanyId, activeCompanyId]);
 
   const handleCompanyChange = (value: string) => {
     setSelectedCompanyId(value);
