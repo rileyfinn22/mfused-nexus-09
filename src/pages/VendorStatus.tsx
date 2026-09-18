@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Search, Factory } from "lucide-react";
 import OrdersSheet, { parseTracking, parseShipTo, parseDateInput, type SheetItem, type SheetPo } from "@/components/vendor/OrdersSheet";
+import { getCached, setCached } from "@/lib/pageCache";
 
 interface Row {
   id: string;
@@ -40,9 +41,12 @@ interface Row {
 
 const ALL = "__all__";
 
+const CACHE_KEY = "vendor-status:rows";
+
 export default function VendorStatus() {
-  const [rows, setRows] = useState<Row[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cached = getCached<Row[]>(CACHE_KEY);
+  const [rows, setRows] = useState<Row[]>(cached || []);
+  const [loading, setLoading] = useState(!cached);
   const [search, setSearch] = useState("");
   const [vendorFilter, setVendorFilter] = useState<string>(ALL);
   const [companyFilter, setCompanyFilter] = useState<string>(ALL);
@@ -53,26 +57,38 @@ export default function VendorStatus() {
     fetchRows();
   }, []);
 
-  const fetchRows = async () => {
-    try {
-      // vibe_admin RLS ("Vibe admins can view all vendor POs") returns every PO.
-      const { data, error } = await (supabase as any)
-        .from("vendor_pos")
-        .select(
-          `id, po_number, vendor_invoice_number, completion_date, delivery_date, sheet_description, sheet_completed_at, production_status, vendor_committed_ship_date, expected_delivery_date,
+  const SELECT = `id, po_number, vendor_invoice_number, completion_date, delivery_date, sheet_description, sheet_completed_at, production_status, vendor_committed_ship_date, expected_delivery_date,
            is_delayed, delay_reason, production_status_updated_at, order_date, description, notes,
            ship_to_name, ship_to_street, ship_to_city, ship_to_state, ship_to_zip,
            tracking_carrier, tracking_number, tracking_url,
            vendors ( name ),
            customer_company:companies!vendor_pos_customer_company_id_fkey ( name ),
            vendor_po_items ( id, name, description, quantity, final_quantity, shipped_quantity, is_adjustment ),
-           orders ( po_number, description, companies ( name ), invoices ( id, invoice_number, customer_po_number, deleted_at ) )`
-        )
-        .neq("po_type", "expense")
-        .order("order_date", { ascending: false });
+           orders ( po_number, description, companies ( name ), invoices ( id, invoice_number, customer_po_number, deleted_at ) )`;
 
-      if (error) throw error;
-      setRows((data || []) as Row[]);
+  /** Newest POs paint first; the rest stream in behind them. */
+  const PAGE = 60;
+
+  const fetchRows = async () => {
+    try {
+      // vibe_admin RLS ("Vibe admins can view all vendor POs") returns every PO.
+      const collected: Row[] = [];
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await (supabase as any)
+          .from("vendor_pos")
+          .select(SELECT)
+          .neq("po_type", "expense")
+          .order("order_date", { ascending: false })
+          .range(from, from + PAGE - 1);
+
+        if (error) throw error;
+        const batch = (data || []) as Row[];
+        collected.push(...batch);
+        setRows([...collected]);
+        setLoading(false);
+        if (batch.length < PAGE) break;
+      }
+      setCached(CACHE_KEY, collected);
     } catch (error: any) {
       console.error("Error loading vendor status:", error);
       toast({ title: "Error", description: "Failed to load vendor status", variant: "destructive" });

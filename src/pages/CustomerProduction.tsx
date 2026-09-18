@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Loader2, Search, Factory } from "lucide-react";
 import OrdersSheet, { type SheetPo } from "@/components/vendor/OrdersSheet";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
+import { getCached, setCached } from "@/lib/pageCache";
 
 /** Customer-safe production row from customer_production_sheet(). */
 interface Row {
@@ -41,16 +42,25 @@ export default function CustomerProduction({ companyId }: { companyId?: string |
   const { activeCompanyId: ctxCompanyId } = useActiveCompany();
   const activeCompanyId = companyId || ctxCompanyId;
 
+  // Show the last result for this company immediately, refresh in the background.
   useEffect(() => {
     if (!activeCompanyId) return;
-    (async () => {
+    const cacheKey = `customer-production:${activeCompanyId}`;
+    const cached = getCached<Row[]>(cacheKey);
+    if (cached) {
+      setRows(cached);
+      setLoading(false);
+    } else {
       setLoading(true);
+    }
+    (async () => {
       try {
         const { data, error } = await (supabase as any).rpc("customer_production_sheet", {
           p_company_id: activeCompanyId,
         });
         if (error) throw error;
         setRows((data || []) as Row[]);
+        setCached(cacheKey, (data || []) as Row[]);
       } catch (error: any) {
         console.error("Error loading production sheet:", error);
         toast({ title: "Failed to load production", description: error?.message || "Try again", variant: "destructive" });
