@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,6 +55,8 @@ const Invoices = () => {
   const [userCompanyName, setUserCompanyName] = useState<string>("");
   const [companies, setCompanies] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
+  // Identifies the newest in-flight paged fetch so a stale one can't overwrite the list.
+  const invoicesRequestRef = useRef(0);
   // True when any listed invoice's order contains branded products; customers then see a
   // Brand column where the PO column was (the PO still shows on the invoice itself).
   const [hasBrands, setHasBrands] = useState(false);
@@ -111,6 +113,11 @@ const Invoices = () => {
     if (data) setCompanies(data);
   };
 
+  /**
+   * Invoices load in pages: the newest page paints straight away and the rest stream in
+   * behind it. Paging also lifts the server's 1000-row response cap, so older invoices
+   * are no longer silently missing from the list.
+   */
   const fetchInvoices = async () => {
     // For non-admin users we must have an active company before querying.
     if (!isVibeAdmin && !activeCompanyId) {
@@ -130,45 +137,64 @@ const Invoices = () => {
       setLoading(true);
     }
 
-    let query = supabase
-      .from('invoices')
-      .select(`
-        *,
-        orders(order_number, customer_name, po_number, description, order_items(product_id)),
-        companies(name)
-      `)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false });
+    const requestId = ++invoicesRequestRef.current;
+    const PAGE = 300;
+    const accumulated: any[] = [];
 
-    // For vibe admins: use URL company filter if set
-    // For regular users: always filter by their active company
-    if (isVibeAdmin) {
-      if (companyFilter !== 'all') {
-        query = query.eq('company_id', companyFilter);
+    for (let page = 0; ; page++) {
+      let query = supabase
+        .from('invoices')
+        .select(`
+          *,
+          orders(order_number, customer_name, po_number, description, order_items(product_id)),
+          companies(name)
+        `)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false })
+        .range(page * PAGE, page * PAGE + PAGE - 1);
+
+      // For vibe admins: use URL company filter if set
+      // For regular users: always filter by their active company
+      if (isVibeAdmin) {
+        if (companyFilter !== 'all') {
+          query = query.eq('company_id', companyFilter);
+        }
+      } else if (activeCompanyId) {
+        query = query.eq('company_id', activeCompanyId);
       }
-    } else if (activeCompanyId) {
-      query = query.eq('company_id', activeCompanyId);
-    }
 
-    const { data, error } = await query;
-    if (error) {
-      console.error('Invoice fetch error:', error);
-    }
+      const { data, error } = await query;
+      if (error) {
+        console.error('Invoice fetch error:', error);
+        break;
+      }
+      // A newer fetch (company switch, refresh) started: drop this one.
+      if (requestId !== invoicesRequestRef.current) return;
 
-    if (data) {
+      const rows = data || [];
       // Brand per line item of the invoiced order, so invoices can be labelled by brand.
       const brandByProduct = await fetchBrandsByProductId(
-        data.flatMap((inv: any) => (inv.orders?.order_items || []).map((i: any) => i.product_id))
+        rows.flatMap((inv: any) => (inv.orders?.order_items || []).map((i: any) => i.product_id))
       );
-      const withBrands = data.map((inv: any) => {
+      if (requestId !== invoicesRequestRef.current) return;
+
+      const withBrands = rows.map((inv: any) => {
         const invoiceBrands = brandsForItems(inv.orders?.order_items, brandByProduct);
         return { ...inv, brands: invoiceBrands, brandNames: invoiceBrands.map((b) => b.name) };
       });
-      setInvoices(withBrands);
-      const anyBrands = withBrands.some((inv: any) => inv.brandNames.length > 0);
-      setHasBrands(anyBrands);
-      setCached(cacheKey, { invoices: withBrands, hasBrands: anyBrands });
+
+      accumulated.push(...withBrands);
+      setInvoices([...accumulated]);
+      setHasBrands(accumulated.some((inv: any) => inv.brandNames.length > 0));
+      setLoading(false);
+
+      if (rows.length < PAGE) break;
     }
+
+    setCached(cacheKey, {
+      invoices: accumulated,
+      hasBrands: accumulated.some((inv: any) => inv.brandNames.length > 0),
+    });
     setLoading(false);
   };
 

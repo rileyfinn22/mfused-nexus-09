@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { StatusDot, type StatusTone } from "@/components/StatusDot";
@@ -59,6 +59,8 @@ const Orders = () => {
   // Read company filter from URL, default to "all" (only for vibe admins)
   const companyFilter = searchParams.get("company") || "all";
   const [orders, setOrders] = useState<any[]>([]);
+  // Identifies the newest in-flight paged fetch so a stale one can't overwrite the list.
+  const ordersRequestRef = useRef(0);
   // True when any listed order contains branded products; customers then get a Brand column.
   const [hasBrands, setHasBrands] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -117,6 +119,60 @@ const Orders = () => {
     }
   };
 
+  /** Adds artwork-approval marks and brand labels to one page of orders. */
+  const decorateOrders = async (rows: any[]) => {
+    const allSkus = Array.from(new Set(
+      rows.flatMap((o: any) => (o.order_items || []).map((i: any) => i.sku).filter(Boolean))
+    ));
+    let approvedSkus = new Set<string>();
+    if (allSkus.length > 0) {
+      const skuChunks: string[][] = [];
+      for (let i = 0; i < allSkus.length; i += 150) skuChunks.push(allSkus.slice(i, i + 150));
+      const chunkResults = await Promise.all(
+        skuChunks.map(async (skus) => {
+          const { data, error } = await supabase
+            .from('artwork_files')
+            .select('sku')
+            .in('sku', skus)
+            .eq('is_approved', true);
+          if (error) {
+            console.error('Error fetching artwork approvals:', error);
+            return [] as any[];
+          }
+          return data || [];
+        })
+      );
+      approvedSkus = new Set(chunkResults.flat().map((a: any) => a.sku));
+    }
+
+    const brandByProduct = await fetchBrandsByProductId(
+      rows.flatMap((o: any) => (o.order_items || []).map((i: any) => i.product_id))
+    );
+
+    const completedStatuses = ['completed', 'shipped', 'delivered'];
+    return rows.map((order: any) => {
+      const productionProgress = completedStatuses.includes(order.status?.toLowerCase())
+        ? 100
+        : (order.production_progress ?? 0);
+      const items = order.order_items || [];
+      const allApproved = items.length > 0 && items.every((item: any) => approvedSkus.has(item.sku));
+      const brands = brandsForItems(items, brandByProduct);
+      return {
+        ...order,
+        artApproved: allApproved,
+        checklistComplete: allApproved && order.order_finalized && order.vibe_processed,
+        productionProgress,
+        brands,
+        brandNames: brands.map((b) => b.name),
+      };
+    });
+  };
+
+  /**
+   * Orders load in pages: the newest page paints straight away and the rest stream in
+   * behind it. Paging also lifts the server's 1000-row response cap, so older orders
+   * are no longer silently missing from the list.
+   */
   const fetchOrders = async () => {
     // Show the last result for this scope at once; the fetch below refreshes it in place.
     const cacheKey = `orders:${isVibeAdmin ? `admin:${companyFilter}` : `company:${activeCompanyId ?? ''}`}`;
@@ -128,89 +184,57 @@ const Orders = () => {
     } else {
       setLoading(true);
     }
-    let query = supabase
-      .from('orders')
-      // Only the line-item fields the list actually renders; `order_items(*)` made this
-      // response several times larger than it needed to be.
-      .select('*, order_items(id, sku, product_id, name, quantity, shipped_quantity, unit_price), companies(name)')
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false });
 
-    // For vibe admins: use URL company filter if set
-    // For regular users: always filter by their active company
-    if (isVibeAdmin) {
-      if (companyFilter !== 'all') {
-        query = query.eq('company_id', companyFilter);
+    const requestId = ++ordersRequestRef.current;
+    const PAGE = 300;
+    const accumulated: any[] = [];
+
+    for (let page = 0; ; page++) {
+      let query = supabase
+        .from('orders')
+        // Only the line-item fields the list actually renders; `order_items(*)` made this
+        // response several times larger than it needed to be.
+        .select('*, order_items(id, sku, product_id, name, quantity, shipped_quantity, unit_price), companies(name)')
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false })
+        .range(page * PAGE, page * PAGE + PAGE - 1);
+
+      // For vibe admins: use URL company filter if set
+      // For regular users: always filter by their active company
+      if (isVibeAdmin) {
+        if (companyFilter !== 'all') {
+          query = query.eq('company_id', companyFilter);
+        }
+      } else if (activeCompanyId) {
+        query = query.eq('company_id', activeCompanyId);
       }
-    } else if (activeCompanyId) {
-      // Non-admin users: filter by their active company
-      query = query.eq('company_id', activeCompanyId);
-    }
 
-    const { data, error } = await query;
-    
-    if (!error && data) {
+      const { data, error } = await query;
+      if (error) {
+        console.error('Error fetching orders:', error);
+        break;
+      }
+      // A newer fetch (company switch, refresh) started: drop this one.
+      if (requestId !== ordersRequestRef.current) return;
+
+      const rows = data || [];
       // For non-vibe admins, filter out draft orders (they can only see pending and later)
-      const filteredData = isVibeAdmin 
-        ? data 
-        : data.filter(order => order.status !== 'draft');
-      
-      // Artwork approval status for every SKU on screen. SKUs are chunked because a single
-      // `in.(...)` filter with thousands of values overflows the request URL (HTTP 400).
-      const allSkus = Array.from(new Set(
-        filteredData.flatMap((o: any) => (o.order_items || []).map((i: any) => i.sku).filter(Boolean))
-      ));
-      let approvedSkus = new Set<string>();
-      if (allSkus.length > 0) {
-        const skuChunks: string[][] = [];
-        for (let i = 0; i < allSkus.length; i += 150) skuChunks.push(allSkus.slice(i, i + 150));
-        const chunkResults = await Promise.all(
-          skuChunks.map(async (skus) => {
-            const { data, error } = await supabase
-              .from('artwork_files')
-              .select('sku')
-              .in('sku', skus)
-              .eq('is_approved', true);
-            if (error) {
-              console.error('Error fetching artwork approvals:', error);
-              return [] as any[];
-            }
-            return data || [];
-          })
-        );
-        approvedSkus = new Set(chunkResults.flat().map((a: any) => a.sku));
-      }
+      const visible = isVibeAdmin ? rows : rows.filter((order: any) => order.status !== 'draft');
+      const decorated = await decorateOrders(visible);
+      if (requestId !== ordersRequestRef.current) return;
 
-      // Brand per line item, so each order can be labelled by the brands it contains.
-      const brandByProduct = await fetchBrandsByProductId(
-        filteredData.flatMap((o: any) => (o.order_items || []).map((i: any) => i.product_id))
-      );
+      accumulated.push(...decorated);
+      setOrders([...accumulated]);
+      setHasBrands(accumulated.some((o: any) => o.brandNames.length > 0));
+      setLoading(false);
 
-      const completedStatuses = ['completed', 'shipped', 'delivered'];
-      const ordersWithChecklist = filteredData.map((order: any) => {
-        const productionProgress = completedStatuses.includes(order.status?.toLowerCase())
-          ? 100
-          : (order.production_progress ?? 0);
-
-        const items = order.order_items || [];
-        const allApproved = items.length > 0 && items.every((item: any) => approvedSkus.has(item.sku));
-
-        return {
-          ...order,
-          artApproved: allApproved,
-          checklistComplete: allApproved && order.order_finalized && order.vibe_processed,
-          productionProgress,
-          brands: brandsForItems(items, brandByProduct),
-          brandNames: brandsForItems(items, brandByProduct).map((b) => b.name),
-        };
-      });
-
-      setOrders(ordersWithChecklist);
-      const anyBrands = ordersWithChecklist.some((o: any) => o.brandNames.length > 0);
-      setHasBrands(anyBrands);
-      setCached(cacheKey, { orders: ordersWithChecklist, hasBrands: anyBrands });
-
+      if (rows.length < PAGE) break;
     }
+
+    setCached(cacheKey, {
+      orders: accumulated,
+      hasBrands: accumulated.some((o: any) => o.brandNames.length > 0),
+    });
     setLoading(false);
   };
 
