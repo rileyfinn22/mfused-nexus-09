@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,6 +55,8 @@ const Invoices = () => {
   const [userCompanyName, setUserCompanyName] = useState<string>("");
   const [companies, setCompanies] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
+  // Identifies the newest in-flight paged fetch so a stale one can't overwrite the list.
+  const invoicesRequestRef = useRef(0);
   // True when any listed invoice's order contains branded products; customers then see a
   // Brand column where the PO column was (the PO still shows on the invoice itself).
   const [hasBrands, setHasBrands] = useState(false);
