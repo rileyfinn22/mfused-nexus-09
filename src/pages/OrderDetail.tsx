@@ -1032,7 +1032,30 @@ const OrderDetail = () => {
     }
   };
 
+  const handleApproveCustomerOrder = async () => {
+    if (!isVibeAdmin) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('orders')
+      .update({
+        vibe_approved: true,
+        vibe_approved_by: user.id,
+        vibe_approved_at: new Date().toISOString(),
+      })
+      .eq('id', orderId);
+
+    if (error) {
+      toast({ title: "Couldn't approve the order", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Order approved", description: "It's moved into the main order list." });
+    fetchOrder();
+  };
+
   const handleVibeProcessed = async () => {
+
     if (!isAdmin) return;
     
     const { data: { user } } = await supabase.auth.getUser();
