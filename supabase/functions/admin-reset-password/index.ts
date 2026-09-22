@@ -41,10 +41,6 @@ Deno.serve(async (req) => {
 
     const redirectTo = redirect_to || "https://vibepkgportal.com/reset-password";
 
-    // Look up the user; if they don't exist yet, create them (invite-style setup link)
-    const { data: existing } = await supabaseAdmin.rpc("noop_placeholder").catch(() => ({ data: null }));
-    void existing;
-
     let linkType: "recovery" | "invite" = "recovery";
     const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
       type: "recovery",
