@@ -363,23 +363,24 @@ const AddArtworkDialog = ({
             </div>
           )}
 
-          {/* Artwork File */}
+          {/* Artwork File(s) */}
           <div className="space-y-2">
-            <Label htmlFor="artwork-file">Artwork File *</Label>
+            <Label htmlFor="artwork-file">Artwork File(s) *</Label>
             <div className="flex items-center gap-2">
               <Input
                 id="artwork-file"
                 type="file"
-                onChange={(e) => setFormData(prev => ({ ...prev, file: e.target.files?.[0] || null }))}
+                multiple
+                onChange={(e) => setFormData(prev => ({ ...prev, files: Array.from(e.target.files || []) }))}
                 className="flex-1"
               />
             </div>
-            {formData.file && (
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
+            {formData.files.map((f) => (
+              <p key={f.name} className="text-xs text-muted-foreground flex items-center gap-1">
                 <FileImage className="h-3 w-3" />
-                {formData.file.name}
+                {f.name}
               </p>
-            )}
+            ))}
           </div>
 
           {/* Preview File */}
@@ -415,7 +416,7 @@ const AddArtworkDialog = ({
             </Button>
             <Button 
               onClick={handleUpload} 
-              disabled={uploading || !formData.productId || !formData.file}
+              disabled={uploading || !formData.productId || !formData.files.length}
             >
               {uploading ? (
                 <>Uploading...</>
