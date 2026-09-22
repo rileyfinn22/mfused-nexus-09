@@ -221,6 +221,47 @@ Deno.serve(async (req) => {
         return json({ status: r.status, body: parsed });
       }
 
+      case "auth_admin": {
+        // { op: "delete"|"create"|"link", ... } -- proxied to GoTrue admin API
+        const { op } = payload;
+        const base = `${SUPABASE_URL}/auth/v1`;
+        const h = {
+          apikey: SERVICE_ROLE,
+          Authorization: `Bearer ${SERVICE_ROLE}`,
+          "Content-Type": "application/json",
+        };
+        if (op === "delete") {
+          if (!payload.user_id) return json({ error: "user_id required" }, 400);
+          const r = await fetch(`${base}/admin/users/${payload.user_id}`, { method: "DELETE", headers: h });
+          return json({ status: r.status, body: await r.json().catch(() => ({})) }, r.ok ? 200 : 400);
+        }
+        if (op === "create") {
+          const r = await fetch(`${base}/admin/users`, {
+            method: "POST",
+            headers: h,
+            body: JSON.stringify({
+              email: payload.email,
+              password: payload.password,
+              email_confirm: payload.email_confirm ?? true,
+            }),
+          });
+          return json({ status: r.status, body: await r.json().catch(() => ({})) }, r.ok ? 200 : 400);
+        }
+        if (op === "link") {
+          const r = await fetch(`${base}/admin/generate_link`, {
+            method: "POST",
+            headers: h,
+            body: JSON.stringify({
+              type: payload.type ?? "recovery",
+              email: payload.email,
+              redirect_to: payload.redirect_to,
+            }),
+          });
+          return json({ status: r.status, body: await r.json().catch(() => ({})) }, r.ok ? 200 : 400);
+        }
+        return json({ error: "op must be delete|create|link" }, 400);
+      }
+
       case "help":
       case undefined:
         return json({
