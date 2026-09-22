@@ -1327,6 +1327,7 @@ export type Database = {
           shipping_note: string | null
           shipping_state: string | null
           shipping_street: string | null
+          shipping_vendor_po_id: string | null
           shipping_zip: string | null
           status: string
           subtotal: number
@@ -1378,6 +1379,7 @@ export type Database = {
           shipping_note?: string | null
           shipping_state?: string | null
           shipping_street?: string | null
+          shipping_vendor_po_id?: string | null
           shipping_zip?: string | null
           status?: string
           subtotal?: number
@@ -1429,6 +1431,7 @@ export type Database = {
           shipping_note?: string | null
           shipping_state?: string | null
           shipping_street?: string | null
+          shipping_vendor_po_id?: string | null
           shipping_zip?: string | null
           status?: string
           subtotal?: number
@@ -1481,6 +1484,13 @@ export type Database = {
             columns: ["quote_id"]
             isOneToOne: false
             referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_shipping_vendor_po_id_fkey"
+            columns: ["shipping_vendor_po_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_pos"
             referencedColumns: ["id"]
           },
         ]
