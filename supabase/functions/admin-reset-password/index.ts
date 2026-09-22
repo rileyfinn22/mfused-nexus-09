@@ -36,10 +36,23 @@ Deno.serve(async (req) => {
       if (!roles || roles.length === 0) return json({ error: "Forbidden" }, 403);
     }
 
-    const { email, redirect_to } = await req.json();
+    const { email, redirect_to, new_password } = await req.json();
     if (!email) return json({ error: "email is required" }, 400);
 
     const redirectTo = redirect_to || "https://vibepkgportal.com/reset-password";
+
+    if (new_password) {
+      const { data: list, error: listError } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      if (listError) return json({ error: listError.message }, 400);
+      const target = list.users.find((u) => (u.email || "").toLowerCase() === String(email).toLowerCase());
+      if (!target) return json({ error: "User not found" }, 404);
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(target.id, {
+        password: new_password,
+      });
+      if (updateError) return json({ error: updateError.message }, 400);
+      return json({ email, password_set: true });
+    }
+
 
     let linkType: "recovery" | "invite" = "recovery";
     const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
