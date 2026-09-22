@@ -1325,7 +1325,6 @@ export type Database = {
           shipping_method: string | null
           shipping_name: string | null
           shipping_note: string | null
-          shipping_vendor_po_id: string | null
           shipping_state: string | null
           shipping_street: string | null
           shipping_vendor_po_id: string | null
@@ -1378,7 +1377,6 @@ export type Database = {
           shipping_method?: string | null
           shipping_name?: string | null
           shipping_note?: string | null
-          shipping_vendor_po_id?: string | null
           shipping_state?: string | null
           shipping_street?: string | null
           shipping_vendor_po_id?: string | null
@@ -1431,7 +1429,6 @@ export type Database = {
           shipping_method?: string | null
           shipping_name?: string | null
           shipping_note?: string | null
-          shipping_vendor_po_id?: string | null
           shipping_state?: string | null
           shipping_street?: string | null
           shipping_vendor_po_id?: string | null
