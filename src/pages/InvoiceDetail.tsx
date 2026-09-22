@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { pdfItemDescription } from "@/lib/pdfItemText";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
+import { ShippingVendorPoSelect } from "@/components/ShippingVendorPoSelect";
+import { toVendorPoOption, type VendorPoOption } from "@/lib/vendorPo";
+import { CreateShippingPoDialog } from "@/components/CreateShippingPoDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -73,7 +76,11 @@ const InvoiceDetail = () => {
   const [deletedItemIds, setDeletedItemIds] = useState<string[]>([]);
   const [editShippingCost, setEditShippingCost] = useState<string>('');
   const [editShippingNote, setEditShippingNote] = useState<string>('');
-  const [editShippingPo, setEditShippingPo] = useState<string>('');
+  // Vendor PO the freight was bought on. Internal: vibe admins only, never on the PDF,
+  // the customer view, or the QuickBooks line.
+  const [editShippingPoId, setEditShippingPoId] = useState<string | null>(null);
+  const [shippingPo, setShippingPo] = useState<VendorPoOption | null>(null);
+  const [createShippingPoOpen, setCreateShippingPoOpen] = useState(false);
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
   const aiFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -180,6 +187,57 @@ const InvoiceDetail = () => {
       fetchInvoiceDetails();
     }
   }, [invoiceId]);
+
+  // Resolve the vendor PO behind the shipping line for the admin-only caption. Customers
+  // cannot read vendor_pos, so this stays null for them and nothing renders.
+  useEffect(() => {
+    const poId: string | null = invoice?.shipping_vendor_po_id ?? null;
+    if (!isVibeAdmin || !poId) {
+      setShippingPo(null);
+      return;
+    }
+    const onOrder = vendorPOs.find((po: any) => po.id === poId);
+    if (onOrder) {
+      setShippingPo(toVendorPoOption(onOrder));
+      return;
+    }
+    let cancelled = false;
+    supabase
+      .from('vendor_pos')
+      .select('id, po_number, po_type, vendors(name)')
+      .eq('id', poId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled) setShippingPo(data ? toVendorPoOption(data) : null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [invoice?.shipping_vendor_po_id, isVibeAdmin, vendorPOs]);
+
+  // A PO minted from the shipping line is linked straight away so it can never be orphaned
+  // by a cancelled edit; the edit draft is updated to match.
+  const handleShippingPoCreated = async (po: VendorPoOption) => {
+    setEditShippingPoId(po.id);
+    setShippingPo(po);
+    const { error } = await supabase
+      .from('invoices')
+      .update({ shipping_vendor_po_id: po.id })
+      .eq('id', invoiceId);
+    if (error) {
+      toast({ title: 'PO created but not linked', description: error.message, variant: 'destructive' });
+      return;
+    }
+    setInvoice((prev: any) => (prev ? { ...prev, shipping_vendor_po_id: po.id } : prev));
+    if (invoice?.order_id) {
+      const { data } = await supabase
+        .from('vendor_pos')
+        .select('*, vendors(name, contact_name, contact_email), vendor_po_items(*)')
+        .eq('order_id', invoice.order_id)
+        .order('created_at', { ascending: true });
+      if (data) setVendorPOs(data);
+    }
+  };
 
   // If a customer opens the payment portal and we don't have a payment link yet,
   // attempt to generate/refresh it automatically (only once per session).
@@ -646,7 +704,6 @@ const InvoiceDetail = () => {
       tax: invoice.tax,
       shipping_cost: invoice.shipping_cost,
       shipping_note: invoice.shipping_note,
-      shipping_po_number: invoice.shipping_po_number,
       notes: invoice.notes,
       companies: (invoice.companies as any) || { name: order.customer_name },
       billed_percentage: invoice.billed_percentage,
@@ -951,7 +1008,7 @@ const InvoiceDetail = () => {
         const { error: shipErr } = await supabase.from('invoices').update({
           shipping_cost: editedShipping,
           shipping_note: editShippingNote || null,
-          shipping_po_number: editShippingPo.trim() || null,
+          shipping_vendor_po_id: editShippingPoId,
         }).eq('id', invoiceId);
         if (shipErr) throw shipErr;
         const { error: recalcErr } = await supabase.rpc('recalc_blanket_invoices_for_order', {
@@ -983,7 +1040,7 @@ const InvoiceDetail = () => {
           total: newTotal,
           shipping_cost: editedShipping,
           shipping_note: editShippingNote || null,
-          shipping_po_number: editShippingPo.trim() || null,
+          shipping_vendor_po_id: editShippingPoId,
         }).eq('id', invoiceId);
         if (invoiceError) throw invoiceError;
       }
@@ -1006,7 +1063,7 @@ const InvoiceDetail = () => {
         total: newTotal,
         shipping_cost: editedShipping,
         shipping_note: editShippingNote || null,
-        shipping_po_number: editShippingPo.trim() || null,
+        shipping_vendor_po_id: editShippingPoId,
         orders: { ...(invoice?.orders || {}), order_items: updatedOrderItems },
       });
       toast({
@@ -1758,7 +1815,7 @@ const InvoiceDetail = () => {
                         }
                         setEditShippingCost(String(invoice?.shipping_cost || 0));
                         setEditShippingNote(invoice?.shipping_note || '');
-                        setEditShippingPo(invoice?.shipping_po_number || '');
+                        setEditShippingPoId(invoice?.shipping_vendor_po_id || null);
                         setIsEditMode(true);
                       }}>
                         <Edit className="h-4 w-4 mr-2" />
@@ -2945,33 +3002,55 @@ const InvoiceDetail = () => {
                       )}
                     </div>
                     {isVibeAdmin && isEditMode ? (
-                      <div className="grid grid-cols-[7.5rem_1fr] gap-1.5">
-                        <Input
-                          value={editShippingPo}
-                          onChange={(e) => setEditShippingPo(e.target.value)}
-                          className="text-xs h-7 font-mono"
-                          placeholder="Shipping PO #"
-                        />
+                      <div className="space-y-1">
                         <Input
                           value={editShippingNote}
                           onChange={(e) => setEditShippingNote(e.target.value)}
                           className="text-xs h-7"
                           placeholder="Shipping note/description…"
                         />
-                      </div>
-                    ) : invoice?.shipping_po_number || invoice?.shipping_note ? (
-                      <p className="text-xs text-muted-foreground pl-1">
-                        {invoice?.shipping_po_number && (
-                          <span className="font-mono text-foreground">PO {invoice.shipping_po_number}</span>
+                        {/* Internal link to the vendor PO the freight was bought on. Never shown to customers. */}
+                        <ShippingVendorPoSelect
+                          value={editShippingPoId}
+                          onChange={setEditShippingPoId}
+                          orderPos={vendorPOs.map(toVendorPoOption)}
+                          onCreate={() => setCreateShippingPoOpen(true)}
+                        />
+                        {invoice && (
+                          <CreateShippingPoDialog
+                            open={createShippingPoOpen}
+                            onOpenChange={setCreateShippingPoOpen}
+                            invoice={{
+                              id: invoice.id,
+                              invoice_number: invoice.invoice_number,
+                              order_id: invoice.order_id ?? null,
+                              company_id: invoice.company_id ?? null,
+                            }}
+                            defaultCost={Number(editShippingCost || 0)}
+                            onCreated={handleShippingPoCreated}
+                          />
                         )}
-                        {invoice?.shipping_po_number && invoice?.shipping_note ? ' · ' : ''}
-                        {invoice?.shipping_note}
-                      </p>
-                    ) : null}
+                      </div>
+                    ) : (
+                      <>
+                        {invoice?.shipping_note && (
+                          <p className="text-xs text-muted-foreground pl-1">{invoice.shipping_note}</p>
+                        )}
+                        {isVibeAdmin && shippingPo && (
+                          <p className="text-xs text-muted-foreground pl-1">
+                            Vendor PO{' '}
+                            <Link to={`/vendor-pos/${shippingPo.id}`} className="font-mono text-primary hover:underline">
+                              {shippingPo.po_number}
+                            </Link>
+                            {shippingPo.vendor_name ? ` · ${shippingPo.vendor_name}` : ''}
+                          </p>
+                        )}
+                      </>
+                    )}
                   </div>
                 ) : isVibeAdmin ? (
                   <button
-                    onClick={() => { setIsEditMode(true); setEditShippingCost('0'); setEditShippingNote(''); setEditShippingPo(''); }}
+                    onClick={() => { setIsEditMode(true); setEditShippingCost('0'); setEditShippingNote(''); setEditShippingPoId(null); }}
                     className="text-xs text-primary hover:underline cursor-pointer"
                   >
                     + Add Shipping Line
