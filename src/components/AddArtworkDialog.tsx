@@ -63,7 +63,7 @@ const AddArtworkDialog = ({
     companyId: defaultCompanyId || restrictToCompany || '',
     sku: defaultSku,
     productId: defaultProductId,
-    file: null as File | null,
+    files: [] as File[],
     previewFile: null as File | null,
     notes: '',
     artworkType: defaultArtworkType || 'customer' as 'customer' | 'vibe_proof',
@@ -94,7 +94,7 @@ const AddArtworkDialog = ({
         companyId: defaultCompanyId || restrictToCompany || '',
         sku: defaultSku,
         productId: defaultProductId,
-        file: null,
+        files: [],
         previewFile: null,
         notes: '',
         artworkType: artworkType,
@@ -160,10 +160,10 @@ const AddArtworkDialog = ({
     setProductComboOpen(false);
   };
 
-  const handleUpload = async () => {
+  const handleUpload = () => {
     const effectiveCompanyId = formData.companyId || userCompanyId;
-    
-    if (!formData.file) {
+
+    if (!formData.files.length) {
       toast.error("Please select an artwork file");
       return;
     }
@@ -184,30 +184,48 @@ const AddArtworkDialog = ({
       return;
     }
 
-    setUploading(true);
+    const job = {
+      files: formData.files,
+      sku: formData.sku,
+      companyId: effectiveCompanyId,
+      artworkType: formData.artworkType,
+      notes: formData.notes,
+      previewFile: formData.previewFile,
+    };
 
-    try {
-      // One upload path for the dialog and the per-product "+" button (src/lib/artworkUpload.ts).
-      // The SKU is stored exactly as the product carries it; the old .toUpperCase() here could
-      // detach a file from a product whose item_id has lower-case characters.
-      await uploadArtworkFile({
-        file: formData.file,
-        sku: formData.sku,
-        companyId: effectiveCompanyId,
-        artworkType: formData.artworkType,
-        notes: formData.notes,
-        previewFile: formData.previewFile,
-      });
+    // Close right away and finish the transfer in the background so several SKUs
+    // can be queued back to back instead of waiting on each upload.
+    onOpenChange(false);
 
-      toast.success("Artwork added successfully");
-      onOpenChange(false);
-      onSuccess?.();
-    } catch (error) {
-      console.error('Error uploading artwork:', error);
-      toast.error(describeArtworkUploadError(error));
-    } finally {
-      setUploading(false);
-    }
+    void (async () => {
+      const label = job.files.length > 1 ? `${job.files.length} art files` : job.files[0].name;
+      const toastId = toast.loading(`Uploading ${label}...`);
+      let done = 0;
+      try {
+        for (const file of job.files) {
+          // One upload path for the dialog and the per-product "+" button (src/lib/artworkUpload.ts).
+          // The SKU is stored exactly as the product carries it.
+          await uploadArtworkFile({
+            file,
+            sku: job.sku,
+            companyId: job.companyId,
+            artworkType: job.artworkType,
+            notes: job.notes,
+            previewFile: job.files.length === 1 ? job.previewFile : null,
+          });
+          done++;
+          onSuccess?.();
+        }
+        toast.success(`Added ${label}`, { id: toastId });
+      } catch (error) {
+        console.error('Error uploading artwork:', error);
+        toast.error(
+          `${done > 0 ? `Added ${done} of ${job.files.length}. ` : ''}${describeArtworkUploadError(error)}`,
+          { id: toastId },
+        );
+        onSuccess?.();
+      }
+    })();
   };
 
   const showCompanySelect = isVibeAdmin && !restrictToCompany;
@@ -345,23 +363,24 @@ const AddArtworkDialog = ({
             </div>
           )}
 
-          {/* Artwork File */}
+          {/* Artwork File(s) */}
           <div className="space-y-2">
-            <Label htmlFor="artwork-file">Artwork File *</Label>
+            <Label htmlFor="artwork-file">Artwork File(s) *</Label>
             <div className="flex items-center gap-2">
               <Input
                 id="artwork-file"
                 type="file"
-                onChange={(e) => setFormData(prev => ({ ...prev, file: e.target.files?.[0] || null }))}
+                multiple
+                onChange={(e) => setFormData(prev => ({ ...prev, files: Array.from(e.target.files || []) }))}
                 className="flex-1"
               />
             </div>
-            {formData.file && (
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
+            {formData.files.map((f) => (
+              <p key={f.name} className="text-xs text-muted-foreground flex items-center gap-1">
                 <FileImage className="h-3 w-3" />
-                {formData.file.name}
+                {f.name}
               </p>
-            )}
+            ))}
           </div>
 
           {/* Preview File */}
@@ -397,7 +416,7 @@ const AddArtworkDialog = ({
             </Button>
             <Button 
               onClick={handleUpload} 
-              disabled={uploading || !formData.productId || !formData.file}
+              disabled={uploading || !formData.productId || !formData.files.length}
             >
               {uploading ? (
                 <>Uploading...</>
