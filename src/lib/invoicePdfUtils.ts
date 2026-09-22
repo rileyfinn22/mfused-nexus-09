@@ -27,6 +27,8 @@ interface InvoiceData {
   tax?: number;
   shipping_cost?: number | null;
   shipping_note?: string | null;
+  /** Customer's PO for the freight, when they issue one separately from the product PO. */
+  shipping_po_number?: string | null;
   notes?: string | null;
   companies?: { name: string } | null;
   billed_percentage?: number | null;
@@ -199,10 +201,16 @@ const renderInvoiceToDoc = async (
   ];
 
   if (hasShipping) {
+    const shippingNote = [
+      invoice.shipping_po_number ? `PO ${invoice.shipping_po_number}` : null,
+      invoice.shipping_note || null,
+    ]
+      .filter(Boolean)
+      .join(' · ');
     totalsRows.push({
       label: 'Shipping',
       value: formatCurrency(shippingAmount),
-      note: invoice.shipping_note || null,
+      note: shippingNote || null,
     });
   }
 

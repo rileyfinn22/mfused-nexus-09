@@ -1512,6 +1512,7 @@ const OrderDetail = () => {
         tax: targetInvoice.tax,
         shipping_cost: targetInvoice.shipping_cost,
         shipping_note: targetInvoice.shipping_note,
+        shipping_po_number: targetInvoice.shipping_po_number,
         notes: targetInvoice.notes,
         companies: { name: order.customer_name },
         billed_percentage: targetInvoice.billed_percentage,

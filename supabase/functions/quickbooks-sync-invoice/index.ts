@@ -903,9 +903,16 @@ serve(async (req) => {
       // Find or create a Shipping item
       const shippingItemId = await findOrCreateQBItem('Shipping', 'Shipping and handling charges', shippingAmount);
       
-      // Use shipping_note as description if available, otherwise default to 'Shipping'
-      const shippingDescription = invoice.shipping_note
-        ? `Shipping - ${invoice.shipping_note}`
+      // Description carries the customer's freight PO (when they issue one) and the
+      // free-text shipping note, e.g. "Shipping - PO 4471 - LTL to Denver".
+      const shippingDetail = [
+        invoice.shipping_po_number ? `PO ${invoice.shipping_po_number}` : null,
+        invoice.shipping_note || null,
+      ]
+        .filter(Boolean)
+        .join(' - ');
+      const shippingDescription = shippingDetail
+        ? `Shipping - ${shippingDetail}`
         : 'Shipping';
       
       lineItems.push({

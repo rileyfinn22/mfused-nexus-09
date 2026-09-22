@@ -73,6 +73,7 @@ const InvoiceDetail = () => {
   const [deletedItemIds, setDeletedItemIds] = useState<string[]>([]);
   const [editShippingCost, setEditShippingCost] = useState<string>('');
   const [editShippingNote, setEditShippingNote] = useState<string>('');
+  const [editShippingPo, setEditShippingPo] = useState<string>('');
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
   const aiFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -645,6 +646,7 @@ const InvoiceDetail = () => {
       tax: invoice.tax,
       shipping_cost: invoice.shipping_cost,
       shipping_note: invoice.shipping_note,
+      shipping_po_number: invoice.shipping_po_number,
       notes: invoice.notes,
       companies: (invoice.companies as any) || { name: order.customer_name },
       billed_percentage: invoice.billed_percentage,
@@ -949,6 +951,7 @@ const InvoiceDetail = () => {
         const { error: shipErr } = await supabase.from('invoices').update({
           shipping_cost: editedShipping,
           shipping_note: editShippingNote || null,
+          shipping_po_number: editShippingPo.trim() || null,
         }).eq('id', invoiceId);
         if (shipErr) throw shipErr;
         const { error: recalcErr } = await supabase.rpc('recalc_blanket_invoices_for_order', {
@@ -980,6 +983,7 @@ const InvoiceDetail = () => {
           total: newTotal,
           shipping_cost: editedShipping,
           shipping_note: editShippingNote || null,
+          shipping_po_number: editShippingPo.trim() || null,
         }).eq('id', invoiceId);
         if (invoiceError) throw invoiceError;
       }
@@ -1002,6 +1006,7 @@ const InvoiceDetail = () => {
         total: newTotal,
         shipping_cost: editedShipping,
         shipping_note: editShippingNote || null,
+        shipping_po_number: editShippingPo.trim() || null,
         orders: { ...(invoice?.orders || {}), order_items: updatedOrderItems },
       });
       toast({
@@ -1753,6 +1758,7 @@ const InvoiceDetail = () => {
                         }
                         setEditShippingCost(String(invoice?.shipping_cost || 0));
                         setEditShippingNote(invoice?.shipping_note || '');
+                        setEditShippingPo(invoice?.shipping_po_number || '');
                         setIsEditMode(true);
                       }}>
                         <Edit className="h-4 w-4 mr-2" />
@@ -2939,19 +2945,33 @@ const InvoiceDetail = () => {
                       )}
                     </div>
                     {isVibeAdmin && isEditMode ? (
-                      <Input
-                        value={editShippingNote}
-                        onChange={(e) => setEditShippingNote(e.target.value)}
-                        className="text-xs h-7"
-                        placeholder="Shipping note/description…"
-                      />
-                    ) : invoice?.shipping_note ? (
-                      <p className="text-xs text-muted-foreground pl-1">{invoice.shipping_note}</p>
+                      <div className="grid grid-cols-[7.5rem_1fr] gap-1.5">
+                        <Input
+                          value={editShippingPo}
+                          onChange={(e) => setEditShippingPo(e.target.value)}
+                          className="text-xs h-7 font-mono"
+                          placeholder="Shipping PO #"
+                        />
+                        <Input
+                          value={editShippingNote}
+                          onChange={(e) => setEditShippingNote(e.target.value)}
+                          className="text-xs h-7"
+                          placeholder="Shipping note/description…"
+                        />
+                      </div>
+                    ) : invoice?.shipping_po_number || invoice?.shipping_note ? (
+                      <p className="text-xs text-muted-foreground pl-1">
+                        {invoice?.shipping_po_number && (
+                          <span className="font-mono text-foreground">PO {invoice.shipping_po_number}</span>
+                        )}
+                        {invoice?.shipping_po_number && invoice?.shipping_note ? ' · ' : ''}
+                        {invoice?.shipping_note}
+                      </p>
                     ) : null}
                   </div>
                 ) : isVibeAdmin ? (
                   <button
-                    onClick={() => { setIsEditMode(true); setEditShippingCost('0'); setEditShippingNote(''); }}
+                    onClick={() => { setIsEditMode(true); setEditShippingCost('0'); setEditShippingNote(''); setEditShippingPo(''); }}
                     className="text-xs text-primary hover:underline cursor-pointer"
                   >
                     + Add Shipping Line
