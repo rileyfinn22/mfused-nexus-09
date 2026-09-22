@@ -160,10 +160,10 @@ const AddArtworkDialog = ({
     setProductComboOpen(false);
   };
 
-  const handleUpload = async () => {
+  const handleUpload = () => {
     const effectiveCompanyId = formData.companyId || userCompanyId;
-    
-    if (!formData.file) {
+
+    if (!formData.files.length) {
       toast.error("Please select an artwork file");
       return;
     }
@@ -184,30 +184,48 @@ const AddArtworkDialog = ({
       return;
     }
 
-    setUploading(true);
+    const job = {
+      files: formData.files,
+      sku: formData.sku,
+      companyId: effectiveCompanyId,
+      artworkType: formData.artworkType,
+      notes: formData.notes,
+      previewFile: formData.previewFile,
+    };
 
-    try {
-      // One upload path for the dialog and the per-product "+" button (src/lib/artworkUpload.ts).
-      // The SKU is stored exactly as the product carries it; the old .toUpperCase() here could
-      // detach a file from a product whose item_id has lower-case characters.
-      await uploadArtworkFile({
-        file: formData.file,
-        sku: formData.sku,
-        companyId: effectiveCompanyId,
-        artworkType: formData.artworkType,
-        notes: formData.notes,
-        previewFile: formData.previewFile,
-      });
+    // Close right away and finish the transfer in the background so several SKUs
+    // can be queued back to back instead of waiting on each upload.
+    onOpenChange(false);
 
-      toast.success("Artwork added successfully");
-      onOpenChange(false);
-      onSuccess?.();
-    } catch (error) {
-      console.error('Error uploading artwork:', error);
-      toast.error(describeArtworkUploadError(error));
-    } finally {
-      setUploading(false);
-    }
+    void (async () => {
+      const label = job.files.length > 1 ? `${job.files.length} art files` : job.files[0].name;
+      const toastId = toast.loading(`Uploading ${label}...`);
+      let done = 0;
+      try {
+        for (const file of job.files) {
+          // One upload path for the dialog and the per-product "+" button (src/lib/artworkUpload.ts).
+          // The SKU is stored exactly as the product carries it.
+          await uploadArtworkFile({
+            file,
+            sku: job.sku,
+            companyId: job.companyId,
+            artworkType: job.artworkType,
+            notes: job.notes,
+            previewFile: job.files.length === 1 ? job.previewFile : null,
+          });
+          done++;
+          onSuccess?.();
+        }
+        toast.success(`Added ${label}`, { id: toastId });
+      } catch (error) {
+        console.error('Error uploading artwork:', error);
+        toast.error(
+          `${done > 0 ? `Added ${done} of ${job.files.length}. ` : ''}${describeArtworkUploadError(error)}`,
+          { id: toastId },
+        );
+        onSuccess?.();
+      }
+    })();
   };
 
   const showCompanySelect = isVibeAdmin && !restrictToCompany;
