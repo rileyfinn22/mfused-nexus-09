@@ -154,3 +154,51 @@ select u.id
   from auth.users u
  where lower(u.email) in ('riley@vibepkg.com', 'carrie@vibepkg.com', 'taz@vibepkg.com')
 on conflict (user_id) do nothing;
+
+-- Retry. pg_net is fire-and-forget: if the edge function was down (or not yet deployed)
+-- the row stays 'queued'. Every 5 minutes re-post anything queued for more than 2 minutes
+-- and less than 3 days. notify-internal skips rows that are no longer 'queued', so a
+-- retry can never double-send.
+create or replace function public.retry_internal_alerts()
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  r     record;
+  n     integer := 0;
+begin
+  for r in
+    select id
+      from public.internal_alert_log
+     where status = 'queued'
+       and created_at < now() - interval '2 minutes'
+       and created_at > now() - interval '3 days'
+     order by created_at
+     limit 20
+  loop
+    begin
+      perform net.http_post(
+        url     := 'https://spxdyqdygsmzyngrqxni.supabase.co/functions/v1/notify-internal',
+        headers := '{"Content-Type": "application/json", "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNweGR5cWR5Z3NtenluZ3JxeG5pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk3NjE5MTQsImV4cCI6MjA3NTMzNzkxNH0.SdfBMwipD6Ml89YbbR-Z4bu_iblYam4MAWu2ujy4OxA"}'::jsonb,
+        body    := jsonb_build_object('alert_id', r.id)
+      );
+      n := n + 1;
+    exception when others then
+      update public.internal_alert_log
+         set error = 'retry http_post: ' || sqlerrm
+       where id = r.id;
+    end;
+  end loop;
+  return n;
+end;
+$$;
+
+revoke all on function public.retry_internal_alerts() from public, anon, authenticated;
+
+select cron.schedule(
+  'internal-alerts-retry',
+  '*/5 * * * *',
+  $$ select public.retry_internal_alerts(); $$
+);
