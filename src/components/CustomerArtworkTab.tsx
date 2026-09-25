@@ -489,6 +489,27 @@ export function CustomerArtworkTab({
     onFileOpened?.();
   };
 
+  // Clicking a product tile counts as opening its customer art, so the dot clears right away.
+  const openProduct = (product: Product) => {
+    setSelectedProduct(product);
+    const sku = product.item_id;
+    if (!isVibeAdmin || !sku || !(skuNeedsAction[sku] > 0)) return;
+    void (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data, error } = await supabase
+        .from('artwork_files')
+        .update({ opened_at: new Date().toISOString(), opened_by: user?.id ?? null })
+        .eq('sku', sku)
+        .eq('artwork_type', 'customer')
+        .is('opened_at', null)
+        .select('id');
+      if (error) { console.warn('Could not mark customer art as opened', error); return; }
+      setSkuNeedsAction((prev) => ({ ...prev, [sku]: 0 }));
+      (data || []).forEach(() => onFileOpened?.());
+      setArtworkFiles((prev) => prev.map((f) => (f.sku === sku && !f.opened_at ? { ...f, opened_at: new Date().toISOString() } : f)));
+    })();
+  };
+
   const openFile = (file: ArtworkFile) => {
     setSelectedFile(file);
     setPreviewDialogOpen(true);
@@ -1005,7 +1026,7 @@ export function CustomerArtworkTab({
                 <Card
                   key={product.id}
                   className="group cursor-pointer overflow-hidden transition-all hover:border-foreground/25"
-                  onClick={() => setSelectedProduct(product)}
+                  onClick={() => openProduct(product)}
                 >
                   <div className="aspect-square bg-muted/40 flex items-center justify-center relative">
                     {tileImage ? (
@@ -1064,7 +1085,7 @@ export function CustomerArtworkTab({
                   <div
                     key={product.id}
                     className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-accent/30 transition-colors cursor-pointer items-center"
-                    onClick={() => setSelectedProduct(product)}
+                    onClick={() => openProduct(product)}
                   >
                     <div className="col-span-1">
                       {(product.item_id && skuArtThumbnails[product.item_id]) || product.image_url ? (
