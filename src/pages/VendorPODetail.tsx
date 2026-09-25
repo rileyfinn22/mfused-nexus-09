@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Download, Edit, Save, X, Plus, Send, DollarSign, Trash2, FileCheck, Paperclip, Upload, FileText, ExternalLink, Package, Banknote } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { caseStickerMessage, type CaseStickerEntry } from "@/lib/vendorPo";
 import { VIBE_COMPANY } from "@/lib/pdfBranding";
 import { renderVendorPoDoc, type PoPdfData } from "@/lib/vendorPoPdf";
 import { EmailPreviewDialog, AdditionalAttachment, ArtworkFile } from "@/components/EmailPreviewDialog";
@@ -77,6 +78,7 @@ const VendorPODetail = () => {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [showEmailPreview, setShowEmailPreview] = useState(false);
+  const [stickerInfo, setStickerInfo] = useState<CaseStickerEntry[]>([]);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [artworkFiles, setArtworkFiles] = useState<ArtworkFile[]>([]);
@@ -573,6 +575,12 @@ const VendorPODetail = () => {
     }
   };
 
+  useEffect(() => {
+    if (!showEmailPreview) return;
+    fetchCaseStickerInfo().then(setStickerInfo).catch(() => setStickerInfo([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showEmailPreview, po?.id, poItems.length]);
+
   const getDefaultEmailMessage = () => {
     const { totalAmount } = splitPOTotals(poItems, po.shipping_cost);
     return `Dear ${vendor.contact_name || vendor.name},
@@ -585,7 +593,7 @@ Total Amount: $${totalAmount.toFixed(2)}
 
 Please confirm receipt of this order and provide an estimated delivery date.
 
-IMPORTANT: Each case sticker must include the Vibe Invoice # and Customer PO # shown on the attached PO. These references are required for our customer to receive the shipment.
+${caseStickerMessage(stickerInfo)}
 
 Thank you for your business.`;
   };
