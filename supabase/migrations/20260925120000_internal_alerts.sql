@@ -133,3 +133,24 @@ create trigger trg_artwork_customer_alert
   after insert on public.artwork_files
   for each row
   execute function public.alert_on_customer_artwork();
+
+-- Who gets the EMAIL. The bell goes to every vibe_admin; the email only to the admins
+-- listed here (must also hold vibe_admin — notify-internal intersects the two).
+create table if not exists public.internal_alert_subscribers (
+  user_id    uuid primary key,
+  created_at timestamptz not null default now()
+);
+
+alter table public.internal_alert_subscribers enable row level security;
+
+drop policy if exists "Vibe admins can view internal alert subscribers" on public.internal_alert_subscribers;
+create policy "Vibe admins can view internal alert subscribers"
+  on public.internal_alert_subscribers
+  for select
+  using (public.has_role(auth.uid(), 'vibe_admin'));
+
+insert into public.internal_alert_subscribers (user_id)
+select u.id
+  from auth.users u
+ where lower(u.email) in ('riley@vibepkg.com', 'carrie@vibepkg.com', 'taz@vibepkg.com')
+on conflict (user_id) do nothing;

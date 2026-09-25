@@ -1,4 +1,4 @@
-// Emails the VibePKG team (every vibe_admin) when a customer acts in the portal.
+// Emails the subscribed VibePKG admins (internal_alert_subscribers) when a customer acts in the portal.
 //
 // Called by the database, not the browser: the triggers in
 // supabase/migrations/20260925120000_internal_alerts.sql insert a row into
@@ -58,11 +58,15 @@ const dateOnly = (iso: string | null | undefined) => {
   return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
 };
 
-/** Every vibe_admin's email address. */
-async function vibeAdminEmails(admin: ReturnType<typeof createClient>): Promise<string[]> {
+/** Email addresses of the subscribed admins: internal_alert_subscribers ∩ vibe_admin. */
+async function subscriberEmails(admin: ReturnType<typeof createClient>): Promise<string[]> {
   const { data: roles, error } = await admin.from("user_roles").select("user_id").eq("role", "vibe_admin");
   if (error) throw new Error(`user_roles: ${error.message}`);
-  const ids = new Set((roles ?? []).map((r: { user_id: string }) => r.user_id));
+  const admins = new Set((roles ?? []).map((r: { user_id: string }) => r.user_id));
+
+  const { data: subs, error: subsError } = await admin.from("internal_alert_subscribers").select("user_id");
+  if (subsError) throw new Error(`internal_alert_subscribers: ${subsError.message}`);
+  const ids = new Set((subs ?? []).map((s: { user_id: string }) => s.user_id).filter((id: string) => admins.has(id)));
   if (ids.size === 0) return [];
 
   const { data, error: usersError } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
@@ -249,9 +253,9 @@ Deno.serve(async (req) => {
   if (!build) return fail(`unknown event ${alert.event}`, 400);
 
   try {
-    const recipients = await vibeAdminEmails(admin);
+    const recipients = await subscriberEmails(admin);
     if (recipients.length === 0) {
-      await admin.from("internal_alert_log").update({ status: "skipped", error: "no vibe_admin recipients" }).eq("id", alert.id);
+      await admin.from("internal_alert_log").update({ status: "skipped", error: "no subscribed vibe_admin recipients" }).eq("id", alert.id);
       return json({ skipped: true, reason: "no recipients" });
     }
 
