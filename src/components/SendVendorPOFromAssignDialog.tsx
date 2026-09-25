@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/table";
 import { Loader2, Send, ArrowLeft, Edit, Save, X, Eye, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { caseStickerMessage, type CaseStickerEntry } from "@/lib/vendorPo";
 import { toast } from "@/hooks/use-toast";
 import { VIBE_COMPANY } from "@/lib/pdfBranding";
 import { formatCurrency, formatDocDate, formatUnitPrice } from "@/lib/utils";
@@ -63,6 +64,7 @@ export function SendVendorPOFromAssignDialog({
   const [isEditing, setIsEditing] = useState(false);
   const [savingEdits, setSavingEdits] = useState(false);
   const [showEmailPreview, setShowEmailPreview] = useState(false);
+  const [stickerInfo, setStickerInfo] = useState<CaseStickerEntry[]>([]);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [artworkFiles, setArtworkFiles] = useState<ArtworkFile[]>([]);
   const [loadingArtwork, setLoadingArtwork] = useState(false);
@@ -366,6 +368,12 @@ export function SendVendorPOFromAssignDialog({
     return doc.output("datauristring").split(",")[1];
   };
 
+  useEffect(() => {
+    if (!showEmailPreview) return;
+    fetchCaseStickerInfo().then(setStickerInfo).catch(() => setStickerInfo([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showEmailPreview, po?.id, poItems.length]);
+
   const getDefaultEmailMessage = () => {
     if (!po || !vendor) return "";
     const totalAmount = poItems.reduce((sum, item) => sum + Number(item.total), 0);
@@ -383,7 +391,7 @@ Total Amount: $${totalAmount.toFixed(2)}
 
 Please confirm receipt of this order and provide an estimated delivery date.
 
-IMPORTANT: Each case sticker must include the Vibe Invoice # and Customer PO # shown on the attached PO. These references are required for our customer to receive the shipment.
+${caseStickerMessage(stickerInfo)}
 
 Thank you for your business.`;
   };
