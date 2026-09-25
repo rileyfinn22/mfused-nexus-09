@@ -982,6 +982,57 @@ export type Database = {
           },
         ]
       }
+      internal_alert_log: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          error: string | null
+          event: string
+          id: string
+          recipients: string[]
+          record_id: string
+          sent_at: string | null
+          status: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          error?: string | null
+          event: string
+          id?: string
+          recipients?: string[]
+          record_id: string
+          sent_at?: string | null
+          status?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          error?: string | null
+          event?: string
+          id?: string
+          recipients?: string[]
+          record_id?: string
+          sent_at?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
+      internal_alert_subscribers: {
+        Row: {
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       inventory: {
         Row: {
           available: number
@@ -4636,6 +4687,10 @@ export type Database = {
         Returns: boolean
       }
       next_order_number: { Args: never; Returns: string }
+      queue_internal_alert: {
+        Args: { p_company_id: string; p_event: string; p_record_id: string }
+        Returns: undefined
+      }
       recalc_blanket_invoices_for_order: {
         Args: {
           p_include_closed?: boolean
@@ -4648,6 +4703,7 @@ export type Database = {
         Args: { p_direction: string; p_leg_id: string; p_token: string }
         Returns: Json
       }
+      retry_internal_alerts: { Args: never; Returns: number }
       set_product_brand: {
         Args: { p_brand_id: string; p_product_id: string }
         Returns: undefined
