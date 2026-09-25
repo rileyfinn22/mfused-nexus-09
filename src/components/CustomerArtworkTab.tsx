@@ -96,6 +96,7 @@ interface CustomerArtworkTabProps {
   companies: Company[];
   companyFilter: string;
   onCompanyFilterChange: (value: string) => void;
+  onFileOpened?: () => void;
 }
 
 export function CustomerArtworkTab({ 
@@ -103,7 +104,8 @@ export function CustomerArtworkTab({
   userCompanyId, 
   companies, 
   companyFilter,
-  onCompanyFilterChange 
+  onCompanyFilterChange,
+  onFileOpened,
 }: CustomerArtworkTabProps) {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
@@ -321,7 +323,7 @@ export function CustomerArtworkTab({
         } else {
           counts[art.sku].pending++;
         }
-        if (!(art.opened_at && hasProof[art.sku])) {
+        if (!art.opened_at) {
           needsAction[art.sku] = (needsAction[art.sku] || 0) + 1;
         }
 
@@ -483,9 +485,8 @@ export function CustomerArtworkTab({
     }
     setArtworkFiles((prev) => prev.map((f) => (f.id === file.id ? { ...f, opened_at: openedAt } : f)));
     setSelectedFile((prev) => (prev && prev.id === file.id ? { ...prev, opened_at: openedAt } : prev));
-    if (skuHasProof[file.sku]) {
-      setSkuNeedsAction((prev) => ({ ...prev, [file.sku]: Math.max(0, (prev[file.sku] || 0) - 1) }));
-    }
+    setSkuNeedsAction((prev) => ({ ...prev, [file.sku]: Math.max(0, (prev[file.sku] || 0) - 1) }));
+    onFileOpened?.();
   };
 
   const openFile = (file: ArtworkFile) => {
@@ -494,13 +495,13 @@ export function CustomerArtworkTab({
     void markOpened(file);
   };
 
-  const fileNeedsAction = (file: ArtworkFile) => !(file.opened_at && skuHasProof[file.sku]);
+  const fileNeedsAction = (file: ArtworkFile) => !file.opened_at;
   const productNeedsAction = (sku: string | null) => !!sku && (skuNeedsAction[sku] || 0) > 0;
   const templateNeedsAction = (templateId: string) =>
     (templateSkus[templateId] || []).some((sku) => (skuNeedsAction[sku] || 0) > 0);
 
   /** The blue "action needed" dot: customer art not yet opened, or SKU still without a vibe proof. */
-  const actionDot = (title = "Needs attention: open the file and add a Vibe proof") => (
+  const actionDot = (title = "New customer art — not opened yet") => (
     <span
       className="inline-block h-2.5 w-2.5 rounded-full bg-info ring-2 ring-background shrink-0"
       title={title}
@@ -805,11 +806,7 @@ export function CustomerArtworkTab({
 
                 <div className="p-4 space-y-3">
                   <div className="flex items-center gap-2 min-w-0">
-                    {fileNeedsAction(file) && actionDot(
-                      !file.opened_at
-                        ? "Not opened yet"
-                        : "No Vibe proof for this SKU yet"
-                    )}
+                    {fileNeedsAction(file) && actionDot("Not opened yet")}
                     <h3 className="font-semibold text-base truncate" title={file.filename}>
                       {file.filename}
                     </h3>

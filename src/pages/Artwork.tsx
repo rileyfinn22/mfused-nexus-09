@@ -437,7 +437,7 @@ const Artwork = () => {
           .map(a => `${a.company_id}|${a.sku}`)
       );
       const pendingCustomerCount = artworkData.filter(
-        a => a.artwork_type === 'customer' && !(a.opened_at && proofKeys.has(`${a.company_id}|${a.sku}`))
+        a => a.artwork_type === 'customer' && !a.opened_at
       ).length;
       setCustomerPendingCount(pendingCustomerCount);
       artworkData = artworkData.filter(a => a.artwork_type !== 'customer');
@@ -2230,6 +2230,7 @@ const Artwork = () => {
             companies={companies}
             companyFilter={companyFilter}
             onCompanyFilterChange={setCompanyFilter}
+            onFileOpened={() => setCustomerPendingCount((c) => Math.max(0, c - 1))}
           />
         </TabsContent>
       </Tabs>
