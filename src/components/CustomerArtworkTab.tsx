@@ -79,6 +79,8 @@ interface ArtworkFile {
   created_at: string;
   company_id: string;
   artwork_type: string;
+  /** When someone at VibePKG first opened the file. Null = nobody has looked yet. */
+  opened_at: string | null;
 }
 
 interface Company {
@@ -117,7 +119,13 @@ export function CustomerArtworkTab({
   
   // Artwork counts per product SKU
   const [artworkCounts, setArtworkCounts] = useState<Record<string, { total: number; approved: number; pending: number }>>({});
-  
+
+  // "Action needed" = a customer file that has not been opened by VibePKG yet, or whose
+  // SKU has no vibe proof. The blue dot shows wherever that count is above zero.
+  const [skuNeedsAction, setSkuNeedsAction] = useState<Record<string, number>>({});
+  const [skuHasProof, setSkuHasProof] = useState<Record<string, boolean>>({});
+  const [templateSkus, setTemplateSkus] = useState<Record<string, string[]>>({});
+
   // Template artwork status
   const [templateStatus, setTemplateStatus] = useState<Record<string, ArtworkStatus>>({});
   const [templateDerivedThumbnails, setTemplateDerivedThumbnails] = useState<Record<string, string>>({});
@@ -277,11 +285,11 @@ export function CustomerArtworkTab({
         .in('id', templateIds.length > 0 ? templateIds : ['none'])
         .order('name');
       
-      // Fetch customer artwork counts per SKU + first usable proof thumbnail
+      // Fetch every artwork row: customer files drive the counts and thumbnails, vibe
+      // proofs only tell us which SKUs already have a proof (for the blue dot).
       let artworkQuery = supabase
         .from('artwork_files')
-        .select('sku, is_approved, preview_url, artwork_url, filename')
-        .eq('artwork_type', 'customer')
+        .select('sku, artwork_type, is_approved, preview_url, artwork_url, filename, opened_at')
         .limit(50000);
       
       if (!isVibeAdmin && userCompanyId) {
@@ -290,9 +298,15 @@ export function CustomerArtworkTab({
         artworkQuery = artworkQuery.eq('company_id', companyFilter);
       }
       
-      const { data: artworkData } = await artworkQuery;
-      
+      const { data: allArtworkData } = await artworkQuery;
+      const hasProof: Record<string, boolean> = {};
+      (allArtworkData || []).forEach((art) => {
+        if (art.artwork_type !== 'customer') hasProof[art.sku] = true;
+      });
+      const artworkData = (allArtworkData || []).filter((art) => art.artwork_type === 'customer');
+
       const counts: Record<string, { total: number; approved: number; pending: number }> = {};
+      const needsAction: Record<string, number> = {};
       const skuThumbnails: Record<string, string | null> = {};
       const skuPdfUrls: Record<string, string> = {};
 
@@ -306,6 +320,9 @@ export function CustomerArtworkTab({
           counts[art.sku].approved++;
         } else {
           counts[art.sku].pending++;
+        }
+        if (!(art.opened_at && hasProof[art.sku])) {
+          needsAction[art.sku] = (needsAction[art.sku] || 0) + 1;
         }
 
         if (!skuThumbnails[art.sku]) {
@@ -325,24 +342,28 @@ export function CustomerArtworkTab({
         }
       });
       setArtworkCounts(counts);
+      setSkuNeedsAction(needsAction);
+      setSkuHasProof(hasProof);
       setSkuArtThumbnails(
         Object.fromEntries(
           Object.entries(skuThumbnails).filter(([, v]) => !!v) as [string, string][]
         )
       );
       setSkuArtPdfUrls(skuPdfUrls);
-      
+
       // Calculate template status based on product artwork
       const templateStatusMap: Record<string, ArtworkStatus> = {};
+      const templateSkuMap: Record<string, string[]> = {};
       const derivedThumbs: Record<string, string> = {};
 
       templatesData?.forEach((template) => {
         const templateProducts = productsData?.filter((p) => p.template_id === template.id) || [];
         const templateSkus = templateProducts.map((p) => p.item_id).filter(Boolean) as string[];
-        
+        templateSkuMap[template.id] = templateSkus;
+
         let hasApproved = false;
         let hasPending = false;
-        
+
         templateSkus.forEach((sku) => {
           if (counts[sku]) {
             if (counts[sku].approved > 0) hasApproved = true;
@@ -373,6 +394,7 @@ export function CustomerArtworkTab({
       });
 
       setTemplateStatus(templateStatusMap);
+      setTemplateSkus(templateSkuMap);
       setTemplateDerivedThumbnails(derivedThumbs);
       setTemplates(templatesData || []);
     } catch (error) {
@@ -441,6 +463,50 @@ export function CustomerArtworkTab({
       });
     }
   };
+
+  // Stamp the first time a VibePKG admin views or downloads a customer file. Once it is
+  // opened and its SKU has a vibe proof, the file stops counting toward the blue dot.
+  const markOpened = async (file: ArtworkFile) => {
+    if (!isVibeAdmin || file.opened_at) return;
+    const openedAt = new Date().toISOString();
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from('artwork_files')
+        .update({ opened_at: openedAt, opened_by: user?.id ?? null })
+        .eq('id', file.id)
+        .is('opened_at', null);
+      if (error) throw error;
+    } catch (error) {
+      console.warn('Could not mark customer art as opened', error);
+      return;
+    }
+    setArtworkFiles((prev) => prev.map((f) => (f.id === file.id ? { ...f, opened_at: openedAt } : f)));
+    setSelectedFile((prev) => (prev && prev.id === file.id ? { ...prev, opened_at: openedAt } : prev));
+    if (skuHasProof[file.sku]) {
+      setSkuNeedsAction((prev) => ({ ...prev, [file.sku]: Math.max(0, (prev[file.sku] || 0) - 1) }));
+    }
+  };
+
+  const openFile = (file: ArtworkFile) => {
+    setSelectedFile(file);
+    setPreviewDialogOpen(true);
+    void markOpened(file);
+  };
+
+  const fileNeedsAction = (file: ArtworkFile) => !(file.opened_at && skuHasProof[file.sku]);
+  const productNeedsAction = (sku: string | null) => !!sku && (skuNeedsAction[sku] || 0) > 0;
+  const templateNeedsAction = (templateId: string) =>
+    (templateSkus[templateId] || []).some((sku) => (skuNeedsAction[sku] || 0) > 0);
+
+  /** The blue "action needed" dot: customer art not yet opened, or SKU still without a vibe proof. */
+  const actionDot = (title = "Needs attention: open the file and add a Vibe proof") => (
+    <span
+      className="inline-block h-2.5 w-2.5 rounded-full bg-info ring-2 ring-background shrink-0"
+      title={title}
+      aria-label={title}
+    />
+  );
 
 
   const handleDelete = async () => {
@@ -685,12 +751,9 @@ export function CustomerArtworkTab({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {artworkFiles.map((file) => (
               <Card key={file.id} className="overflow-hidden hover:border-foreground/25 transition-colors group">
-                <div 
+                <div
                   className="relative w-full aspect-square bg-muted overflow-hidden cursor-pointer"
-                  onClick={() => {
-                    setSelectedFile(file);
-                    setPreviewDialogOpen(true);
-                  }}
+                  onClick={() => openFile(file)}
                 >
                   {(() => {
                     const thumbnail = getArtworkThumbnail(file);
@@ -741,7 +804,12 @@ export function CustomerArtworkTab({
                 </div>
 
                 <div className="p-4 space-y-3">
-                  <div>
+                  <div className="flex items-center gap-2 min-w-0">
+                    {fileNeedsAction(file) && actionDot(
+                      !file.opened_at
+                        ? "Not opened yet"
+                        : "No Vibe proof for this SKU yet"
+                    )}
                     <h3 className="font-semibold text-base truncate" title={file.filename}>
                       {file.filename}
                     </h3>
@@ -758,19 +826,19 @@ export function CustomerArtworkTab({
                       className="flex-1"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setSelectedFile(file);
-                        setPreviewDialogOpen(true);
+                        openFile(file);
                       }}
                     >
                       <Eye className="h-4 w-4 mr-1" />
                       View
                     </Button>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       className="flex-1"
                       onClick={(e) => {
                         e.stopPropagation();
+                        void markOpened(file);
                         handleDownload(file.artwork_url, file.filename);
                       }}
                     >
@@ -955,7 +1023,7 @@ export function CustomerArtworkTab({
                     <div className="absolute top-2 left-2">
                       {getStatusBadge(status)}
                     </div>
-                    
+
                     {/* Artwork count badge */}
                     {artCount.total > 0 && (
                       <div className="absolute top-2 right-2">
@@ -970,7 +1038,10 @@ export function CustomerArtworkTab({
                     {tileAddButton(product)}
                   </div>
                   <div className="p-3">
-                    <h3 className="font-medium text-sm truncate">{getDisplayName(product.name)}</h3>
+                    <div className="flex items-center gap-2 min-w-0">
+                      {productNeedsAction(product.item_id) && actionDot()}
+                      <h3 className="font-medium text-sm truncate">{getDisplayName(product.name)}</h3>
+                    </div>
                     <p className="text-xs text-muted-foreground font-mono">{product.item_id || 'No SKU'}</p>
                   </div>
                 </Card>
@@ -1011,7 +1082,10 @@ export function CustomerArtworkTab({
                         </div>
                       )}
                     </div>
-                    <div className="col-span-4 font-medium text-sm truncate">{getDisplayName(product.name)}</div>
+                    <div className="col-span-4 font-medium text-sm truncate flex items-center gap-2 min-w-0">
+                      {productNeedsAction(product.item_id) && actionDot()}
+                      <span className="truncate">{getDisplayName(product.name)}</span>
+                    </div>
                     <div className="col-span-3 text-sm font-mono text-muted-foreground">{product.item_id || '-'}</div>
                     <div className="col-span-2">
                       {artCount.total > 0 ? (
@@ -1146,7 +1220,10 @@ export function CustomerArtworkTab({
                 </div>
               </div>
               <div className="p-3 space-y-1">
-                <h3 className="font-medium text-sm leading-snug">{template.name}</h3>
+                <div className="flex items-center gap-2 min-w-0">
+                  {templateNeedsAction(template.id) && actionDot()}
+                  <h3 className="font-medium text-sm leading-snug">{template.name}</h3>
+                </div>
                 {brandName(template.brand_id) && (
                   <p className="text-xs text-muted-foreground truncate">{brandName(template.brand_id)}</p>
                 )}

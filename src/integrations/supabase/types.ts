@@ -59,6 +59,8 @@ export type Database = {
           id: string
           is_approved: boolean
           notes: string | null
+          opened_at: string | null
+          opened_by: string | null
           preview_url: string | null
           sku: string
           updated_at: string
@@ -74,6 +76,8 @@ export type Database = {
           id?: string
           is_approved?: boolean
           notes?: string | null
+          opened_at?: string | null
+          opened_by?: string | null
           preview_url?: string | null
           sku: string
           updated_at?: string
@@ -89,6 +93,8 @@ export type Database = {
           id?: string
           is_approved?: boolean
           notes?: string | null
+          opened_at?: string | null
+          opened_by?: string | null
           preview_url?: string | null
           sku?: string
           updated_at?: string

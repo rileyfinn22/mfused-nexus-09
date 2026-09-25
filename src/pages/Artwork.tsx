@@ -427,10 +427,18 @@ const Artwork = () => {
         }
       }
 
-      // Customer-supplied art belongs to the Customer Art tab only. Track how
-      // many are still awaiting a VibePKG proof, then drop them entirely from
-      // the Vibe Proofs data set.
-      const pendingCustomerCount = artworkData.filter(a => a.artwork_type === 'customer' && !a.is_approved).length;
+      // Customer-supplied art belongs to the Customer Art tab only. A customer file
+      // still needs action until someone at VibePKG has opened it AND a vibe proof
+      // exists for the same company + SKU; that count drives the blue dot on the
+      // tab. Then drop customer files entirely from the Vibe Proofs data set.
+      const proofKeys = new Set(
+        artworkData
+          .filter(a => a.artwork_type !== 'customer')
+          .map(a => `${a.company_id}|${a.sku}`)
+      );
+      const pendingCustomerCount = artworkData.filter(
+        a => a.artwork_type === 'customer' && !(a.opened_at && proofKeys.has(`${a.company_id}|${a.sku}`))
+      ).length;
       setCustomerPendingCount(pendingCustomerCount);
       artworkData = artworkData.filter(a => a.artwork_type !== 'customer');
 
