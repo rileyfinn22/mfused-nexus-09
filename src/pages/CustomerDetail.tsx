@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { SalesRepSelect } from "@/components/SalesRepSelect";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1041,6 +1042,31 @@ const CustomerDetail = () => {
           {saving ? "Saving..." : "Save Changes"}
         </Button>
       </div>
+
+      <Card>
+        <CardContent className="flex flex-wrap items-center gap-4 py-4">
+          <div>
+            <Label htmlFor="company_sales_rep" className="text-sm font-semibold">Salesperson</Label>
+            <p className="text-xs text-muted-foreground">Gets vendor update emails for this company, with Carrie and Taz.</p>
+          </div>
+          <SalesRepSelect
+            id="company_sales_rep"
+            className="w-72"
+            value={customer.sales_rep_email}
+            onChange={async (email) => {
+              const prev = customer.sales_rep_email;
+              setCustomer({ ...customer, sales_rep_email: email });
+              const { error } = await supabase.from("companies").update({ sales_rep_email: email }).eq("id", customer.id);
+              if (error) {
+                setCustomer({ ...customer, sales_rep_email: prev });
+                toast({ title: "Couldn't update salesperson", description: error.message, variant: "destructive" });
+              } else {
+                toast({ title: "Salesperson updated" });
+              }
+            }}
+          />
+        </CardContent>
+      </Card>
 
       {/* QuickBooks Status */}
       {customer.quickbooks_id && (

@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { InviteCompanyUserDialog } from "@/components/InviteCompanyUserDialog";
+import { SalesRepSelect } from "@/components/SalesRepSelect";
 import { CompanyEmailsManager } from "@/components/CompanyEmailsManager";
 import {
   Dialog,
@@ -81,6 +82,7 @@ const Customers = () => {
     shipping_state: "",
     shipping_zip: "",
     notes: "",
+    sales_rep_email: "",
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
@@ -135,6 +137,7 @@ const Customers = () => {
         shipping_state: customer.shipping_state || "",
         shipping_zip: customer.shipping_zip || "",
         notes: customer.notes || "",
+        sales_rep_email: customer.sales_rep_email || "",
       });
     } else {
       setEditingCustomer(null);
@@ -155,6 +158,7 @@ const Customers = () => {
         shipping_state: "",
         shipping_zip: "",
         notes: "",
+        sales_rep_email: "",
       });
     }
     setInlineEmails([]);
@@ -166,6 +170,11 @@ const Customers = () => {
     try {
       // Validate form data
       const validated = customerSchema.parse(formData);
+      if (!formData.sales_rep_email) {
+        setFormErrors({ sales_rep_email: "Salesperson is required" });
+        toast({ title: "Salesperson is required", variant: "destructive" });
+        return;
+      }
       
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
@@ -187,6 +196,7 @@ const Customers = () => {
         shipping_state: validated.shipping_state || null,
         shipping_zip: validated.shipping_zip || null,
         notes: validated.notes || null,
+        sales_rep_email: formData.sales_rep_email,
       };
 
       if (editingCustomer) {
@@ -442,6 +452,16 @@ const Customers = () => {
                     placeholder="Company Name"
                   />
                   {formErrors.name && <p className="text-sm text-destructive mt-1">{formErrors.name}</p>}
+                </div>
+                <div>
+                  <Label htmlFor="sales_rep">Salesperson *</Label>
+                  <SalesRepSelect
+                    id="sales_rep"
+                    value={formData.sales_rep_email}
+                    onChange={(v) => setFormData({ ...formData, sales_rep_email: v })}
+                    invalid={!!formErrors.sales_rep_email}
+                  />
+                  {formErrors.sales_rep_email && <p className="text-sm text-destructive">{formErrors.sales_rep_email}</p>}
                 </div>
                 <div>
                   <Label htmlFor="email">Primary Email</Label>

@@ -276,6 +276,7 @@ async function vendorUpdate(admin: ReturnType<typeof createClient>, alert: Alert
 
   let poNumber = "", vendorName = "", customer = "", orderNumber = "";
   let customerId: string | null = null;
+  let orderRep: string | null = null;
   if (poId) {
     const { data: po } = await admin.from("vendor_pos").select("po_number, vendor_id, order_id, customer_company_id").eq("id", poId).maybeSingle();
     if (po) {
@@ -289,8 +290,9 @@ async function vendorUpdate(admin: ReturnType<typeof createClient>, alert: Alert
     }
   }
   if (orderId) {
-    const { data: o } = await admin.from("orders").select("order_number, company_id").eq("id", orderId).maybeSingle();
+    const { data: o } = await admin.from("orders").select("order_number, company_id, sales_rep_email").eq("id", orderId).maybeSingle();
     orderNumber = o?.order_number ?? "";
+    if (o?.sales_rep_email) orderRep = o.sales_rep_email;
     if (!customerId && o?.company_id) { customerId = o.company_id; customer = await companyName(admin, o.company_id); }
   }
 
@@ -324,7 +326,8 @@ async function vendorUpdate(admin: ReturnType<typeof createClient>, alert: Alert
 
   const url = poId ? `${PORTAL_URL}/vendor-pos/${poId}` : orderId ? `${PORTAL_URL}/orders/${orderId}` : PORTAL_URL;
   const to = new Set(["carrie@vibepkg.com", "taz@vibepkg.com"]);
-  if (customerId) {
+  if (orderRep) to.add(orderRep.toLowerCase());
+  else if (customerId) {
     const { data: c } = await admin.from("companies").select("sales_rep_email").eq("id", customerId).maybeSingle();
     if (c?.sales_rep_email) to.add(c.sales_rep_email.toLowerCase());
   }

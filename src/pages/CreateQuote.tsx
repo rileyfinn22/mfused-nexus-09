@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { SalesRepSelect } from "@/components/SalesRepSelect";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -107,6 +108,7 @@ const CreateQuote = () => {
 
   // Form state
   const [companyId, setCompanyId] = useState("");
+  const [salesRep, setSalesRep] = useState("");
   const [companyNameManual, setCompanyNameManual] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
@@ -236,6 +238,7 @@ const CreateQuote = () => {
 
     setParentQuote(quote);
     setCompanyId(quote.company_id);
+    setSalesRep((quote as any).sales_rep_email || "");
     setCustomerName(quote.customer_name);
     setCustomerEmail(quote.customer_email || "");
     setCustomerPhone(quote.customer_phone || "");
@@ -283,6 +286,7 @@ const CreateQuote = () => {
       .single();
 
     if (!companyData) return;
+    if ((companyData as any).sales_rep_email) setSalesRep((companyData as any).sales_rep_email);
 
     const companyName = companyData.name;
 
@@ -332,6 +336,7 @@ const CreateQuote = () => {
     if (error) throw error;
 
     setCompanyId(quote.company_id);
+    setSalesRep((quote as any).sales_rep_email || "");
     setCustomerName(quote.customer_name);
     setCustomerEmail(quote.customer_email || "");
     setCustomerPhone(quote.customer_phone || "");
@@ -805,6 +810,15 @@ const CreateQuote = () => {
       return;
     }
 
+    if (isVibeAdmin && !salesRep) {
+      toast({
+        title: "Salesperson required",
+        description: "Please select the salesperson for this quote",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!customerName) {
       toast({
         title: "Error",
@@ -825,6 +839,7 @@ const CreateQuote = () => {
 
       const quoteData: any = {
         company_id: companyId || null,
+        ...(isVibeAdmin && salesRep ? { sales_rep_email: salesRep } : {}),
         customer_name: customerName || companyNameManual,
         customer_email: customerEmail || null,
         customer_phone: customerPhone || null,
@@ -1025,6 +1040,10 @@ const CreateQuote = () => {
                       ))}
                     </SelectContent>
                   </Select>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Salesperson *</Label>
+                    <SalesRepSelect value={salesRep} onChange={setSalesRep} />
+                  </div>
                   {!isResponding && (
                     <>
                       <div className="flex items-center gap-2">

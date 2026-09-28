@@ -14,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, Plus, Minus, X, Save, Send, Search, Upload, FileText, Loader2, Check, ChevronsUpDown, Sparkles, Paperclip, Clock, RefreshCw, GripVertical } from "lucide-react";
+import { SalesRepSelect } from "@/components/SalesRepSelect";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { z } from "zod";
@@ -272,6 +273,7 @@ const CreateOrder = () => {
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [companies, setCompanies] = useState<any[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
+  const [salesRep, setSalesRep] = useState<string>("");
   const [productTemplates, setProductTemplates] = useState<ProductTemplateOption[]>([]);
 
   // Brand filter in the item picker follows the one chosen on Products (persisted per company).
@@ -1374,6 +1376,12 @@ const CreateOrder = () => {
     }
   };
 
+  useEffect(() => {
+    if (!isVibeAdmin || !selectedCompanyId || orderId) return;
+    supabase.from('companies').select('sales_rep_email').eq('id', selectedCompanyId).maybeSingle()
+      .then(({ data }) => setSalesRep((data as any)?.sales_rep_email || ""));
+  }, [isVibeAdmin, selectedCompanyId, orderId]);
+
   const loadExistingOrder = async (id: string, isAdminOverride?: boolean) => {
     const { data: order, error } = await supabase
       .from('orders')
@@ -1382,6 +1390,7 @@ const CreateOrder = () => {
       .single();
 
     if (!error && order) {
+      setSalesRep((order as any).sales_rep_email || "");
       // Check if order can be edited
       // Use the passed isAdminOverride if provided (to avoid stale closure issue), otherwise use state
       const effectiveIsAdmin = isAdminOverride !== undefined ? isAdminOverride : isVibeAdmin;
@@ -1908,6 +1917,15 @@ const CreateOrder = () => {
           setLoading(false);
           return;
         }
+        if (!salesRep && !isDraft) {
+          toast({
+            title: "Salesperson Required",
+            description: "Please select the salesperson for this order",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
         companyId = selectedCompanyId;
       } else {
         if (!activeCompanyId) throw new Error("User company not found");
@@ -1998,6 +2016,7 @@ const CreateOrder = () => {
             customer_phone: formData.customerPhone || null,
             status: isDraft ? 'draft' : 'pending',
             due_date: formData.dueDate || null,
+            ...(isVibeAdmin && salesRep ? { sales_rep_email: salesRep } : {}),
             shipping_name: formData.shippingName,
             shipping_street: formData.shippingStreet,
             shipping_city: formData.shippingCity,
@@ -2067,6 +2086,7 @@ const CreateOrder = () => {
             customer_phone: formData.customerPhone || null,
             status: isDraft ? 'draft' : 'pending',
             due_date: formData.dueDate || null,
+            ...(isVibeAdmin && salesRep ? { sales_rep_email: salesRep } : {}),
             shipping_name: formData.shippingName,
             shipping_street: formData.shippingStreet,
             shipping_city: formData.shippingCity,
@@ -2393,6 +2413,10 @@ const CreateOrder = () => {
                 ))}
               </SelectContent>
             </Select>
+            <Label htmlFor="sales_rep" className="text-xs font-semibold uppercase text-muted-foreground mt-4 block">
+              Salesperson *
+            </Label>
+            <SalesRepSelect id="sales_rep" className="w-full mt-2" value={salesRep} onChange={setSalesRep} />
             {selectedCompanyId && (
               <p className="text-xs text-muted-foreground mt-2">
                 {orderId 

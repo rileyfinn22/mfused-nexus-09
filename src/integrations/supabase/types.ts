@@ -1852,6 +1852,7 @@ export type Database = {
           qb_estimate_id: string | null
           qb_project_id: string | null
           quote_id: string | null
+          sales_rep_email: string | null
           shipping_city: string
           shipping_cost: number | null
           shipping_method: string | null
@@ -1915,6 +1916,7 @@ export type Database = {
           qb_estimate_id?: string | null
           qb_project_id?: string | null
           quote_id?: string | null
+          sales_rep_email?: string | null
           shipping_city: string
           shipping_cost?: number | null
           shipping_method?: string | null
@@ -1978,6 +1980,7 @@ export type Database = {
           qb_estimate_id?: string | null
           qb_project_id?: string | null
           quote_id?: string | null
+          sales_rep_email?: string | null
           shipping_city?: string
           shipping_cost?: number | null
           shipping_method?: string | null
@@ -3240,6 +3243,7 @@ export type Database = {
           quote_number: string
           request_notes: string | null
           requested_by: string | null
+          sales_rep_email: string | null
           sent_at: string | null
           shipping_city: string | null
           shipping_cost: number
@@ -3279,6 +3283,7 @@ export type Database = {
           quote_number: string
           request_notes?: string | null
           requested_by?: string | null
+          sales_rep_email?: string | null
           sent_at?: string | null
           shipping_city?: string | null
           shipping_cost?: number
@@ -3318,6 +3323,7 @@ export type Database = {
           quote_number?: string
           request_notes?: string | null
           requested_by?: string | null
+          sales_rep_email?: string | null
           sent_at?: string | null
           shipping_city?: string | null
           shipping_cost?: number

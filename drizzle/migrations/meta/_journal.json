@@ -50,6 +50,20 @@
       "when": 1790609290596,
       "tag": "0006_company_sales_rep",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790609846955,
+      "tag": "0007_sales_rep_on_orders_quotes",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790609879441,
+      "tag": "0008_default_sales_rep_from_company",
+      "breakpoints": true
     }
   ]
 }
