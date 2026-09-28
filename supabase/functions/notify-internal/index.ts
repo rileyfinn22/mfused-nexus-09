@@ -386,13 +386,12 @@ Deno.serve(async (req) => {
   if (!build) return fail(`unknown event ${alert.event}`, 400);
 
   try {
-    const recipients = FIXED_RECIPIENTS[alert.event] ?? await subscriberEmails(admin);
+    const message = await build(admin, alert as AlertRow);
+    const recipients = message.to ?? FIXED_RECIPIENTS[alert.event] ?? await subscriberEmails(admin);
     if (recipients.length === 0) {
       await admin.from("internal_alert_log").update({ status: "skipped", error: "no subscribed vibe_admin recipients" }).eq("id", alert.id);
       return json({ skipped: true, reason: "no recipients" });
     }
-
-    const message = await build(admin, alert as AlertRow);
 
     const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
     const sent = await resend.emails.send({ from: FROM, to: recipients, subject: message.subject, html: message.html });
