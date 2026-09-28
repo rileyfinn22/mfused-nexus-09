@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { SalesRepSelect } from "@/components/SalesRepSelect";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,7 +21,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { getSignedArtworkUrl } from "@/lib/signedArtworkUrl";
 import { toast } from "@/hooks/use-toast";
 import {
-import { SalesRepSelect } from "@/components/SalesRepSelect";
   Dialog,
   DialogContent,
   DialogDescription,
