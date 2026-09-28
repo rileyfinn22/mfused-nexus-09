@@ -300,6 +300,7 @@ export type Database = {
           phone: string | null
           portal_features: Json
           quickbooks_id: string | null
+          sales_rep_email: string | null
           shipping_city: string | null
           shipping_name: string | null
           shipping_state: string | null
@@ -326,6 +327,7 @@ export type Database = {
           phone?: string | null
           portal_features?: Json
           quickbooks_id?: string | null
+          sales_rep_email?: string | null
           shipping_city?: string | null
           shipping_name?: string | null
           shipping_state?: string | null
@@ -352,6 +354,7 @@ export type Database = {
           phone?: string | null
           portal_features?: Json
           quickbooks_id?: string | null
+          sales_rep_email?: string | null
           shipping_city?: string | null
           shipping_name?: string | null
           shipping_state?: string | null
