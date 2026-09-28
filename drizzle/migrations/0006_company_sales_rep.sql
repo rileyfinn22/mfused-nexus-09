@@ -1,0 +1,1 @@
+alter table public.companies add column if not exists sales_rep_email text;

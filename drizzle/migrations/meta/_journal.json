@@ -43,6 +43,13 @@
       "when": 1790609065699,
       "tag": "0005_vendor_update_alerts",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790609290596,
+      "tag": "0006_company_sales_rep",
+      "breakpoints": true
     }
   ]
 }
