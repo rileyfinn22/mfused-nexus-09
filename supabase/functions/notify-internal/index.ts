@@ -249,14 +249,102 @@ async function orderCreated(admin: ReturnType<typeof createClient>, alert: Alert
   };
 }
 
+const VENDOR_KINDS: Record<string, { label: string; userCol: string; poCol?: string }> = {
+  vendor_po_status_history: { label: "Status update", userCol: "changed_by", poCol: "vendor_po_id" },
+  vendor_po_production_updates: { label: "Production update", userCol: "created_by", poCol: "vendor_po_id" },
+  vendor_po_packing_lists: { label: "Packing list uploaded", userCol: "created_by", poCol: "vendor_po_id" },
+  production_stage_updates: { label: "Production stage update", userCol: "updated_by" },
+  shipment_legs: { label: "Shipment added", userCol: "created_by", poCol: "vendor_po_id" },
+};
+
+async function vendorUpdate(admin: ReturnType<typeof createClient>, alert: AlertRow): Promise<Message> {
+  const table = alert.event.split(":")[1];
+  const kind = VENDOR_KINDS[table];
+  if (!kind) throw new Error(`unknown vendor table ${table}`);
+  const { data: row, error } = await admin.from(table).select("*").eq("id", alert.record_id).maybeSingle();
+  if (error) throw new Error(`${table}: ${error.message}`);
+  if (!row) throw new Error(`${table} ${alert.record_id} not found`);
+  const r = row as Record<string, any>;
+
+  let poId: string | null = kind.poCol ? r[kind.poCol] ?? null : null;
+  let orderId: string | null = r.order_id ?? null;
+  if (table === "production_stage_updates" && r.stage_id) {
+    const { data: st } = await admin.from("production_stages").select("order_id, stage_name").eq("id", r.stage_id).maybeSingle();
+    orderId = st?.order_id ?? null;
+    if (st?.stage_name) r.__stage = st.stage_name;
+  }
+
+  let poNumber = "", vendorName = "", customer = "", orderNumber = "";
+  if (poId) {
+    const { data: po } = await admin.from("vendor_pos").select("po_number, vendor_id, order_id, customer_company_id").eq("id", poId).maybeSingle();
+    if (po) {
+      poNumber = po.po_number ?? "";
+      orderId = orderId ?? po.order_id;
+      if (po.vendor_id) {
+        const { data: v } = await admin.from("vendors").select("name").eq("id", po.vendor_id).maybeSingle();
+        vendorName = v?.name ?? "";
+      }
+      if (po.customer_company_id) customer = await companyName(admin, po.customer_company_id);
+    }
+  }
+  if (orderId) {
+    const { data: o } = await admin.from("orders").select("order_number, company_id").eq("id", orderId).maybeSingle();
+    orderNumber = o?.order_number ?? "";
+    if (!customer && o?.company_id) customer = await companyName(admin, o.company_id);
+  }
+
+  let who = "";
+  const uid = r[kind.userCol];
+  if (uid) {
+    const { data } = await admin.auth.admin.getUserById(uid);
+    who = (data?.user?.user_metadata?.full_name as string) || data?.user?.email || "";
+  }
+  if (!who) who = vendorName || "Vendor (shipment link)";
+
+  const detail =
+    r.new_status ? `${r.previous_status ?? "—"} → ${r.new_status}` : "";
+  const note = r.note ?? r.note_text ?? r.notes ?? "";
+  const rows = [
+    { label: "Update", value: escapeHtml(kind.label + (r.__stage ? ` — ${r.__stage}` : "")), emphasis: true },
+    ...(vendorName ? [{ label: "Vendor", value: escapeHtml(vendorName) }] : []),
+    ...(poNumber ? [{ label: "Vendor PO", value: escapeHtml(poNumber), mono: true }] : []),
+    ...(orderNumber ? [{ label: "Order", value: escapeHtml(orderNumber), mono: true }] : []),
+    ...(customer ? [{ label: "Customer", value: escapeHtml(customer) }] : []),
+    ...(detail ? [{ label: "Status", value: escapeHtml(detail) }] : []),
+    ...(r.committed_ship_date ? [{ label: "Committed ship date", value: escapeHtml(dateOnly(r.committed_ship_date) ?? "") }] : []),
+    ...(r.is_delayed ? [{ label: "Delayed", value: escapeHtml(r.delay_reason || "Yes"), danger: true }] : []),
+    ...(r.percent_at_time != null ? [{ label: "Progress", value: `${escapeHtml(r.percent_at_time)}%` }] : []),
+    ...(r.file_name ? [{ label: "File", value: escapeHtml(r.file_name) }] : []),
+    ...(r.tracking_number ? [{ label: "Tracking", value: escapeHtml(`${r.carrier ?? ""} ${r.tracking_number}`.trim()), mono: true }] : []),
+    ...(note ? [{ label: "Note", value: escapeHtml(note) }] : []),
+    { label: "Updated by", value: escapeHtml(who) },
+    { label: "When", value: escapeHtml(when(r.created_at)) },
+  ];
+
+  const url = poId ? `${PORTAL_URL}/vendor-pos/${poId}` : orderId ? `${PORTAL_URL}/orders/${orderId}` : PORTAL_URL;
+  const ref = poNumber ? `PO ${poNumber}` : orderNumber ? `order ${orderNumber}` : "a PO";
+  return {
+    subject: `Vendor update: ${kind.label} on ${ref}${vendorName ? ` (${vendorName})` : ""}`,
+    html: renderEmail({
+      documentLabel: "VENDOR UPDATE",
+      heading: `${vendorName || "A vendor"} updated ${ref}`,
+      bodyHtml: detailCard(rows) + buttons([{ label: "Open in portal", url }]),
+      noReply: true,
+    }),
+  };
+}
+
+const VENDOR_RECIPIENTS = ["carrie@vibepkg.com", "justin@vibepkg.com", "riley@vibepkg.com", "jack@vibepkg.com"];
 const FIXED_RECIPIENTS: Record<string, string[]> = {
   order_created: ["justin@vibepkg.com", "carrie@vibepkg.com"],
+  ...Object.fromEntries(Object.keys(VENDOR_KINDS).map((t) => [`vendor_update:${t}`, VENDOR_RECIPIENTS])),
 };
 
 const builders: Record<string, (admin: ReturnType<typeof createClient>, alert: AlertRow) => Promise<Message>> = {
   order_submitted: orderSubmitted,
   artwork_uploaded: artworkUploaded,
   order_created: orderCreated,
+  ...Object.fromEntries(Object.keys(VENDOR_KINDS).map((t) => [`vendor_update:${t}`, vendorUpdate])),
 };
 
 Deno.serve(async (req) => {
