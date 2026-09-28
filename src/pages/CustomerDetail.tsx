@@ -20,6 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getSignedArtworkUrl } from "@/lib/signedArtworkUrl";
 import { toast } from "@/hooks/use-toast";
 import {
+import { SalesRepSelect } from "@/components/SalesRepSelect";
   Dialog,
   DialogContent,
   DialogDescription,
