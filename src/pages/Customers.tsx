@@ -463,7 +463,7 @@ const Customers = () => {
                   />
                   {formErrors.sales_rep_email && <p className="text-sm text-destructive">{formErrors.sales_rep_email}</p>}
                 </div>
-                <div className="space-y-2">
+                <div>
                   <Label htmlFor="email">Primary Email</Label>
                   <Input
                     id="email"
