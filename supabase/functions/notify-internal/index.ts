@@ -35,7 +35,7 @@ type AlertRow = {
   status: string;
 };
 
-type Message = { subject: string; html: string };
+type Message = { subject: string; html: string; to?: string[] };
 
 const money = (n: unknown) =>
   `$${Number(n ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -275,6 +275,7 @@ async function vendorUpdate(admin: ReturnType<typeof createClient>, alert: Alert
   }
 
   let poNumber = "", vendorName = "", customer = "", orderNumber = "";
+  let customerId: string | null = null;
   if (poId) {
     const { data: po } = await admin.from("vendor_pos").select("po_number, vendor_id, order_id, customer_company_id").eq("id", poId).maybeSingle();
     if (po) {
@@ -284,13 +285,13 @@ async function vendorUpdate(admin: ReturnType<typeof createClient>, alert: Alert
         const { data: v } = await admin.from("vendors").select("name").eq("id", po.vendor_id).maybeSingle();
         vendorName = v?.name ?? "";
       }
-      if (po.customer_company_id) customer = await companyName(admin, po.customer_company_id);
+      if (po.customer_company_id) { customerId = po.customer_company_id; customer = await companyName(admin, po.customer_company_id); }
     }
   }
   if (orderId) {
     const { data: o } = await admin.from("orders").select("order_number, company_id").eq("id", orderId).maybeSingle();
     orderNumber = o?.order_number ?? "";
-    if (!customer && o?.company_id) customer = await companyName(admin, o.company_id);
+    if (!customerId && o?.company_id) { customerId = o.company_id; customer = await companyName(admin, o.company_id); }
   }
 
   let who = "";
@@ -322,6 +323,11 @@ async function vendorUpdate(admin: ReturnType<typeof createClient>, alert: Alert
   ];
 
   const url = poId ? `${PORTAL_URL}/vendor-pos/${poId}` : orderId ? `${PORTAL_URL}/orders/${orderId}` : PORTAL_URL;
+  const to = new Set(["carrie@vibepkg.com"]);
+  if (customerId) {
+    const { data: c } = await admin.from("companies").select("sales_rep_email").eq("id", customerId).maybeSingle();
+    if (c?.sales_rep_email) to.add(c.sales_rep_email.toLowerCase());
+  }
   const ref = poNumber ? `PO ${poNumber}` : orderNumber ? `order ${orderNumber}` : "a PO";
   return {
     subject: `Vendor update: ${kind.label} on ${ref}${vendorName ? ` (${vendorName})` : ""}`,
@@ -331,13 +337,12 @@ async function vendorUpdate(admin: ReturnType<typeof createClient>, alert: Alert
       bodyHtml: detailCard(rows) + buttons([{ label: "Open in portal", url }]),
       noReply: true,
     }),
+    to: [...to],
   };
 }
 
-const VENDOR_RECIPIENTS = ["carrie@vibepkg.com", "justin@vibepkg.com", "riley@vibepkg.com", "jack@vibepkg.com"];
 const FIXED_RECIPIENTS: Record<string, string[]> = {
   order_created: ["justin@vibepkg.com", "carrie@vibepkg.com"],
-  ...Object.fromEntries(Object.keys(VENDOR_KINDS).map((t) => [`vendor_update:${t}`, VENDOR_RECIPIENTS])),
 };
 
 const builders: Record<string, (admin: ReturnType<typeof createClient>, alert: AlertRow) => Promise<Message>> = {
