@@ -214,9 +214,49 @@ async function artworkUploaded(admin: ReturnType<typeof createClient>, alert: Al
   };
 }
 
+async function orderCreated(admin: ReturnType<typeof createClient>, alert: AlertRow): Promise<Message> {
+  const { data: order, error } = await admin
+    .from("orders")
+    .select("id, order_number, company_id, created_by, customer_name, customer_email, created_at")
+    .eq("id", alert.record_id)
+    .maybeSingle();
+  if (error) throw new Error(`orders: ${error.message}`);
+  if (!order) throw new Error(`order ${alert.record_id} not found`);
+
+  const company = await companyName(admin, order.company_id ?? alert.company_id);
+  let enteredBy = "";
+  if (order.created_by) {
+    const { data } = await admin.auth.admin.getUserById(order.created_by);
+    const u = data?.user;
+    enteredBy = (u?.user_metadata?.full_name as string) || u?.email || "";
+  }
+  if (!enteredBy) enteredBy = [order.customer_name, order.customer_email].filter(Boolean).join(" · ") || "Unknown";
+
+  return {
+    subject: `New order ${order.order_number} — ${company}`,
+    html: renderEmail({
+      documentLabel: "NEW ORDER",
+      heading: `New order ${order.order_number}`,
+      bodyHtml:
+        detailCard([
+          { label: "Order", value: escapeHtml(order.order_number), mono: true, emphasis: true },
+          { label: "Date", value: escapeHtml(when(order.created_at)) },
+          { label: "Customer", value: escapeHtml(company) },
+          { label: "Entered by", value: escapeHtml(enteredBy) },
+        ]) + buttons([{ label: "Open order", url: `${PORTAL_URL}/orders/${order.id}` }]),
+      noReply: true,
+    }),
+  };
+}
+
+const FIXED_RECIPIENTS: Record<string, string[]> = {
+  order_created: ["justin@vibepkg.com", "carrie@vibepkg.com"],
+};
+
 const builders: Record<string, (admin: ReturnType<typeof createClient>, alert: AlertRow) => Promise<Message>> = {
   order_submitted: orderSubmitted,
   artwork_uploaded: artworkUploaded,
+  order_created: orderCreated,
 };
 
 Deno.serve(async (req) => {
@@ -253,7 +293,7 @@ Deno.serve(async (req) => {
   if (!build) return fail(`unknown event ${alert.event}`, 400);
 
   try {
-    const recipients = await subscriberEmails(admin);
+    const recipients = FIXED_RECIPIENTS[alert.event] ?? await subscriberEmails(admin);
     if (recipients.length === 0) {
       await admin.from("internal_alert_log").update({ status: "skipped", error: "no subscribed vibe_admin recipients" }).eq("id", alert.id);
       return json({ skipped: true, reason: "no recipients" });
