@@ -323,7 +323,7 @@ async function vendorUpdate(admin: ReturnType<typeof createClient>, alert: Alert
   ];
 
   const url = poId ? `${PORTAL_URL}/vendor-pos/${poId}` : orderId ? `${PORTAL_URL}/orders/${orderId}` : PORTAL_URL;
-  const to = new Set(["carrie@vibepkg.com"]);
+  const to = new Set(["carrie@vibepkg.com", "taz@vibepkg.com"]);
   if (customerId) {
     const { data: c } = await admin.from("companies").select("sales_rep_email").eq("id", customerId).maybeSingle();
     if (c?.sales_rep_email) to.add(c.sales_rep_email.toLowerCase());
