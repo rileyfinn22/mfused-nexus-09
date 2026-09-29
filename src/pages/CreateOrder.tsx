@@ -1917,7 +1917,7 @@ const CreateOrder = () => {
           setLoading(false);
           return;
         }
-        if (!salesRep && !isDraft) {
+        if (isVibeAdmin && !salesRep && !isDraft) {
           toast({
             title: "Salesperson Required",
             description: "Please select the salesperson for this order",
@@ -2413,10 +2413,14 @@ const CreateOrder = () => {
                 ))}
               </SelectContent>
             </Select>
-            <Label htmlFor="sales_rep" className="text-xs font-semibold uppercase text-muted-foreground mt-4 block">
-              Salesperson *
-            </Label>
-            <SalesRepSelect id="sales_rep" className="w-full mt-2" value={salesRep} onChange={setSalesRep} />
+            {isVibeAdmin && (
+              <>
+                <Label htmlFor="sales_rep" className="text-xs font-semibold uppercase text-muted-foreground mt-4 block">
+                  Salesperson *
+                </Label>
+                <SalesRepSelect id="sales_rep" className="w-full mt-2" value={salesRep} onChange={setSalesRep} />
+              </>
+            )}
             {selectedCompanyId && (
               <p className="text-xs text-muted-foreground mt-2">
                 {orderId 
