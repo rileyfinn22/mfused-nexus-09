@@ -36,7 +36,7 @@ interface Row {
   vendors: { name: string | null } | null;
   customer_company: { name: string | null } | null;
   vendor_po_items: SheetItem[] | null;
-  orders: { po_number: string | null; description: string | null; companies: { name: string | null } | null; invoices: { id: string; invoice_number: string | null; customer_po_number: string | null; deleted_at: string | null }[] | null } | null;
+  orders: { po_number: string | null; deleted_at?: string | null; description: string | null; companies: { name: string | null } | null; invoices: { id: string; invoice_number: string | null; customer_po_number: string | null; deleted_at: string | null }[] | null } | null;
 }
 
 const ALL = "__all__";
@@ -64,7 +64,7 @@ export default function VendorStatus() {
            vendors ( name ),
            customer_company:companies!vendor_pos_customer_company_id_fkey ( name ),
            vendor_po_items ( id, name, description, quantity, final_quantity, shipped_quantity, is_adjustment ),
-           orders ( po_number, description, companies ( name ), invoices ( id, invoice_number, customer_po_number, deleted_at ) )`;
+           orders ( po_number, deleted_at, description, companies ( name ), invoices ( id, invoice_number, customer_po_number, deleted_at ) )`;
 
   /** Newest POs paint first; the rest stream in behind them. */
   const PAGE = 60;
@@ -138,6 +138,8 @@ export default function VendorStatus() {
   };
 
   const scoped = rows
+    // POs left behind on a deleted order are dead drafts; never show them.
+    .filter((r) => !r.orders?.deleted_at)
     .filter((r) => vendorFilter === ALL || (r.vendors?.name?.trim() || "Unknown vendor") === vendorFilter)
     .filter((r) => companyFilter === ALL || companyOf(r) === companyFilter);
 
