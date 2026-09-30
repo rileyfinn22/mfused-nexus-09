@@ -64,6 +64,13 @@
       "when": 1790609879441,
       "tag": "0008_default_sales_rep_from_company",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790735212600,
+      "tag": "0009_regrant_user_rpcs_and_skip_draft_alerts",
+      "breakpoints": true
     }
   ]
 }
