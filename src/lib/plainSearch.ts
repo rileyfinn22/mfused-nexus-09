@@ -30,12 +30,26 @@ function dateForms(d: Date): string {
   return `${m}/${day}/${y} ${String(m).padStart(2, "0")}/${String(day).padStart(2, "0")}/${y} ${mon} ${day} ${y}`;
 }
 
-/** True when every typed word is found in the record (any field, any nesting). */
+const esc = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Ordered match: the first word must start a word in the record; each next word
+ * must start a word somewhere after the previous match. If the first word
+ * isn't found, the record is excluded without checking the rest.
+ */
 export function matchesQuery(record: unknown, query: string): boolean {
   const toks = tokenize(query);
   if (!toks.length) return true;
   const hay = normalize(haystack(record));
-  return toks.every((t) => hay.includes(t));
+  let from = 0;
+  for (const t of toks) {
+    const re = new RegExp(`(^|[^a-z0-9])${esc(t)}`, "g");
+    re.lastIndex = from;
+    const m = re.exec(hay);
+    if (!m) return false;
+    from = m.index + m[0].length;
+  }
+  return true;
 }
 
 /** Filter a list in plain language. */
