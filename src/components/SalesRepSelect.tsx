@@ -1,4 +1,5 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useActiveCompany } from "@/hooks/useActiveCompany";
 
 export const SALES_REPS = [
   { email: "justin@vibepkg.com", name: "Justin Finn", title: "President" },
@@ -20,6 +21,9 @@ interface Props {
 }
 
 export function SalesRepSelect({ value, onChange, invalid, id, className }: Props) {
+  const { isVibeAdmin } = useActiveCompany();
+  // Internal-only field: never render on customer/vendor portal pages.
+  if (!isVibeAdmin) return null;
   return (
     <Select value={value || ""} onValueChange={onChange}>
       <SelectTrigger id={id} className={`${className ?? ""} ${invalid ? "border-destructive" : ""}`}>

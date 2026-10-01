@@ -1040,10 +1040,12 @@ const CreateQuote = () => {
                       ))}
                     </SelectContent>
                   </Select>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Salesperson *</Label>
-                    <SalesRepSelect value={salesRep} onChange={setSalesRep} />
-                  </div>
+                  {isVibeAdmin && (
+                    <div className="space-y-1">
+                      <Label className="text-xs">Salesperson *</Label>
+                      <SalesRepSelect value={salesRep} onChange={setSalesRep} />
+                    </div>
+                  )}
                   {!isResponding && (
                     <>
                       <div className="flex items-center gap-2">
