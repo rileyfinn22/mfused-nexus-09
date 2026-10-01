@@ -46,7 +46,7 @@ const Invoices = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { activeCompanyId, isVibeAdmin, loading: activeCompanyLoading } = useActiveCompany();
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(() => new URLSearchParams(window.location.search).get("q") || "");
   const [statusFilter, setStatusFilter] = useState("all");
   // Read company filter from URL, default to "all" (only for vibe admins)
   const companyFilter = searchParams.get("company") || "all";
