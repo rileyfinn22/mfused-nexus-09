@@ -1,0 +1,1 @@
+- Global search: one security-definer RPC `global_search` (staff-only, word-by-word ILIKE across records) feeds the header search bar shown only to VibePKG staff; page searches use `src/lib/plainSearch.ts` matchesQuery so every typed word must match in any order. Why: one consistent plain-language match everywhere, no customer data leakage.

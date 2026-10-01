@@ -1,3 +1,4 @@
+import { matchesQuery } from "@/lib/plainSearch";
 import { useState, useEffect, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -46,7 +47,7 @@ const Invoices = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { activeCompanyId, isVibeAdmin, loading: activeCompanyLoading } = useActiveCompany();
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(() => new URLSearchParams(window.location.search).get("q") || "");
   const [statusFilter, setStatusFilter] = useState("all");
   // Read company filter from URL, default to "all" (only for vibe admins)
   const companyFilter = searchParams.get("company") || "all";
@@ -417,9 +418,12 @@ const Invoices = () => {
   const { brands, brandFilter, setBrandFilter } = useBrandFilter(brandCompanyId);
 
   const filteredInvoices = invoices.filter(invoice => {
-    const matchesSearch = invoice.invoice_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         invoice.orders?.order_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         invoice.orders?.customer_name?.toLowerCase().includes(searchQuery.toLowerCase());
+    // Plain language: every word typed must appear somewhere (number, PO, customer, amount, date, status).
+    const matchesSearch = matchesQuery(
+      [invoice.invoice_number, invoice.customer_po_number, invoice.status, invoice.total, invoice.invoice_date, invoice.due_date,
+       invoice.orders?.order_number, invoice.orders?.customer_name, invoice.companies?.name],
+      searchQuery
+    );
     
     // Status filter logic (includes billed invoices that are past due => treated as DUE)
     let matchesStatus = true;
