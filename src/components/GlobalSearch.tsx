@@ -4,7 +4,7 @@ import { Search, X, FileText, ClipboardList, Building2, Package, Factory, Calcul
 import { supabase } from "@/integrations/supabase/client";
 import { highlightParts, matchesQuery, tokenize } from "@/lib/plainSearch";
 import { formatCurrency, formatDocDate, cn } from "@/lib/utils";
-import { StatusDot } from "@/components/StatusDot";
+import { StatusDot, type StatusTone } from "@/components/StatusDot";
 
 type Row = { kind: string; id: string; title: string; subtitle: string; status: string | null; amount: number | null; doc_date: string | null; link_id: string };
 type Item = { key: string; group: string; title: string; subtitle?: string; status?: string | null; amount?: number | null; date?: string | null; icon: any; to: string };
@@ -40,6 +40,16 @@ const HELP = [
   ["Sending an invoice email", "/invoices", "email send invoice notice"],
   ["Repaying financed POs", "/financing", "repayment finance deposit"],
 ] as const;
+
+const labelFor = (s: string) => s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+const toneFor = (s: string, _d?: string | null): StatusTone => {
+  const v = s.toLowerCase();
+  if (/paid|complete|delivered|approved|synced|accepted/.test(v)) return "success";
+  if (/overdue|due|void|cancel|reject|delay|error/.test(v)) return "danger";
+  if (/open|pending|draft/.test(v)) return "warning";
+  if (/billed|sent|production|shipped|progress/.test(v)) return "info";
+  return "neutral";
+};
 
 export function GlobalSearch() {
   const navigate = useNavigate();
@@ -174,7 +184,7 @@ export function GlobalSearch() {
                           </p>
                         )}
                       </div>
-                      {it.status && <StatusDot status={it.status} />}
+                      {it.status && <StatusDot pill tone={toneFor(it.status, it.date)}>{labelFor(it.status)}</StatusDot>}
                       {it.amount != null && <span className="text-sm tabular-nums shrink-0"><Hl text={formatCurrency(Number(it.amount))} /></span>}
                     </button>
                   );

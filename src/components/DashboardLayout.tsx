@@ -10,6 +10,7 @@ import { NotificationsDropdown } from "./NotificationsDropdown";
 import { ThemeToggle } from "./ThemeToggle";
 import { useCompany } from "@/contexts/CompanyContext";
 import { CompanyHeaderSwitcher } from "./CompanyHeaderSwitcher";
+import { GlobalSearch } from "./GlobalSearch";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -18,7 +19,7 @@ interface DashboardLayoutProps {
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { activeCompany, loading: companyLoading, isFinancePortalUser, isForwarderPortalUser, isVendorPortalUser } = useCompany();
+  const { activeCompany, hasVibeAdminRole, loading: companyLoading, isFinancePortalUser, isForwarderPortalUser, isVendorPortalUser } = useCompany();
   const [loading, setLoading] = useState(true);
 
   // Finance portal users should only ever see /financing routes
@@ -113,7 +114,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           <header className="h-14 border-b border-border bg-background sticky top-0 z-40 flex items-center px-4 gap-4">
             <SidebarTrigger className="h-9 w-9 shrink-0" />
             
-            <div className="flex-1 min-w-0">
+            <div className="min-w-0 shrink-0">
               {/* Header company indicator + switcher (for multi-company users) */}
               <CompanyHeaderSwitcher />
               {/* Fallback text while company is still resolving */}
@@ -122,6 +123,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   {companyName}
                 </h1>
               )}
+            </div>
+
+            {/* Global search: VibePKG staff only, never on customer/vendor/finance portals. */}
+            <div className="flex-1 min-w-0 flex justify-center">
+              {hasVibeAdminRole && <GlobalSearch />}
             </div>
             
             <div className="flex items-center gap-2">
