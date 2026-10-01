@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { InviteCompanyUserDialog } from "@/components/InviteCompanyUserDialog";
 import { SalesRepSelect } from "@/components/SalesRepSelect";
+import { AssignSalesRepsDialog } from "@/components/AssignSalesRepsDialog";
 import { CompanyEmailsManager } from "@/components/CompanyEmailsManager";
 import {
   Dialog,
@@ -58,6 +59,7 @@ const Customers = () => {
   const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [showRepsDialog, setShowRepsDialog] = useState(false);
   const [showDialog, setShowDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
@@ -299,10 +301,18 @@ const Customers = () => {
         </div>
         <div className="flex gap-2">
           {isVibeAdmin && (
+            <Button variant="outline" onClick={() => setShowRepsDialog(true)}>
+              Assign Salespeople
+            </Button>
+          )}
+          {isVibeAdmin && (
             <Button variant="outline" onClick={() => setShowInviteDialog(true)}>
               <UserPlus className="h-4 w-4 mr-2" />
               Invite User
             </Button>
+          )}
+          {isVibeAdmin && (
+            <AssignSalesRepsDialog open={showRepsDialog} onOpenChange={setShowRepsDialog} onSaved={fetchCustomers} />
           )}
           <Button onClick={() => handleOpenDialog()}>
             <Plus className="h-4 w-4 mr-2" />
