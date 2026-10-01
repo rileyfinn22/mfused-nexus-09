@@ -48,6 +48,7 @@ export function plainFilter<T>(items: T[], query: string, pick?: (item: T) => un
 export function highlightParts(text: string, query: string): { text: string; hit: boolean }[] {
   const toks = tokenize(query).map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   if (!toks.length || !text) return [{ text, hit: false }];
-  const re = new RegExp(`(${toks.join("|")})`, "gi");
-  return text.split(re).filter(Boolean).map((p) => ({ text: p, hit: re.test(p) && (re.lastIndex = 0, true) }));
+  const split = new RegExp(`(${toks.join("|")})`, "gi");
+  const whole = new RegExp(`^(${toks.join("|")})$`, "i");
+  return text.split(split).filter(Boolean).map((p) => ({ text: p, hit: whole.test(p) }));
 }
