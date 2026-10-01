@@ -293,6 +293,8 @@ const CreateOrder = () => {
 
   // Customer PO attachment state
   const [customerPoFile, setCustomerPoFile] = useState<File | null>(null);
+  // POs uploaded for AI analysis — attached to the order on save so the source file is never lost.
+  const [analyzedPoFiles, setAnalyzedPoFiles] = useState<{ path: string; name: string; size: number; type: string }[]>([]);
   const [uploadingCustomerPo, setUploadingCustomerPo] = useState(false);
   
   // Auto-save state
@@ -949,6 +951,19 @@ const CreateOrder = () => {
 
   // Upload Customer PO attachment to order
   const uploadCustomerPoAttachment = async (orderId: string): Promise<void> => {
+    if (analyzedPoFiles.length > 0) {
+      const { data: { user: u } } = await supabase.auth.getUser();
+      const { data: existing } = await supabase.from('order_attachments').select('file_path').eq('order_id', orderId);
+      const have = new Set((existing || []).map((r: any) => r.file_path));
+      const rows = analyzedPoFiles.filter((f) => !have.has(f.path)).map((f) => ({
+        order_id: orderId, file_name: f.name, file_path: f.path, file_size: f.size,
+        file_type: f.type, description: 'Customer PO', uploaded_by: u?.id,
+      }));
+      if (rows.length) {
+        const { error } = await supabase.from('order_attachments').insert(rows);
+        if (error) console.error('Analyzed PO attach error:', error);
+      }
+    }
     if (!customerPoFile) return;
     
     try {
@@ -1066,6 +1081,8 @@ const CreateOrder = () => {
           });
           continue;
         }
+
+        setAnalyzedPoFiles((prev) => [...prev, { path: fileName, name: file.name, size: file.size, type: file.type || 'application/pdf' }]);
 
         // Trigger AI analysis
         const { data: functionData, error: functionError } = await supabase.functions.invoke('analyze-po', {
