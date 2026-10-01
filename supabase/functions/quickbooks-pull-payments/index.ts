@@ -276,15 +276,7 @@ serve(async (req) => {
       const query = `SELECT * FROM Payment WHERE Line.LinkedTxn.TxnType = 'Invoice' AND Line.LinkedTxn.TxnId = '${invoice.quickbooks_id}'`;
       console.log('Querying QBO for payments:', query);
 
-      const paymentsResponse = await fetch(
-        `${qbApiUrl}/query?query=${encodeURIComponent(query)}&minorversion=65`,
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Accept': 'application/json',
-          },
-        }
-      );
+      const paymentsResponse = await qbFetch(`${qbApiUrl}/query?query=${encodeURIComponent(query)}&minorversion=65`);
 
       if (!paymentsResponse.ok) {
         const errorText = await paymentsResponse.text();
@@ -353,15 +345,7 @@ serve(async (req) => {
     console.log('Fetching all recent payments from QuickBooks...');
     const query = 'SELECT * FROM Payment ORDERBY TxnDate DESC MAXRESULTS 100';
     
-    const paymentsResponse = await fetch(
-      `${qbApiUrl}/query?query=${encodeURIComponent(query)}&minorversion=65`,
-      {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Accept': 'application/json',
-        },
-      }
-    );
+    const paymentsResponse = await qbFetch(`${qbApiUrl}/query?query=${encodeURIComponent(query)}&minorversion=65`);
 
     if (!paymentsResponse.ok) {
       const errorText = await paymentsResponse.text();
