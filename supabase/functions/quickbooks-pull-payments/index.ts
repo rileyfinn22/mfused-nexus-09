@@ -223,12 +223,30 @@ serve(async (req) => {
     const tokenExpiresAt = new Date(qbSettings.token_expires_at);
     const now = new Date();
 
-    if (tokenExpiresAt <= now) {
-      console.log('Access token expired, refreshing...');
+    // Refresh 5 minutes early to absorb clock skew / stale stored expiry.
+    if (isNaN(tokenExpiresAt.getTime()) || tokenExpiresAt.getTime() - 5 * 60 * 1000 <= now.getTime()) {
+      console.log('Access token expired or expiring soon, refreshing...');
       accessToken = await refreshAccessToken(supabase, vibeCompanyId, qbSettings.refresh_token);
     }
 
     const qbApiUrl = `https://quickbooks.api.intuit.com/v3/company/${qbSettings.realm_id}`;
+
+    // On a 401, refresh the token once and retry. Uses the latest stored
+    // refresh token in case another invocation already rotated it.
+    let refreshedOnce = false;
+    const qbFetch = async (url: string): Promise<Response> => {
+      const doFetch = () => fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' } });
+      let res = await doFetch();
+      if (res.status === 401 && !refreshedOnce) {
+        refreshedOnce = true;
+        console.log('QuickBooks returned 401, refreshing token and retrying...');
+        const { data: latest } = await supabase
+          .from('quickbooks_settings').select('refresh_token').eq('company_id', vibeCompanyId).single();
+        accessToken = await refreshAccessToken(supabase, vibeCompanyId, latest?.refresh_token || qbSettings.refresh_token);
+        res = await doFetch();
+      }
+      return res;
+    };
 
     // If a specific invoice is provided, just check that one
     if (invoiceId) {
