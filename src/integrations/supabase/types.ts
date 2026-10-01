@@ -4688,6 +4688,19 @@ export type Database = {
           user_id: string
         }[]
       }
+      global_search: {
+        Args: { per_kind?: number; q: string }
+        Returns: {
+          amount: number
+          doc_date: string
+          id: string
+          kind: string
+          link_id: string
+          status: string
+          subtitle: string
+          title: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
