@@ -165,7 +165,7 @@ serve(async (req) => {
     const tokenExpiresAt = new Date(qbSettings.token_expires_at);
     const now = new Date();
 
-    if (tokenExpiresAt <= now) {
+    if (isNaN(tokenExpiresAt.getTime()) || tokenExpiresAt.getTime() - 5 * 60 * 1000 <= now.getTime()) {
       console.log('Access token expired, refreshing...');
       accessToken = await refreshAccessToken(supabase, vibeCompanyId, qbSettings.refresh_token);
     }
@@ -304,7 +304,7 @@ serve(async (req) => {
     }
     claimedPaymentId = paymentId;
 
-    const qbResponse = await fetch(
+    const postPayment = () => fetch(
       `https://quickbooks.api.intuit.com/v3/company/${qbSettings.realm_id}/payment?minorversion=65`,
       {
         method: 'POST',
@@ -316,6 +316,16 @@ serve(async (req) => {
         body: JSON.stringify(paymentData),
       }
     );
+    let qbResponse = await postPayment();
+    // A 401 means QuickBooks rejected the token before creating anything, so
+    // refreshing once and retrying cannot double-post.
+    if (qbResponse.status === 401) {
+      console.log('QuickBooks returned 401, refreshing token and retrying...');
+      const { data: latest } = await supabase
+        .from('quickbooks_settings').select('refresh_token').eq('company_id', vibeCompanyId).single();
+      accessToken = await refreshAccessToken(supabase, vibeCompanyId, latest?.refresh_token || qbSettings.refresh_token);
+      qbResponse = await postPayment();
+    }
 
     if (!qbResponse.ok) {
       const errorText = await qbResponse.text();

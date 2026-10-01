@@ -172,7 +172,7 @@ const Customers = () => {
     try {
       // Validate form data
       const validated = customerSchema.parse(formData);
-      if (!formData.sales_rep_email) {
+      if (isVibeAdmin && !formData.sales_rep_email) {
         setFormErrors({ sales_rep_email: "Salesperson is required" });
         toast({ title: "Salesperson is required", variant: "destructive" });
         return;
@@ -198,7 +198,7 @@ const Customers = () => {
         shipping_state: validated.shipping_state || null,
         shipping_zip: validated.shipping_zip || null,
         notes: validated.notes || null,
-        sales_rep_email: formData.sales_rep_email,
+        ...(isVibeAdmin ? { sales_rep_email: formData.sales_rep_email } : {}),
       };
 
       if (editingCustomer) {
@@ -463,7 +463,7 @@ const Customers = () => {
                   />
                   {formErrors.name && <p className="text-sm text-destructive mt-1">{formErrors.name}</p>}
                 </div>
-                <div>
+                {isVibeAdmin && <div>
                   <Label htmlFor="sales_rep">Salesperson *</Label>
                   <SalesRepSelect
                     id="sales_rep"
@@ -472,7 +472,7 @@ const Customers = () => {
                     invalid={!!formErrors.sales_rep_email}
                   />
                   {formErrors.sales_rep_email && <p className="text-sm text-destructive">{formErrors.sales_rep_email}</p>}
-                </div>
+                </div>}
                 <div>
                   <Label htmlFor="email">Primary Email</Label>
                   <Input
