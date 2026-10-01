@@ -1,6 +1,6 @@
 /**
  * Plain-language matching shared by the global search and page searches.
- * Every word typed must appear somewhere in the record, in any order, so
+ * Words match in the order typed, each at the start of a word, so
  * "tin merch" matches "Tin Merch Pack" and "17971.20" matches "$17,971.20".
  */
 export const normalize = (s: unknown): string =>
