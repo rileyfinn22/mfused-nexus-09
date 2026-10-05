@@ -915,6 +915,7 @@ const Artwork = () => {
           preview_url: selectedFile.preview_url,
           notes: selectedFile.notes,
           rejection_reason: rejectionReason,
+          artwork_type: (selectedFile as any).artwork_type ?? 'vibe_proof',
           rejected_by: user.id,
           original_created_at: selectedFile.created_at
         });
@@ -1067,6 +1068,21 @@ const Artwork = () => {
     setProductArtworkLoading(true);
     setSelectedProduct(product);
   };
+
+  // Email deep links: /artwork?sku=XXX opens that product's Vibe Proofs directly.
+  const deepLinkedSkuRef = useRef<string | null>(null);
+  useEffect(() => {
+    const sku = searchParams.get('sku');
+    if (!sku || searchParams.get('tab') === 'customer' || isVibeAdmin === null) return;
+    if (deepLinkedSkuRef.current === sku) return;
+    deepLinkedSkuRef.current = sku;
+    (async () => {
+      let q = supabase.from('products').select('*').eq('item_id', sku).limit(1);
+      if (!isVibeAdmin && userCompanyId) q = q.eq('company_id', userCompanyId);
+      const { data } = await q;
+      if (data?.[0]) handleSelectProduct(data[0] as any);
+    })();
+  }, [searchParams, isVibeAdmin, userCompanyId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleBack = () => {
     if (selectedProduct) {
@@ -1899,7 +1915,7 @@ const Artwork = () => {
       <PageHeader title="Artwork" />
 
       {/* Tabs for Vibe Proofs and Customer Art */}
-      <Tabs defaultValue="proofs" className="space-y-6">
+      <Tabs defaultValue={searchParams.get("tab") === "customer" ? "customer" : "proofs"} className="space-y-6">
         <TabsList>
           <TabsTrigger value="proofs" className="flex items-center gap-2">
             <FolderOpen className="h-4 w-4" />
@@ -2231,6 +2247,7 @@ const Artwork = () => {
             companyFilter={companyFilter}
             onCompanyFilterChange={setCompanyFilter}
             onFileOpened={() => setCustomerPendingCount((c) => Math.max(0, c - 1))}
+            initialSku={searchParams.get("tab") === "customer" ? searchParams.get("sku") : null}
           />
         </TabsContent>
       </Tabs>

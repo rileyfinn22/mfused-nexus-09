@@ -3372,6 +3372,7 @@ export type Database = {
       }
       rejected_artwork_files: {
         Row: {
+          artwork_type: string | null
           artwork_url: string
           company_id: string
           created_at: string
@@ -3387,6 +3388,7 @@ export type Database = {
           sku: string
         }
         Insert: {
+          artwork_type?: string | null
           artwork_url: string
           company_id: string
           created_at?: string
@@ -3402,6 +3404,7 @@ export type Database = {
           sku: string
         }
         Update: {
+          artwork_type?: string | null
           artwork_url?: string
           company_id?: string
           created_at?: string
