@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useListFilters } from "@/hooks/useListFilters";
+import { useCompanyScope } from "@/contexts/CompanyScopeContext";
 import SignedImage from "@/components/SignedImage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -92,7 +93,9 @@ const Inventory = () => {
   const setStateFilter = (value: string) => setFilter("state", value);
   const statusFilter = filters.status;
   const setStatusFilter = (value: string) => setFilter("status", value);
-  const companyFilter = filters.company;
+  // The header's master company filter overrides the page's own company dropdown.
+  const { scopeCompanyId } = useCompanyScope();
+  const companyFilter = scopeCompanyId ?? filters.company;
   const setCompanyFilter = (value: string) => setFilter("company", value);
   const [sortField, setSortField] = useState("available");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -652,7 +655,7 @@ const Inventory = () => {
             className="pl-10"
           />
         </div>
-        {isVibeAdmin && (
+        {isVibeAdmin && !scopeCompanyId && (
           <Select value={companyFilter} onValueChange={setCompanyFilter}>
             <SelectTrigger className="w-full lg:w-40">
               <SelectValue placeholder="Company" />

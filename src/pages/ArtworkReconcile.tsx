@@ -11,6 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sparkles, Save, Loader2, Check, ChevronsUpDown, AlertTriangle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { BackButton } from "@/components/layout/BackButton";
+import { useCompanyScope } from "@/contexts/CompanyScopeContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -53,7 +54,10 @@ export default function ArtworkReconcile() {
   const [orphans, setOrphans] = useState<Orphan[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [companyFilter, setCompanyFilter] = useState<string>('all');
+  const [ownCompanyFilter, setCompanyFilter] = useState<string>('all');
+  // The header's master company filter overrides the page's own company dropdown.
+  const { scopeCompanyId } = useCompanyScope();
+  const companyFilter = scopeCompanyId ?? ownCompanyFilter;
   const [search, setSearch] = useState('');
   const [selections, setSelections] = useState<Record<string, { sku: string; productName?: string }>>({});
   const [checked, setChecked] = useState<Record<string, boolean>>({});
@@ -169,15 +173,17 @@ export default function ArtworkReconcile() {
       </div>
 
       <Card className="p-4 flex flex-wrap items-center gap-3">
-        <Select value={companyFilter} onValueChange={setCompanyFilter}>
-          <SelectTrigger className="w-[260px]"><SelectValue placeholder="Company" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All companies</SelectItem>
-            {companies.filter(c => orphans.some(o => o.company_id === c.id)).map(c => (
-              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {!scopeCompanyId && (
+          <Select value={companyFilter} onValueChange={setCompanyFilter}>
+            <SelectTrigger className="w-[260px]"><SelectValue placeholder="Company" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All companies</SelectItem>
+              {companies.filter(c => orphans.some(o => o.company_id === c.id)).map(c => (
+                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <Input placeholder="Search filename or SKU" value={search} onChange={e => setSearch(e.target.value)} className="w-[280px]" />
         <div className="flex-1" />
         <Badge variant="outline" className="text-sm">

@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
+import { useCompanyScope } from "@/contexts/CompanyScopeContext";
 interface LowStockItem {
   sku: string;
   state: string;
@@ -45,17 +46,20 @@ const Dashboard = () => {
     }
   }, [isFinancePortalUser, activeCompanyRole, navigate]);
 
+  // Admins see every company unless the header's master company filter is on.
+  const { scopeCompanyId } = useCompanyScope();
+
   useEffect(() => {
     if (!isFinancePortalUser && (activeCompanyId || isVibeAdmin)) {
       setLoading(true);
-      fetchDashboardData(activeCompanyId, isVibeAdmin);
+      fetchDashboardData(activeCompanyId, isVibeAdmin, scopeCompanyId);
     }
-  }, [activeCompanyId, isVibeAdmin, isFinancePortalUser]);
+  }, [activeCompanyId, isVibeAdmin, isFinancePortalUser, scopeCompanyId]);
 
-  const fetchDashboardData = async (companyId: string | null, isAdmin: boolean) => {
+  const fetchDashboardData = async (companyId: string | null, isAdmin: boolean, scopeId: string | null) => {
     try {
-      // Build base query conditions - filter by company unless vibe admin
-      const companyFilter = !isAdmin && companyId ? companyId : null;
+      // Build base query conditions - customers see their company; admins see all, or the scoped one.
+      const companyFilter = isAdmin ? scopeId : companyId || null;
 
       // Fetch low stock items (where available < redline)
       let inventoryQuery = supabase

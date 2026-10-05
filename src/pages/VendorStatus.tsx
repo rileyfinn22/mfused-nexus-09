@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useListFilters } from "@/hooks/useListFilters";
+import { useCompanyScope } from "@/contexts/CompanyScopeContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
@@ -54,7 +55,9 @@ export default function VendorStatus() {
   const setSearch = (value: string) => setFilter("search", value);
   const vendorFilter = filters.vendor;
   const setVendorFilter = (value: string) => setFilter("vendor", value);
-  const companyFilter = filters.company;
+  // This sheet filters by company *name*; the header's master filter supplies one when set.
+  const { scopeCompany } = useCompanyScope();
+  const companyFilter = scopeCompany ? scopeCompany.name.trim() : filters.company;
   const setCompanyFilter = (value: string) => setFilter("company", value);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -217,15 +220,17 @@ export default function VendorStatus() {
             ))}
           </SelectContent>
         </Select>
-        <Select value={companyFilter} onValueChange={setCompanyFilter}>
-          <SelectTrigger className="w-full sm:w-[220px]"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>All companies</SelectItem>
-            {companyNames.map((c) => (
-              <SelectItem key={c} value={c}>{c}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {!scopeCompany && (
+          <Select value={companyFilter} onValueChange={setCompanyFilter}>
+            <SelectTrigger className="w-full sm:w-[220px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>All companies</SelectItem>
+              {companyNames.map((c) => (
+                <SelectItem key={c} value={c}>{c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {/* Editable sheet */}

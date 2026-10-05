@@ -25,6 +25,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { useListFilters } from "@/hooks/useListFilters";
+import { useCompanyScope } from "@/contexts/CompanyScopeContext";
 import { toast } from "@/hooks/use-toast";
 import { exportToCSV } from "@/lib/exportUtils";
 import { generateInvoicePDF } from "@/lib/invoicePdfUtils";
@@ -58,7 +59,9 @@ const Invoices = () => {
   const setSearchQuery = (value: string) => setFilter("search", value);
   const statusFilter = filters.status;
   const setStatusFilter = (value: string) => setFilter("status", value);
-  const companyFilter = filters.company;
+  // The header's master company filter overrides the page's own company dropdown.
+  const { scopeCompanyId } = useCompanyScope();
+  const companyFilter = scopeCompanyId ?? filters.company;
   const setCompanyFilter = (value: string) => setFilter("company", value);
   const [isCompanyUser, setIsCompanyUser] = useState(false);
   const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
@@ -580,7 +583,7 @@ const Invoices = () => {
 
 
       <FilterBar search={{ value: searchQuery, onChange: setSearchQuery, placeholder: "Search invoices" }}>
-        {isVibeAdmin && (
+        {isVibeAdmin && !scopeCompanyId && (
           <Select value={companyFilter} onValueChange={setCompanyFilter}>
             <SelectTrigger className="w-full sm:w-48">
               <SelectValue placeholder="Company" />

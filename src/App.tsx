@@ -7,6 +7,7 @@ import { lazyWithRetry } from "@/lib/lazyWithRetry";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { CompanyProvider } from "./contexts/CompanyContext";
+import { CompanyScopeProvider } from "./contexts/CompanyScopeContext";
 import { DashboardLayout } from "./components/DashboardLayout";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
@@ -78,6 +79,7 @@ const App = () => (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
       <TooltipProvider>
         <CompanyProvider>
+         <CompanyScopeProvider>
           <Toaster />
           <Sonner />
           <BrowserRouter>
@@ -142,6 +144,7 @@ const App = () => (
             </Routes>
             </Suspense>
           </BrowserRouter>
+         </CompanyScopeProvider>
         </CompanyProvider>
       </TooltipProvider>
     </ThemeProvider>

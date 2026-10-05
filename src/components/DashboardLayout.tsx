@@ -11,6 +11,7 @@ import { ThemeToggle } from "./ThemeToggle";
 import { useCompany } from "@/contexts/CompanyContext";
 import { CompanyHeaderSwitcher } from "./CompanyHeaderSwitcher";
 import { GlobalSearch } from "./GlobalSearch";
+import { CompanyScopePicker } from "./CompanyScopePicker";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -124,6 +125,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 </h1>
               )}
             </div>
+
+            {/* Master company filter: VibePKG staff only. Locks every list to one customer. */}
+            {hasVibeAdminRole && <CompanyScopePicker className="shrink-0" />}
 
             {/* Global search: VibePKG staff only, never on customer/vendor/finance portals. */}
             <div className="flex-1 min-w-0 flex justify-center">

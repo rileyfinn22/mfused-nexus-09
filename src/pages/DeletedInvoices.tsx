@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { BackButton } from "@/components/layout/BackButton";
 import { useListFilters } from "@/hooks/useListFilters";
+import { useCompanyScope } from "@/contexts/CompanyScopeContext";
 import { toast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -31,7 +32,9 @@ const DeletedInvoices = () => {
   const { filters, set: setFilter } = useListFilters("deleted-invoices", { search: "", company: "all" });
   const searchQuery = filters.search;
   const setSearchQuery = (value: string) => setFilter("search", value);
-  const companyFilter = filters.company;
+  // The header's master company filter overrides the page's own company dropdown.
+  const { scopeCompanyId } = useCompanyScope();
+  const companyFilter = scopeCompanyId ?? filters.company;
   const setCompanyFilter = (value: string) => setFilter("company", value);
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [roleChecked, setRoleChecked] = useState(false);
@@ -193,7 +196,7 @@ const DeletedInvoices = () => {
             className="pl-10"
           />
         </div>
-        {isVibeAdmin && (
+        {isVibeAdmin && !scopeCompanyId && (
           <Select value={companyFilter} onValueChange={setCompanyFilter}>
             <SelectTrigger className="w-full sm:w-48">
               <SelectValue placeholder="Company" />

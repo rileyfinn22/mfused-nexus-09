@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useListFilters } from "@/hooks/useListFilters";
+import { useCompanyScope } from "@/contexts/CompanyScopeContext";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -112,7 +113,9 @@ const Products = () => {
   const { filters, set: setFilter } = useListFilters("products", { search: "", company: "all" });
   const searchQuery = filters.search;
   const setSearchQuery = (value: string) => setFilter("search", value);
-  const companyFilter = filters.company;
+  // The header's master company filter overrides the page's own company dropdown.
+  const { scopeCompanyId } = useCompanyScope();
+  const companyFilter = scopeCompanyId ?? filters.company;
   const setCompanyFilter = (value: string) => setFilter("company", value);
   const [artworkStatus, setArtworkStatus] = useState<Record<string, boolean>>({});
   const [artworkThumbnails, setArtworkThumbnails] = useState<Record<string, string>>({});
@@ -997,7 +1000,7 @@ const Products = () => {
               className="pl-8"
             />
           </div>
-          {isVibeAdmin && (
+          {isVibeAdmin && !scopeCompanyId && (
             <Select value={companyFilter} onValueChange={setCompanyFilter}>
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="Company" />

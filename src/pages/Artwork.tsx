@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import SignedImage from "@/components/SignedImage";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useListFilters } from "@/hooks/useListFilters";
+import { useCompanyScope } from "@/contexts/CompanyScopeContext";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -130,7 +131,9 @@ const Artwork = () => {
     'MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC',
     'SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'
   ];
-  const companyFilter = filters.company;
+  // The header's master company filter overrides the page's own company dropdown.
+  const { scopeCompanyId } = useCompanyScope();
+  const companyFilter = scopeCompanyId ?? filters.company;
   const setCompanyFilter = (value: string) => setFilter("company", value);
   const [companies, setCompanies] = useState<any[]>([]);
   const { activeCompanyId, isVibeAdmin: isVibeAdminFromCtx, loading: companyCtxLoading } = useActiveCompany();
@@ -1988,7 +1991,7 @@ const Artwork = () => {
           showWhenEmpty={!!isVibeAdmin}
         />
         <KindSelect config={kindConfig} value={kindFilter} onChange={setKindFilter} />
-        {isVibeAdmin && (
+        {isVibeAdmin && !scopeCompanyId && (
           <Select value={companyFilter} onValueChange={setCompanyFilter}>
             <SelectTrigger className="w-full sm:w-48">
               <SelectValue placeholder="Company" />
