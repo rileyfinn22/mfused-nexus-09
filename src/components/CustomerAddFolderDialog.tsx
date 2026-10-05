@@ -139,7 +139,25 @@ export function CustomerAddFolderDialog({
         resolvedBrandId = brand.id;
       }
 
-      let folderId = existingFolder?.id ?? null;
+      // Re-check the database for this brand + category's folder instead of trusting the
+      // on-screen list, which can be stale right after another folder was created.
+      let folderId: string | null = null;
+      let reusedName: string | null = null;
+      if (isOther) {
+        folderId = existingFolder?.id ?? null;
+        reusedName = existingFolder?.name ?? null;
+      } else if (!wantsNewBrand && group) {
+        const { data: match } = await supabase
+          .from("product_templates")
+          .select("id, name")
+          .eq("company_id", companyId)
+          .eq("brand_id", resolvedBrandId)
+          .in("product_type", group.product_types)
+          .order("created_at", { ascending: true })
+          .limit(1);
+        folderId = match?.[0]?.id ?? null;
+        reusedName = match?.[0]?.name ?? null;
+      }
       if (!folderId) {
         const { data, error } = await supabase.rpc("create_customer_template", {
           p_company_id: companyId,
@@ -170,7 +188,7 @@ export function CustomerAddFolderDialog({
 
       const added = names.length - failed.length;
       toast({
-        title: existingFolder ? `Added to ${existingFolder.name}` : `Folder ${folderName.trim()} created`,
+        title: reusedName ? `Added to ${reusedName}` : `Folder ${folderName.trim()} created`,
         description:
           added > 0
             ? `${added} product${added === 1 ? "" : "s"} added.${failed.length ? ` Could not add: ${failed.join(", ")}` : ""}`

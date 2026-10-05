@@ -208,7 +208,7 @@ export function CustomerAddProductDialog({
             <Label>
               Category <span className="text-destructive">*</span>
             </Label>
-            <Select value={kind} onValueChange={setKind}>
+            <Select value={kind} onValueChange={setKind} disabled={lockedToTemplate && !!template?.product_type}>
               <SelectTrigger>
                 <SelectValue placeholder="Choose a category" />
               </SelectTrigger>
