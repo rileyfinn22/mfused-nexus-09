@@ -20,6 +20,10 @@ export function lazyWithRetry<T extends ComponentType<any>>(
       } catch (err2) {
         const last = Number(sessionStorage.getItem(RELOAD_KEY) || 0);
         if (Date.now() - last > 10000) {
+          // Don't cut off an artwork upload: wait for it to finish, then reload.
+          while (((window as any).__artworkUploads || 0) > 0) {
+            await new Promise((r) => setTimeout(r, 1000));
+          }
           sessionStorage.setItem(RELOAD_KEY, String(Date.now()));
           window.location.reload();
           // Never resolves; the reload takes over.

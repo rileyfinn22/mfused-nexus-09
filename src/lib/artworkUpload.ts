@@ -39,10 +39,12 @@ export const artworkUploadsInProgress = () => pendingUploads > 0;
 
 export async function uploadArtworkFile(args: UploadArtworkArgs): Promise<void> {
   if (pendingUploads++ === 0) window.addEventListener("beforeunload", warnBeforeLeave);
+  (window as any).__artworkUploads = pendingUploads;
   try {
     await uploadArtworkFileInner(args);
   } finally {
     if (--pendingUploads === 0) window.removeEventListener("beforeunload", warnBeforeLeave);
+    (window as any).__artworkUploads = pendingUploads;
   }
 }
 
