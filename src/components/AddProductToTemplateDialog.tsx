@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { ProductBrandField } from "@/components/ProductBrandField";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -31,6 +32,17 @@ export function AddProductToTemplateDialog({
   const [loading, setLoading] = useState(false);
   const [parsing, setParsing] = useState(false);
   const [skuNames, setSkuNames] = useState("");
+  const [brandId, setBrandId] = useState("");
+  const [brandRequired, setBrandRequired] = useState(false);
+
+  // Preset the brand from the folder; staff can pick one when the folder has none.
+  useEffect(() => {
+    if (!open) return;
+    void (async () => {
+      const { data } = await supabase.from('product_templates').select('brand_id').eq('id', template.id).maybeSingle();
+      setBrandId((data as any)?.brand_id || "");
+    })();
+  }, [open, template.id]);
 
   const generateTempSKU = () => {
     const randomDigits = Math.floor(10000 + Math.random() * 90000);
@@ -110,8 +122,9 @@ export function AddProductToTemplateDialog({
             state: template.state,
             item_id: tempSKU,
             template_id: template.id,
-            company_id: companyId
-          })
+            company_id: companyId,
+            brand_id: brandId || null
+          } as any)
           .select()
           .single();
 
@@ -167,6 +180,8 @@ export function AddProductToTemplateDialog({
             </p>
           </div>
 
+          <ProductBrandField companyId={companyId} value={brandId} onChange={setBrandId} onRequiredChange={setBrandRequired} />
+
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="skuNames">Product Names <span className="text-destructive">*</span></Label>
@@ -198,7 +213,7 @@ export function AddProductToTemplateDialog({
             </p>
           </div>
 
-          <Button type="submit" disabled={loading || !companyId} className="w-full">
+          <Button type="submit" disabled={loading || !companyId || (brandRequired && !brandId)} className="w-full">
             {loading ? "Adding..." : "Add Products"}
           </Button>
 
