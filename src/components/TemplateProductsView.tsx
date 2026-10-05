@@ -496,7 +496,7 @@ export function TemplateProductsView({
               Add Product
             </Button>
           )}
-          {isVibeAdmin && (
+          {isVibeAdmin && !onCustomerAddProduct && !onCustomerQuickAdd && (
             <>
               {/* Quick Add Button */}
               <Button size="sm" variant="outline" onClick={() => setQuickAddOpen(true)}>
