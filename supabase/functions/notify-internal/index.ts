@@ -206,11 +206,63 @@ async function artworkUploaded(admin: ReturnType<typeof createClient>, alert: Al
         detailCard(rows) +
         preview +
         buttons([
-          { label: "Review in portal", url: `${PORTAL_URL}/artwork?search=${encodeURIComponent(art.sku)}` },
+          { label: "Review in portal", url: `${PORTAL_URL}/artwork?tab=customer&sku=${encodeURIComponent(art.sku)}` },
           ...(art.artwork_url ? [{ label: "Open file", url: art.artwork_url, secondary: true }] : []),
         ]),
       noReply: true,
     }),
+  };
+}
+
+async function artworkRejected(admin: ReturnType<typeof createClient>, alert: AlertRow): Promise<Message> {
+  const { data: rej, error } = await admin
+    .from("rejected_artwork_files")
+    .select("id, sku, filename, rejection_reason, company_id, rejected_at, artwork_type")
+    .eq("id", alert.record_id)
+    .maybeSingle();
+  if (error) throw new Error(`rejected_artwork_files: ${error.message}`);
+  if (!rej) throw new Error(`rejected artwork ${alert.record_id} not found`);
+  const companyId = rej.company_id ?? alert.company_id;
+  const company = await companyName(admin, companyId);
+
+  let productName: string | null = null;
+  if (companyId) {
+    const { data: product } = await admin.from("products").select("name")
+      .eq("company_id", companyId).eq("item_id", rej.sku).limit(1).maybeSingle();
+    productName = product?.name ?? null;
+  }
+
+  // Recipients: the customer's own portal users (never VibePKG staff-only addresses).
+  const to = new Set<string>();
+  if (companyId) {
+    const { data: roles } = await admin.from("user_roles").select("user_id, role").eq("company_id", companyId);
+    const ids = new Set((roles ?? []).filter((r: any) => ["company", "customer", "admin"].includes(r.role)).map((r: any) => r.user_id));
+    if (ids.size) {
+      const { data } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      for (const u of data?.users ?? []) if (ids.has(u.id) && u.email && !u.email.endsWith("@vendor.local")) to.add(u.email.toLowerCase());
+    }
+  }
+
+  const tab = rej.artwork_type === "vibe_proof" ? "proofs" : "customer";
+  const url = `${PORTAL_URL}/artwork?tab=${tab}&sku=${encodeURIComponent(rej.sku)}`;
+  return {
+    subject: `Artwork needs changes: ${productName || rej.sku}`,
+    html: renderEmail({
+      documentLabel: "ARTWORK RETURNED",
+      heading: `Please resubmit artwork for ${productName || rej.sku}`,
+      bodyHtml:
+        paragraph(`VibePKG reviewed the artwork ${escapeHtml(company)} submitted and it needs changes before we can proof it. The file has been moved to your rejected archive.`) +
+        detailCard([
+          ...(productName ? [{ label: "Product", value: escapeHtml(productName), emphasis: true }] : []),
+          { label: "SKU", value: escapeHtml(rej.sku), mono: true },
+          { label: "File", value: escapeHtml(rej.filename || "(unnamed file)") },
+          { label: "Reason", value: escapeHtml(rej.rejection_reason || ""), danger: true },
+          { label: "Returned", value: escapeHtml(when(rej.rejected_at)) },
+        ]) +
+        buttons([{ label: "Upload new artwork", url }]),
+      noReply: true,
+    }),
+    to: [...to],
   };
 }
 
@@ -351,6 +403,7 @@ const FIXED_RECIPIENTS: Record<string, string[]> = {
 const builders: Record<string, (admin: ReturnType<typeof createClient>, alert: AlertRow) => Promise<Message>> = {
   order_submitted: orderSubmitted,
   artwork_uploaded: artworkUploaded,
+  artwork_rejected: artworkRejected,
   order_created: orderCreated,
   ...Object.fromEntries(Object.keys(VENDOR_KINDS).map((t) => [`vendor_update:${t}`, vendorUpdate])),
 };
