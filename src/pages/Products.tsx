@@ -970,14 +970,19 @@ const Products = () => {
                 onProductsAdded={fetchProducts}
                 selectedCompanyId={isVibeAdmin && companyFilter !== 'all' ? companyFilter : undefined}
               />
-              <QuickAddProductsDialog 
-                onProductsAdded={fetchProducts}
-                selectedCompanyId={isVibeAdmin && companyFilter !== 'all' ? companyFilter : undefined}
-              />
-              <AddProductDialog
-                onProductAdded={fetchProducts}
-                selectedCompanyId={isVibeAdmin && companyFilter !== 'all' ? companyFilter : undefined}
-              />
+              {/* Brand/category companies use the single "Add Products" flow instead. */}
+              {!canCustomerAddProduct && (
+                <>
+                  <QuickAddProductsDialog 
+                    onProductsAdded={fetchProducts}
+                    selectedCompanyId={isVibeAdmin && companyFilter !== 'all' ? companyFilter : undefined}
+                  />
+                  <AddProductDialog
+                    onProductAdded={fetchProducts}
+                    selectedCompanyId={isVibeAdmin && companyFilter !== 'all' ? companyFilter : undefined}
+                  />
+                </>
+              )}
             </>
           )}
           {canCustomerAddProduct && (
