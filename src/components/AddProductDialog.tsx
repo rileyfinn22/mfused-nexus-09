@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { ProductCategoryField } from "@/components/ProductCategoryField";
 import { ProductBrandField } from "@/components/ProductBrandField";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -49,6 +50,9 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProdu
   });
   const [brandId, setBrandId] = useState("");
   const [brandRequired, setBrandRequired] = useState(false);
+  const [category, setCategory] = useState("");
+  const [categoryRequired, setCategoryRequired] = useState(false);
+  const categoryTypeRef = useRef<(k: string) => string | null>(() => null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
@@ -210,7 +214,8 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProdu
           item_id: formData.item_id?.trim() || tempSKU,
           customer_item_id: formData.customer_item_id || null,
           company_id: finalCompanyId,
-          brand_id: brandId || null
+          product_type: categoryRequired ? categoryTypeRef.current(category) : undefined,
+            brand_id: brandId || null
         } as any)
         .select()
         .single();
@@ -253,6 +258,7 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProdu
       
       setOpen(false);
       setBrandId("");
+      setCategory("");
       setFormData({ name: "", description: "", state: "", cost: "", price: "", preferred_vendor_id: "", specs: "", customer_item_id: "", item_id: "" });
       setImageFile(null);
       setImagePreview(null);
@@ -306,6 +312,7 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProdu
             </div>
           )}
 
+          <ProductCategoryField companyId={companyId} value={category} onChange={setCategory} onRequiredChange={(r, fn) => { setCategoryRequired(r); categoryTypeRef.current = fn; }} />
           <ProductBrandField companyId={companyId} value={brandId} onChange={setBrandId} onRequiredChange={setBrandRequired} />
 
           <div className="space-y-2">
@@ -510,7 +517,7 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProdu
             </div>
             <p className="text-xs text-muted-foreground">Max 5MB. JPEG, PNG, WebP, or GIF</p>
           </div>
-          <Button type="submit" disabled={loading || (brandRequired && !brandId)} className="w-full">
+          <Button type="submit" disabled={loading || (brandRequired && !brandId) || (categoryRequired && !category)} className="w-full">
             {loading ? "Adding..." : "Add Product"}
           </Button>
         </form>
