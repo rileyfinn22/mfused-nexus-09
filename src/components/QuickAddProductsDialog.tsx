@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { ProductBrandField } from "@/components/ProductBrandField";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +25,7 @@ interface ProductTemplate {
   cost: number | null;
   company_id: string | null;
   state: string | null;
+  brand_id?: string | null;
 }
 
 export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: QuickAddProductsDialogProps) {
@@ -43,6 +45,9 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
   const [manualPrice, setManualPrice] = useState<string>("");
   const [manualCost, setManualCost] = useState<string>("");
 
+  const [brandId, setBrandId] = useState("");
+  const [brandRequired, setBrandRequired] = useState(false);
+
   const selectedTemplate = templates.find(t => t.id === selectedTemplateId);
 
   useEffect(() => {
@@ -51,6 +56,10 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
       fetchTemplates();
     }
   }, [open]);
+
+  useEffect(() => {
+    if (selectedTemplate?.brand_id) setBrandId(selectedTemplate.brand_id);
+  }, [selectedTemplateId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (selectedCompanyId) {
@@ -94,7 +103,7 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
     try {
       const { data, error } = await supabase
         .from('product_templates')
-        .select('id, name, description, price, company_id, state')
+        .select('id, name, description, price, company_id, state, brand_id')
         .order('name');
 
       if (error) throw error;
@@ -197,8 +206,9 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
             state: productState,
             item_id: tempSKU,
             company_id: finalCompanyId,
-            template_id: selectedTemplate?.id || null
-          })
+            template_id: selectedTemplate?.id || null,
+            brand_id: brandId || selectedTemplate?.brand_id || null
+          } as any)
           .select()
           .single();
 
@@ -228,6 +238,7 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
       setOpen(false);
       setSkuNames("");
       setSelectedTemplateId("");
+      setBrandId("");
       setManualState("");
       setManualPrice("");
       setManualCost("");
@@ -298,6 +309,13 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
               </SelectContent>
             </Select>
           </div>
+
+          <ProductBrandField
+            companyId={companyId}
+            value={brandId}
+            onChange={setBrandId}
+            onRequiredChange={setBrandRequired}
+          />
 
           {selectedTemplate && (
             <div className="bg-muted/50 rounded-lg p-3 space-y-1 text-sm">
@@ -389,7 +407,7 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
 
           <Button 
             type="submit" 
-            disabled={loading || (isVibeAdmin && !companyId) || (!selectedTemplate && !manualState)} 
+            disabled={loading || (isVibeAdmin && !companyId) || (!selectedTemplate && !manualState) || (brandRequired && !brandId)} 
             className="w-full"
           >
             {loading ? "Adding..." : "Add Products"}

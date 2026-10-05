@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { ProductBrandField } from "@/components/ProductBrandField";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +47,8 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProdu
     customer_item_id: "",
     item_id: ""
   });
+  const [brandId, setBrandId] = useState("");
+  const [brandRequired, setBrandRequired] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
@@ -206,8 +209,9 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProdu
           image_url: imageUrl,
           item_id: formData.item_id?.trim() || tempSKU,
           customer_item_id: formData.customer_item_id || null,
-          company_id: finalCompanyId
-        })
+          company_id: finalCompanyId,
+          brand_id: brandId || null
+        } as any)
         .select()
         .single();
 
@@ -248,6 +252,7 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProdu
       }
       
       setOpen(false);
+      setBrandId("");
       setFormData({ name: "", description: "", state: "", cost: "", price: "", preferred_vendor_id: "", specs: "", customer_item_id: "", item_id: "" });
       setImageFile(null);
       setImagePreview(null);
@@ -300,6 +305,8 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProdu
               </Select>
             </div>
           )}
+
+          <ProductBrandField companyId={companyId} value={brandId} onChange={setBrandId} onRequiredChange={setBrandRequired} />
 
           <div className="space-y-2">
             <Label htmlFor="name">Item Name</Label>
@@ -503,7 +510,7 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProdu
             </div>
             <p className="text-xs text-muted-foreground">Max 5MB. JPEG, PNG, WebP, or GIF</p>
           </div>
-          <Button type="submit" disabled={loading} className="w-full">
+          <Button type="submit" disabled={loading || (brandRequired && !brandId)} className="w-full">
             {loading ? "Adding..." : "Add Product"}
           </Button>
         </form>
