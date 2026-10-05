@@ -45,6 +45,8 @@ export function AddProductToTemplateDialog({
     void (async () => {
       const { data } = await supabase.from('product_templates').select('brand_id').eq('id', template.id).maybeSingle();
       setBrandId((data as any)?.brand_id || "");
+      const { data: sib } = await supabase.from('products').select('product_type').eq('template_id', template.id).not('product_type', 'is', null).limit(1);
+      setCategory(((sib as any)?.[0]?.product_type ? "__type:" + (sib as any)[0].product_type : ""));
     })();
   }, [open, template.id]);
 

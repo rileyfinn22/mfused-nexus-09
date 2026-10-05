@@ -31,6 +31,14 @@ export function ProductCategoryField({
     });
   }, [required, orderPicker]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Callers may preset "__type:<product_type>"; map it to its group once the config loads.
+  useEffect(() => {
+    if (!orderPicker || !value.startsWith("__type:")) return;
+    const t = value.slice(7).toLowerCase();
+    const g = orderPicker.groups.find((x) => x.product_types.includes(t));
+    onChange(g ? g.key : OTHER_CATEGORY);
+  }, [orderPicker, value]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!required || !orderPicker) return null;
   return (
     <div className="space-y-2">
