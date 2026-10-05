@@ -26,7 +26,7 @@ export function ProductBrandField({
 
   useEffect(() => {
     onRequiredChange?.(required);
-    if (value && !brands.some((b) => b.id === value)) onChange("");
+    if (brands.length > 0 && value && !brands.some((b) => b.id === value)) onChange("");
   }, [required, brands]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!required) return null;
