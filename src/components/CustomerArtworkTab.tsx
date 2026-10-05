@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -97,6 +98,8 @@ interface CustomerArtworkTabProps {
   companyFilter: string;
   onCompanyFilterChange: (value: string) => void;
   onFileOpened?: () => void;
+  /** Email deep link: open this product's customer art directly. */
+  initialSku?: string | null;
 }
 
 export function CustomerArtworkTab({ 
@@ -106,6 +109,7 @@ export function CustomerArtworkTab({
   companyFilter,
   onCompanyFilterChange,
   onFileOpened,
+  initialSku,
 }: CustomerArtworkTabProps) {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
@@ -638,6 +642,77 @@ export function CustomerArtworkTab({
     }
   };
 
+  // Reject a customer file with a reason: archived + emailed to the customer.
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejecting, setRejecting] = useState(false);
+  const [rejectedForSku, setRejectedForSku] = useState<any[]>([]);
+
+  const fetchRejectedForSku = async (sku: string | null) => {
+    if (!sku) { setRejectedForSku([]); return; }
+    const { data } = await supabase
+      .from('rejected_artwork_files')
+      .select('id, filename, rejection_reason, rejected_at')
+      .eq('sku', sku)
+      .not('rejection_reason', 'ilike', 'Archived%')
+      .order('rejected_at', { ascending: false })
+      .limit(10);
+    setRejectedForSku(data || []);
+  };
+
+  useEffect(() => {
+    void fetchRejectedForSku(selectedProduct?.item_id ?? null);
+  }, [selectedProduct?.item_id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleReject = async () => {
+    if (!selectedFile || !rejectReason.trim()) return;
+    setRejecting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error: insErr } = await supabase.from('rejected_artwork_files').insert({
+        original_artwork_id: selectedFile.id,
+        company_id: selectedFile.company_id,
+        sku: selectedFile.sku,
+        filename: selectedFile.filename,
+        artwork_url: selectedFile.artwork_url,
+        preview_url: selectedFile.preview_url,
+        notes: (selectedFile as any).notes ?? null,
+        rejection_reason: rejectReason.trim(),
+        artwork_type: 'customer',
+        rejected_by: user?.id ?? null,
+        original_created_at: selectedFile.created_at,
+      } as any);
+      if (insErr) throw insErr;
+      const { error: delErr } = await supabase.from('artwork_files').delete().eq('id', selectedFile.id);
+      if (delErr) throw delErr;
+      toast({ title: "Artwork rejected", description: "The customer has been emailed your note so they can resubmit." });
+      setRejectDialogOpen(false);
+      setRejectReason("");
+      setSelectedFile(null);
+      fetchArtworkForProduct();
+      fetchTemplates();
+      void fetchRejectedForSku(selectedProduct?.item_id ?? null);
+    } catch (e: any) {
+      toast({ title: "Error", description: e?.message || "Failed to reject artwork", variant: "destructive" });
+    } finally {
+      setRejecting(false);
+    }
+  };
+
+  // Deep link from email: open the product with this SKU.
+  const deepLinkedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!initialSku || deepLinkedRef.current === initialSku) return;
+    if (!isVibeAdmin && !userCompanyId) return;
+    deepLinkedRef.current = initialSku;
+    (async () => {
+      let q = supabase.from('products').select('id, name, item_id, template_id, company_id, image_url').eq('item_id', initialSku).limit(1);
+      if (!isVibeAdmin && userCompanyId) q = q.eq('company_id', userCompanyId);
+      const { data } = await q;
+      if (data?.[0]) openProduct(data[0] as any);
+    })();
+  }, [initialSku, isVibeAdmin, userCompanyId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleBack = () => {
     if (selectedProduct) {
       setSelectedProduct(null);
@@ -865,6 +940,22 @@ export function CustomerArtworkTab({
                     </Button>
                   </div>
 
+                  {isVibeAdmin && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-destructive hover:bg-destructive/10"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedFile(file);
+                        setRejectReason("");
+                        setRejectDialogOpen(true);
+                      }}
+                    >
+                      <XCircle className="h-4 w-4 mr-1" />
+                      Reject &amp; ask to resubmit
+                    </Button>
+                  )}
                   <Button 
                     variant="outline" 
                     size="sm"
@@ -883,6 +974,50 @@ export function CustomerArtworkTab({
             ))}
           </div>
         )}
+
+        {rejectedForSku.length > 0 && (
+          <Card className="p-4 border-destructive/30">
+            <h3 className="font-semibold text-sm mb-3 flex items-center gap-2 text-destructive">
+              <XCircle className="h-4 w-4" />
+              Rejected files — please resubmit
+            </h3>
+            <ul className="space-y-2">
+              {rejectedForSku.map((r) => (
+                <li key={r.id} className="text-sm border-t pt-2 first:border-t-0 first:pt-0">
+                  <div className="flex justify-between gap-2">
+                    <span className="font-medium truncate">{r.filename}</span>
+                    <span className="text-xs text-muted-foreground shrink-0">{new Date(r.rejected_at).toLocaleDateString()}</span>
+                  </div>
+                  <p className="whitespace-pre-wrap text-muted-foreground">{r.rejection_reason}</p>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+
+        <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Reject customer art</DialogTitle>
+              <DialogDescription>
+                {selectedFile?.filename} will be moved to the rejected archive and the customer will be emailed your note with a button to resubmit.
+              </DialogDescription>
+            </DialogHeader>
+            <Textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="Why is this file being rejected? (e.g. fonts not outlined, wrong dimensions)"
+              rows={4}
+            />
+            <div className="flex gap-2">
+              <Button variant="destructive" className="flex-1" onClick={handleReject} disabled={!rejectReason.trim() || rejecting}>
+                {rejecting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Reject &amp; email customer
+              </Button>
+              <Button variant="outline" className="flex-1" onClick={() => setRejectDialogOpen(false)}>Cancel</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Add Artwork Dialog - pre-filled with product, default to customer artwork */}
         <AddArtworkDialog
