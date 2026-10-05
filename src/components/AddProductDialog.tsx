@@ -510,7 +510,7 @@ export function AddProductDialog({ onProductAdded, selectedCompanyId }: AddProdu
             </div>
             <p className="text-xs text-muted-foreground">Max 5MB. JPEG, PNG, WebP, or GIF</p>
           </div>
-          <Button type="submit" disabled={loading} className="w-full">
+          <Button type="submit" disabled={loading || (brandRequired && !brandId)} className="w-full">
             {loading ? "Adding..." : "Add Product"}
           </Button>
         </form>
