@@ -1,0 +1,2 @@
+alter table public.companies add column if not exists artwork_contact_email text;
+comment on column public.companies.artwork_contact_email is 'Single customer contact who receives artwork notification emails.';

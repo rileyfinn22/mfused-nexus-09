@@ -274,15 +274,11 @@ async function artworkRejected(admin: ReturnType<typeof createClient>, alert: Al
     };
   }
 
-  // Rejected customer art: email the customer's portal users, with VibePKG staff copied.
+  // Rejected customer art: email the company's one artwork contact, VibePKG staff copied.
   const to = new Set<string>();
   if (companyId) {
-    const { data: roles } = await admin.from("user_roles").select("user_id, role").eq("company_id", companyId);
-    const ids = new Set((roles ?? []).filter((r: any) => ["company", "customer", "admin"].includes(r.role)).map((r: any) => r.user_id));
-    if (ids.size) {
-      const { data } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-      for (const u of data?.users ?? []) if (ids.has(u.id) && u.email && !u.email.endsWith("@vendor.local")) to.add(u.email.toLowerCase());
-    }
+    const { data: c } = await admin.from("companies").select("artwork_contact_email").eq("id", companyId).maybeSingle();
+    if (c?.artwork_contact_email) to.add(c.artwork_contact_email.trim().toLowerCase());
   }
   for (const e of to) staff.delete(e);
   const recipients = to.size ? [...to] : [...staff];
