@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { ProductCategoryField } from "@/components/ProductCategoryField";
 import { ProductBrandField } from "@/components/ProductBrandField";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,9 @@ export function AddProductToTemplateDialog({
   const [skuNames, setSkuNames] = useState("");
   const [brandId, setBrandId] = useState("");
   const [brandRequired, setBrandRequired] = useState(false);
+  const [category, setCategory] = useState("");
+  const [categoryRequired, setCategoryRequired] = useState(false);
+  const categoryTypeRef = useRef<(k: string) => string | null>(() => null);
 
   // Preset the brand from the folder; staff can pick one when the folder has none.
   useEffect(() => {
@@ -41,6 +45,8 @@ export function AddProductToTemplateDialog({
     void (async () => {
       const { data } = await supabase.from('product_templates').select('brand_id').eq('id', template.id).maybeSingle();
       setBrandId((data as any)?.brand_id || "");
+      const { data: sib } = await supabase.from('products').select('product_type').eq('template_id', template.id).not('product_type', 'is', null).limit(1);
+      setCategory(((sib as any)?.[0]?.product_type ? "__type:" + (sib as any)[0].product_type : ""));
     })();
   }, [open, template.id]);
 
@@ -123,6 +129,7 @@ export function AddProductToTemplateDialog({
             item_id: tempSKU,
             template_id: template.id,
             company_id: companyId,
+            product_type: categoryRequired ? categoryTypeRef.current(category) : undefined,
             brand_id: brandId || null
           } as any)
           .select()
@@ -180,6 +187,7 @@ export function AddProductToTemplateDialog({
             </p>
           </div>
 
+          <ProductCategoryField companyId={companyId} value={category} onChange={setCategory} onRequiredChange={(r, fn) => { setCategoryRequired(r); categoryTypeRef.current = fn; }} />
           <ProductBrandField companyId={companyId} value={brandId} onChange={setBrandId} onRequiredChange={setBrandRequired} />
 
           <div className="space-y-2">
@@ -213,7 +221,7 @@ export function AddProductToTemplateDialog({
             </p>
           </div>
 
-          <Button type="submit" disabled={loading || !companyId || (brandRequired && !brandId)} className="w-full">
+          <Button type="submit" disabled={loading || !companyId || (brandRequired && !brandId) || (categoryRequired && !category)} className="w-full">
             {loading ? "Adding..." : "Add Products"}
           </Button>
 

@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { ProductCategoryField } from "@/components/ProductCategoryField";
 import { ProductBrandField } from "@/components/ProductBrandField";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -47,6 +48,9 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
 
   const [brandId, setBrandId] = useState("");
   const [brandRequired, setBrandRequired] = useState(false);
+  const [category, setCategory] = useState("");
+  const [categoryRequired, setCategoryRequired] = useState(false);
+  const categoryTypeRef = useRef<(k: string) => string | null>(() => null);
 
   const selectedTemplate = templates.find(t => t.id === selectedTemplateId);
 
@@ -207,6 +211,7 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
             item_id: tempSKU,
             company_id: finalCompanyId,
             template_id: selectedTemplate?.id || null,
+            product_type: categoryRequired ? categoryTypeRef.current(category) : undefined,
             brand_id: brandId || selectedTemplate?.brand_id || null
           } as any)
           .select()
@@ -239,6 +244,7 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
       setSkuNames("");
       setSelectedTemplateId("");
       setBrandId("");
+      setCategory("");
       setManualState("");
       setManualPrice("");
       setManualCost("");
@@ -310,6 +316,7 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
             </Select>
           </div>
 
+          <ProductCategoryField companyId={companyId} value={category} onChange={setCategory} onRequiredChange={(r, fn) => { setCategoryRequired(r); categoryTypeRef.current = fn; }} />
           <ProductBrandField
             companyId={companyId}
             value={brandId}
@@ -407,7 +414,7 @@ export function QuickAddProductsDialog({ onProductsAdded, selectedCompanyId }: Q
 
           <Button 
             type="submit" 
-            disabled={loading || (isVibeAdmin && !companyId) || (!selectedTemplate && !manualState) || (brandRequired && !brandId)} 
+            disabled={loading || (isVibeAdmin && !companyId) || (!selectedTemplate && !manualState) || (brandRequired && !brandId) || (categoryRequired && !category)} 
             className="w-full"
           >
             {loading ? "Adding..." : "Add Products"}
