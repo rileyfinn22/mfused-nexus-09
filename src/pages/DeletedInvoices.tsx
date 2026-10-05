@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+import { BackButton } from "@/components/layout/BackButton";
+import { useListFilters } from "@/hooks/useListFilters";
 import { toast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -26,8 +28,11 @@ import {
 
 const DeletedInvoices = () => {
   const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [companyFilter, setCompanyFilter] = useState("all");
+  const { filters, set: setFilter } = useListFilters("deleted-invoices", { search: "", company: "all" });
+  const searchQuery = filters.search;
+  const setSearchQuery = (value: string) => setFilter("search", value);
+  const companyFilter = filters.company;
+  const setCompanyFilter = (value: string) => setFilter("company", value);
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [roleChecked, setRoleChecked] = useState(false);
   const [companies, setCompanies] = useState<any[]>([]);
@@ -169,13 +174,7 @@ const DeletedInvoices = () => {
       {/* Header */}
       <div className="border-b border-table-border pb-4">
         <div className="flex items-center gap-2 mb-2">
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => navigate('/invoices')}
-          >
-            ← Back to Invoices
-          </Button>
+          <BackButton to="/invoices" label="Back to Invoices" />
         </div>
         <h1 className="text-2xl font-semibold">Deleted Invoices Archive</h1>
         <p className="text-sm text-muted-foreground mt-1">

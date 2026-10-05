@@ -8,8 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ArrowLeft, Sparkles, Save, Loader2, Check, ChevronsUpDown, AlertTriangle } from "lucide-react";
+import { Sparkles, Save, Loader2, Check, ChevronsUpDown, AlertTriangle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { BackButton } from "@/components/layout/BackButton";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -160,7 +161,7 @@ export default function ArtworkReconcile() {
   return (
     <div className="container mx-auto py-6 space-y-4">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={() => navigate('/artwork')}><ArrowLeft className="h-4 w-4 mr-1" />Back</Button>
+        <BackButton to="/artwork" label="Back to Artwork" />
         <div>
           <h1 className="text-2xl font-bold">Reconcile Artwork SKUs</h1>
           <p className="text-sm text-muted-foreground">Re-map orphaned artwork files to the correct product SKU</p>

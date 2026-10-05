@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { BackButton, safeReturnTo } from "@/components/layout/BackButton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Download, Edit, Save, X, Plus, Send, DollarSign, Trash2, FileCheck, Paperclip, Upload, FileText, ExternalLink, Package, Banknote } from "lucide-react";
+import { Download, Edit, Save, X, Plus, Send, DollarSign, Trash2, FileCheck, Paperclip, Upload, FileText, ExternalLink, Package, Banknote } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { caseStickerMessage, type CaseStickerEntry } from "@/lib/vendorPo";
@@ -63,9 +64,9 @@ const VendorPODetail = () => {
   const { poId } = useParams();
   const navigate = useNavigate();
   
-  // Get returnTo parameter from URL to navigate back properly
+  // The Back button handles ?returnTo= itself; it's read here only to pick the page layout.
   const searchParams = new URLSearchParams(window.location.search);
-  const returnTo = searchParams.get('returnTo') || '/vendor-pos';
+  const returnTo = safeReturnTo(searchParams.get('returnTo')) || '/vendor-pos';
   const autoSend = searchParams.get('send') === 'true';
   const [po, setPO] = useState<any>(null);
   const [poItems, setPOItems] = useState<any[]>([]);
@@ -86,7 +87,7 @@ const VendorPODetail = () => {
 
   // Coming from Vendor Status, lead with exactly what the vendor sees; the
   // standard admin PO content follows below.
-  const vendorViewFirst = returnTo === '/vendor-status';
+  const vendorViewFirst = returnTo === '/vendor-status' || returnTo === '/production';
 
   useEffect(() => {
     checkAdminStatus();
@@ -692,10 +693,7 @@ Thank you for your business.`;
     <div className="max-w-7xl mx-auto">
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
-        <Button variant="ghost" size="sm" onClick={() => navigate(returnTo)}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          {returnTo.startsWith('/projects/') ? 'Back to Project' : 'Back'}
-        </Button>
+        <BackButton to="/vendor-pos" label="Back to Vendor POs" />
         <div className="flex gap-3">
           {isAdmin && (
             <>

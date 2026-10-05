@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { BackButton } from "@/components/layout/BackButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { getSignedArtworkUrl } from "@/lib/signedArtworkUrl";
 import { toast } from "sonner";
-import { ArrowLeft, FileImage, CheckCircle, Clock, Eye, Upload, Trash2 } from "lucide-react";
+import { FileImage, CheckCircle, Clock, Eye, Upload, Trash2 } from "lucide-react";
 import AddArtworkDialog from "@/components/AddArtworkDialog";
 import SignedImage from "@/components/SignedImage";
 
@@ -25,6 +26,8 @@ const EditProduct = () => {
   const [addArtworkOpen, setAddArtworkOpen] = useState(false);
   const [productCompanyId, setProductCompanyId] = useState<string | null>(null);
   const [productTemplateId, setProductTemplateId] = useState<string | null>(null);
+  // Back / Cancel / Save all return to the products list, reopened on this product's folder.
+  const productsListPath = productTemplateId ? `/products?template=${productTemplateId}` : "/products";
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
   const [originalItemId, setOriginalItemId] = useState<string>("");
   
@@ -262,11 +265,7 @@ const EditProduct = () => {
       }
 
       toast.success("Product updated successfully");
-      if (productTemplateId) {
-        navigate(`/products?template=${productTemplateId}`);
-      } else {
-        navigate('/products');
-      }
+      navigate(productsListPath, { replace: true });
     } catch (error) {
       console.error('Error updating product:', error);
       toast.error("Failed to update product");
@@ -283,14 +282,7 @@ const EditProduct = () => {
     <div className="space-y-6 max-w-4xl">
       {/* Header */}
       <div className="flex items-center gap-4 border-b border-table-border pb-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate(-1)}
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
-        </Button>
+        <BackButton to={productsListPath} label="Back to Products" replace />
         <div className="flex-1">
           <h1 className="text-2xl font-semibold">{isVibeAdmin ? "Edit Product" : "Product Details"}</h1>
           <p className="text-sm text-muted-foreground mt-1">{isVibeAdmin ? "Update product details and specifications" : "View product information"}</p>
@@ -620,7 +612,7 @@ const EditProduct = () => {
           <Button
             type="button"
             variant="outline"
-            onClick={() => productTemplateId ? navigate(`/products?template=${productTemplateId}`) : navigate('/products')}
+            onClick={() => navigate(productsListPath, { replace: true })}
           >
             {isVibeAdmin ? "Cancel" : "Back"}
           </Button>

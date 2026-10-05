@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useListFilters } from "@/hooks/useListFilters";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +32,10 @@ const Projects = () => {
   const navigate = useNavigate();
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
+  // Search survives opening a project and coming back.
+  const { filters, set: setFilter } = useListFilters("projects", { search: "" });
+  const searchTerm = filters.search;
+  const setSearchTerm = (value: string) => setFilter("search", value);
   const [isVibeAdmin, setIsVibeAdmin] = useState<boolean | null>(null);
 
   useEffect(() => {

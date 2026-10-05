@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { BackButton } from "@/components/layout/BackButton";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, ArrowLeft, Upload, Plus, CalendarClock, FileText, Package, Truck, CheckCircle2, AlertCircle, StickyNote, MessageSquare, Send, ChevronDown, ChevronRight, ClipboardList } from "lucide-react";
+import { Loader2, Upload, Plus, CalendarClock, FileText, Package, Truck, CheckCircle2, AlertCircle, StickyNote, MessageSquare, Send, ChevronDown, ChevronRight, ClipboardList } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "@/hooks/use-toast";
@@ -1291,10 +1292,7 @@ export default function ProductionDetail() {
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={() => navigate(`/production${companyFilter ? `?company=${companyFilter}` : ''}`)}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Production
-        </Button>
+        <BackButton to="/production" label="Back to Production" />
       </div>
 
       <div className="border border-border rounded-xl p-5 bg-card space-y-4">

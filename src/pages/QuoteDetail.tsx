@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { BackButton } from "@/components/layout/BackButton";
 import { supabase } from "@/integrations/supabase/client";
 import { downloadStorageObject, normalizeStorageObjectPath } from "@/lib/storageUrl";
 import { Button } from "@/components/ui/button";
@@ -26,7 +27,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  ArrowLeft,
   Send,
   CheckCircle,
   XCircle,
@@ -691,9 +691,7 @@ const QuoteDetail = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/quotes')}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
+          <BackButton to="/quotes" label="Back to Quotes" />
           <div>
             <div className="flex items-center gap-3">
               <h1 className="page-title">{quote.quote_number}</h1>

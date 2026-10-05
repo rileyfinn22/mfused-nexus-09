@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { BackButton } from "@/components/layout/BackButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { 
   Search, 
-  ArrowLeft,
   FileImage,
   XCircle,
   Download,
@@ -87,14 +87,7 @@ const RejectedArchive = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex items-center gap-4">
-          <Button 
-            variant="ghost" 
-            size="sm"
-            onClick={() => navigate('/artwork')}
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Artwork
-          </Button>
+          <BackButton to="/artwork" label="Back to Artwork" />
           <div>
             <h1 className="text-3xl font-bold flex items-center gap-2">
               <XCircle className="h-8 w-8 text-destructive" />

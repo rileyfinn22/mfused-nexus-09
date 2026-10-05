@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useListFilters } from "@/hooks/useListFilters";
 import SignedImage from "@/components/SignedImage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -78,10 +79,21 @@ const Inventory = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { activeCompanyId, isVibeAdmin } = useActiveCompany();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [stateFilter, setStateFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [companyFilter, setCompanyFilter] = useState("all");
+  // Filters survive leaving the page and coming back.
+  const { filters, set: setFilter } = useListFilters("inventory", {
+    search: "",
+    state: "all",
+    status: "all",
+    company: "all",
+  });
+  const searchQuery = filters.search;
+  const setSearchQuery = (value: string) => setFilter("search", value);
+  const stateFilter = filters.state;
+  const setStateFilter = (value: string) => setFilter("state", value);
+  const statusFilter = filters.status;
+  const setStatusFilter = (value: string) => setFilter("status", value);
+  const companyFilter = filters.company;
+  const setCompanyFilter = (value: string) => setFilter("company", value);
   const [sortField, setSortField] = useState("available");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [artworkStatus, setArtworkStatus] = useState<Record<string, boolean>>({});

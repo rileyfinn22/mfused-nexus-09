@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Loader2, Sparkles, Upload, FileSpreadsheet, FileText, Trash2, Package } from "lucide-react";
+import { BackButton } from "@/components/layout/BackButton";
+import { Loader2, Sparkles, Upload, FileSpreadsheet, FileText, Trash2, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -278,9 +279,7 @@ const InvoiceShippedEdit = () => {
     <div className="container mx-auto p-6 space-y-6 max-w-6xl">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => navigate(`/invoices/${invoiceId}`, { replace: true })}>
-            <ArrowLeft className="h-4 w-4 mr-1.5" /> Back to Invoice
-          </Button>
+          <BackButton to={`/invoices/${invoiceId}`} label="Back to Invoice" replace />
           <div>
             <h1 className="text-2xl font-semibold flex items-center gap-2">
               <Package className="h-5 w-5" /> Edit Shipped Quantities

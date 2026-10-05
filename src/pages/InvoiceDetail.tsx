@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { pdfItemDescription } from "@/lib/pdfItemText";
 import { useParams, useNavigate, Link } from "react-router-dom";
+import { BackButton } from "@/components/layout/BackButton";
 import { ShippingVendorPoSelect } from "@/components/ShippingVendorPoSelect";
 import { toVendorPoOption, type VendorPoOption } from "@/lib/vendorPo";
 import { CreateShippingPoDialog } from "@/components/CreateShippingPoDialog";
@@ -12,7 +13,7 @@ import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { ArrowLeft, Download, FileText, Edit, Trash2, RefreshCw, Copy, ExternalLink, CheckCircle2, DollarSign, CalendarIcon, Mail, RotateCcw, ChevronDown, Check, Unlink, Bell, Loader2, AlertCircle, Package, ChevronsUpDown, FileSpreadsheet, Sparkles, Plus, X } from "lucide-react";
+import { Download, FileText, Edit, Trash2, RefreshCw, Copy, ExternalLink, CheckCircle2, DollarSign, CalendarIcon, Mail, RotateCcw, ChevronDown, Check, Unlink, Bell, Loader2, AlertCircle, Package, ChevronsUpDown, FileSpreadsheet, Sparkles, Plus, X } from "lucide-react";
 
 import { format } from "date-fns";
 import { formatDocDate, cn, formatCurrency, formatUnitPrice } from "@/lib/utils";
@@ -1679,17 +1680,7 @@ const InvoiceDetail = () => {
   return <div className="max-w-7xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <Button variant="ghost" size="sm" onClick={() => {
-           // Always a fixed destination, never history-relative: after "Edit Shipped" or a
-           // sibling-invoice hop, history(-1) would land on the wrong page. The invoices list
-           // remembers its own filters, so a bare /invoices restores where the user was.
-           const params = new URLSearchParams(window.location.search);
-           const returnTo = params.get('returnTo');
-           navigate(returnTo || '/invoices');
-         }}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          {new URLSearchParams(window.location.search).get('returnTo') ? 'Back to Project' : 'Back to Invoices'}
-        </Button>
+        <BackButton to="/invoices" label="Back to Invoices" />
         <div className="flex flex-wrap gap-2">
           {isVibeAdmin && <>
               {isEditMode ? <>

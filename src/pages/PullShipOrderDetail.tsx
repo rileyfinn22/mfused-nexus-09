@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { BackButton } from "@/components/layout/BackButton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Download, Package, CheckCircle2, Circle, Truck, FileText, Send, AlertTriangle, Trash2 } from "lucide-react";
+import { Download, Package, CheckCircle2, Circle, Truck, FileText, Send, AlertTriangle, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import jsPDF from "jspdf";
@@ -727,10 +728,7 @@ const PullShipOrderDetail = () => {
     <div className="max-w-7xl mx-auto">
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/pull-ship-orders")}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Pull & Ship Orders
-        </Button>
+        <BackButton to="/pull-ship-orders" label="Back to Pull & Ship Orders" />
         <div className="flex gap-3">
           {isAdmin && (
             <Button variant="destructive" size="sm" onClick={() => setShowDeleteDialog(true)}>

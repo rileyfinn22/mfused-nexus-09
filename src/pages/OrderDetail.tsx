@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { BackButton } from "@/components/layout/BackButton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ArrowLeft, Download, Plus, Upload, FileText, Package, CheckCircle2, Circle, Truck, Edit, AlertCircle, X, Loader2, Paperclip, Trash2, Lock, Sparkles, ChevronsUpDown, Check, Image, ExternalLink, Mail } from "lucide-react";
+import { Download, Plus, Upload, FileText, Package, CheckCircle2, Circle, Truck, Edit, AlertCircle, X, Loader2, Paperclip, Trash2, Lock, Sparkles, ChevronsUpDown, Check, Image, ExternalLink, Mail } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { VendorAssignmentDialog } from "@/components/VendorAssignmentDialog";
@@ -1830,10 +1831,7 @@ const OrderDetail = () => {
       
       {/* Header with Back Button and Action Buttons */}
       <div className="mb-6 flex items-center justify-between">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/orders")}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Orders
-        </Button>
+        <BackButton to="/orders" label="Back to Orders" />
         <div className="flex gap-3">
           {/* Edit button logic:
               - Vibe admins can edit pending/in production orders

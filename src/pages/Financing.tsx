@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { toast } from "@/hooks/use-toast";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useListFilters } from "@/hooks/useListFilters";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -106,10 +107,16 @@ export default function Financing() {
   const [acceptOpen, setAcceptOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [preselectedVendorPO, setPreselectedVendorPO] = useState<{ id: string; po_number: string; total: number; description: string | null } | null>(null);
-  const [activeTab, setActiveTab] = useState("active");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  // Tab, search and date range survive opening a record and coming back.
+  const { filters, set: setFilter } = useListFilters("financing", { tab: "active", search: "", from: "", to: "" });
+  const activeTab = filters.tab;
+  const setActiveTab = (value: string) => setFilter("tab", value);
+  const searchQuery = filters.search;
+  const setSearchQuery = (value: string) => setFilter("search", value);
+  const dateFrom = filters.from;
+  const setDateFrom = (value: string) => setFilter("from", value);
+  const dateTo = filters.to;
+  const setDateTo = (value: string) => setFilter("to", value);
   const [pendingConfirmations, setPendingConfirmations] = useState(0);
 
   const { lang, toggleLang, t } = useFinanceLang();

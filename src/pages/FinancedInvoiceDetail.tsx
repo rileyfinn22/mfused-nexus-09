@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { BackButton } from "@/components/layout/BackButton";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
-import { ArrowLeft, Save, Upload, Trash2, ExternalLink, FileText, Pencil, X, History, CheckCircle2, AlertTriangle, Clock, Link2, Search } from "lucide-react";
+import { Save, Upload, Trash2, ExternalLink, FileText, Pencil, X, History, CheckCircle2, AlertTriangle, Clock, Link2, Search } from "lucide-react";
 import { calculateFinanceFee, getAgingColor, formatUSD } from "@/lib/financeUtils";
 import { AcceptFinanceRequestDialog } from "@/components/AcceptFinanceRequestDialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -306,9 +307,7 @@ export default function FinancedInvoiceDetail() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/financing")}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
+        <BackButton to="/financing" label="Back to Financing" />
         <div>
           <h1 className="text-xl font-bold">
             {isFinanceUser

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useListFilters } from "@/hooks/useListFilters";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -58,7 +59,10 @@ const Customers = () => {
   const { activeCompanyId, isVibeAdmin } = useActiveCompany();
   const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
+  // Search survives opening a customer and coming back.
+  const { filters, set: setFilter } = useListFilters("customers", { search: "" });
+  const searchQuery = filters.search;
+  const setSearchQuery = (value: string) => setFilter("search", value);
   const [showRepsDialog, setShowRepsDialog] = useState(false);
   const [showDialog, setShowDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);

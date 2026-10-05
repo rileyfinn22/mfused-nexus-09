@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { BackButton } from "@/components/layout/BackButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,7 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Plus, Minus, X, Save, Send, Search, Upload, FileText, Loader2, Check, ChevronsUpDown, Sparkles, Paperclip, Clock, RefreshCw, GripVertical } from "lucide-react";
+import { Plus, Minus, X, Save, Send, Search, Upload, FileText, Loader2, Check, ChevronsUpDown, Sparkles, Paperclip, Clock, RefreshCw, GripVertical } from "lucide-react";
 import { SalesRepSelect } from "@/components/SalesRepSelect";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -1420,7 +1421,7 @@ const CreateOrder = () => {
           description: "This order has been approved for production and cannot be edited",
           variant: "destructive",
         });
-        navigate('/orders');
+        navigate('/orders', { replace: true });
         return;
       }
 
@@ -2011,7 +2012,8 @@ const CreateOrder = () => {
           title: "Order Submitted",
           description: "It's pending review — VibePKG will confirm pricing and timing.",
         });
-        navigate(`/orders/${newOrderId}`);
+        // Replace: the editor shouldn't sit behind the order in browser history.
+        navigate(`/orders/${newOrderId}`, { replace: true });
         return;
       }
 
@@ -2308,7 +2310,7 @@ const CreateOrder = () => {
         description: `Order ${orderNumber} has been ${actionText} successfully`,
       });
 
-      navigate(`/orders/${order.id}`);
+      navigate(`/orders/${order.id}`, { replace: true });
     } catch (error: any) {
       console.error("Error saving order:", error);
       toast({
@@ -2358,10 +2360,7 @@ const CreateOrder = () => {
       <div className="mb-6 sticky top-0 bg-background z-10 pb-4 border-b border-table-border">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={() => navigate("/orders")}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
+            <BackButton to="/orders" label="Back to Orders" replace />
             <div>
               <h1 className="text-2xl font-semibold">{orderId ? 'Edit Draft Order' : 'Create New Order'}</h1>
               <div className="flex items-center gap-2">

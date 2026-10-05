@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useListFilters } from "@/hooks/useListFilters";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,9 +55,14 @@ const Quotes = () => {
   const { activeCompanyId, isVibeAdmin } = useActiveCompany();
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [companyFilter, setCompanyFilter] = useState("all");
+  // Filters survive opening a quote and coming back.
+  const { filters, set: setFilter } = useListFilters("quotes", { search: "", status: "all", company: "all" });
+  const searchQuery = filters.search;
+  const setSearchQuery = (value: string) => setFilter("search", value);
+  const statusFilter = filters.status;
+  const setStatusFilter = (value: string) => setFilter("status", value);
+  const companyFilter = filters.company;
+  const setCompanyFilter = (value: string) => setFilter("company", value);
   const [companies, setCompanies] = useState<Company[]>([]);
 
   // Redirect non-admin users away from quotes

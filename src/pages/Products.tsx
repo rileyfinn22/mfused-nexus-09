@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useListFilters } from "@/hooks/useListFilters";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -107,8 +108,12 @@ const Products = () => {
   const { toast } = useToast();
   const { activeCompanyId, isVibeAdmin } = useActiveCompany();
   const [expandedProducts, setExpandedProducts] = useState<string[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [companyFilter, setCompanyFilter] = useState("all");
+  // Search and company survive opening a product and coming back.
+  const { filters, set: setFilter } = useListFilters("products", { search: "", company: "all" });
+  const searchQuery = filters.search;
+  const setSearchQuery = (value: string) => setFilter("search", value);
+  const companyFilter = filters.company;
+  const setCompanyFilter = (value: string) => setFilter("company", value);
   const [artworkStatus, setArtworkStatus] = useState<Record<string, boolean>>({});
   const [artworkThumbnails, setArtworkThumbnails] = useState<Record<string, string>>({});
   const [products, setProducts] = useState<Product[]>([]);

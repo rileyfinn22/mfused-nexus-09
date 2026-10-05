@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { BackButton } from "@/components/layout/BackButton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +9,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { 
-  ArrowLeft, 
   FileText, 
   Receipt, 
   Package, 
@@ -296,9 +296,7 @@ const ProjectDetail = () => {
     <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/projects')}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
+        <BackButton to="/projects" label="Back to Projects" />
         <div className="flex-1">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold">Project: {order.order_number}</h1>

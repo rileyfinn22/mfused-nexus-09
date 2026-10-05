@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { BackButton } from "@/components/layout/BackButton";
 import { SalesRepSelect } from "@/components/SalesRepSelect";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -31,7 +32,6 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import {
-  ArrowLeft,
   Plus,
   Trash2,
   Loader2,
@@ -962,7 +962,8 @@ const CreateQuote = () => {
         description: isEditing ? "Quote updated" : "Quote created",
       });
 
-      navigate(`/quotes/${savedQuoteId}`);
+      // Replace: the editor shouldn't sit behind the quote in browser history.
+      navigate(`/quotes/${savedQuoteId}`, { replace: true });
     } catch (error: any) {
       toast({
         title: "Error",
@@ -993,9 +994,7 @@ const CreateQuote = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/quotes')}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
+        <BackButton to="/quotes" label="Back to Quotes" replace />
         <div>
           <h1 className="page-title">
             {isEditing ? "Edit Quote" : (isResponding ? "Create Quote for Customer" : (isVibeAdmin ? "Create Quote" : "Request Quote"))}

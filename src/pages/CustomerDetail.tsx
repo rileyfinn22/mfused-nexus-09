@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { SalesRepSelect } from "@/components/SalesRepSelect";
 import { useParams, useNavigate } from "react-router-dom";
+import { BackButton } from "@/components/layout/BackButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Save, Plus, Trash2, Package, Users, Building2, Mail, Phone, MapPin, Upload, FileSpreadsheet, AlertCircle, Loader2, Edit, FileImage, CheckCircle, Clock, Eye, Search, LayoutGrid, List, Layers, Copy, Receipt, UserCircle } from "lucide-react";
+import { Save, Plus, Trash2, Package, Users, Building2, Mail, Phone, MapPin, Upload, FileSpreadsheet, AlertCircle, Loader2, Edit, FileImage, CheckCircle, Clock, Eye, Search, LayoutGrid, List, Layers, Copy, Receipt, UserCircle } from "lucide-react";
 import { CustomerStatementTab } from "@/components/CustomerStatementTab";
 import { AssignTemplateDropdown } from "@/components/AssignTemplateDropdown";
 import { CompanyEmailsManager } from "@/components/CompanyEmailsManager";
@@ -1028,10 +1029,7 @@ const CustomerDetail = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={() => navigate("/customers")}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Customers
-          </Button>
+          <BackButton to="/customers" label="Back to Customers" />
           <div>
             <h1 className="text-3xl font-bold">{customer.name}</h1>
             <p className="text-muted-foreground mt-1">Manage company information, contacts, and products</p>
