@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { BackButton } from "@/components/layout/BackButton";
+import { useCompanyScope } from "@/contexts/CompanyScopeContext";
 import { SalesRepSelect } from "@/components/SalesRepSelect";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -173,6 +174,14 @@ const CreateQuote = () => {
       fetchProducts(companyId);
     }
   }, [companyId]);
+
+  // The header's master company filter presets the company on a new quote (still changeable).
+  const { scopeCompanyId } = useCompanyScope();
+  useEffect(() => {
+    if (isVibeAdmin && !isEditing && !isResponding && !companyId && scopeCompanyId) {
+      setCompanyId(scopeCompanyId);
+    }
+  }, [isVibeAdmin, isEditing, isResponding, scopeCompanyId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const initializeForm = async () => {
     setLoading(true);

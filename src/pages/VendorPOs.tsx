@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, Fragment } from "react";
 import { useNavigate } from "react-router-dom";
 import { useListFilters } from "@/hooks/useListFilters";
+import { useCompanyScope } from "@/contexts/CompanyScopeContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -38,7 +39,16 @@ import { formatDocDate } from "@/lib/utils";
 
 const VendorPOs = () => {
   const navigate = useNavigate();
-  const [pos, setPOs] = useState<any[]>([]);
+  const [allPos, setPOs] = useState<any[]>([]);
+  // The header's master company filter narrows to that customer's POs (linked directly or via the order).
+  const { scopeCompanyId } = useCompanyScope();
+  const pos = useMemo(
+    () =>
+      scopeCompanyId
+        ? allPos.filter((po) => po.customer_company_id === scopeCompanyId || po.orders?.company_id === scopeCompanyId)
+        : allPos,
+    [allPos, scopeCompanyId]
+  );
   // Filters and the active tab survive opening a PO and coming back; vendor is also in the URL (?vendor=).
   const { filters, set: setFilter } = useListFilters(
     "vendor-pos",
@@ -100,7 +110,7 @@ const VendorPOs = () => {
     setLoading(true);
     const { data, error } = await (supabase as any)
       .from('vendor_pos')
-      .select('*, vendors(id, name), orders(order_number, description), customer_company:companies!vendor_pos_customer_company_id_fkey(name)')
+      .select('*, vendors(id, name), orders(order_number, description, company_id), customer_company:companies!vendor_pos_customer_company_id_fkey(name)')
       .order('created_at', { ascending: false });
     
     if (!error && data) {

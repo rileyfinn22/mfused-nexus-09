@@ -21,6 +21,7 @@ import { toast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
+import { useCompanyScope } from "@/contexts/CompanyScopeContext";
 import { useBrandFilter } from "@/hooks/useBrandFilter";
 import { BrandSelect } from "@/components/BrandSelect";
 import { GroupedProductPicker, type PickedItem } from "@/components/GroupedProductPicker";
@@ -276,6 +277,18 @@ const CreateOrder = () => {
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
   const [salesRep, setSalesRep] = useState<string>("");
   const [productTemplates, setProductTemplates] = useState<ProductTemplateOption[]>([]);
+
+  // The header's master company filter presets the company on a new order (still changeable).
+  // A preset alone must not spawn an auto-saved draft: auto-save waits for items unless the
+  // admin picked the company themselves.
+  const { scopeCompanyId } = useCompanyScope();
+  const companyPresetRef = useRef(false);
+  useEffect(() => {
+    if (isVibeAdmin && !orderId && !selectedCompanyId && scopeCompanyId) {
+      companyPresetRef.current = true;
+      setSelectedCompanyId(scopeCompanyId);
+    }
+  }, [isVibeAdmin, orderId, scopeCompanyId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Brand filter in the item picker follows the one chosen on Products (persisted per company).
   const brandCompanyId = isVibeAdmin ? (selectedCompanyId || null) : (activeCompanyId || null);
@@ -632,6 +645,8 @@ const CreateOrder = () => {
     const hasAddress = formData.shippingStreet.trim() !== '';
     
     if (!hasItems && !hasAddress) return;
+    // Addresses auto-filled from a scope-preset company aren't user input yet.
+    if (!hasItems && companyPresetRef.current) return;
     if (loading || isAutoSaving) return;
     
     setIsAutoSaving(true);
@@ -2417,7 +2432,14 @@ const CreateOrder = () => {
             <Label htmlFor="company" className="text-xs font-semibold uppercase text-muted-foreground">
               Select Company *
             </Label>
-            <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId} disabled={!!orderId}>
+            <Select
+              value={selectedCompanyId}
+              onValueChange={(value) => {
+                companyPresetRef.current = false;
+                setSelectedCompanyId(value);
+              }}
+              disabled={!!orderId}
+            >
               <SelectTrigger className="w-full mt-2">
                 <SelectValue placeholder="Choose a company..." />
               </SelectTrigger>

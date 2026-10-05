@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useListFilters } from "@/hooks/useListFilters";
+import { useCompanyScope } from "@/contexts/CompanyScopeContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -167,11 +168,14 @@ const Projects = () => {
     }
   };
 
-  const filteredProjects = projects.filter(project => 
+  // The header's master company filter narrows the list to that company's projects.
+  const { scopeCompanyId } = useCompanyScope();
+  const filteredProjects = projects.filter(project =>
+    (!scopeCompanyId || project.company_id === scopeCompanyId) && (
     project.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
     project.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     project.company_name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ));
 
   const totals = filteredProjects.reduce((acc, project) => ({
     revenue: acc.revenue + project.total_revenue,
