@@ -212,6 +212,10 @@ const AddArtworkDialog = ({
             artworkType: job.artworkType,
             notes: job.notes,
             previewFile: job.files.length === 1 ? job.previewFile : null,
+            onProgress: (pct) => {
+              const which = job.files.length > 1 ? ` (${done + 1} of ${job.files.length})` : '';
+              toast.loading(`Uploading ${file.name}${which}... ${pct}%`, { id: toastId });
+            },
           });
           done++;
           onSuccess?.();

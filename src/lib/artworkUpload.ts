@@ -1,4 +1,47 @@
 import { supabase } from "@/integrations/supabase/client";
+import * as tus from "tus-js-client";
+
+const BIG_FILE = 6 * 1024 * 1024;
+
+/**
+ * Large files go up in 6 MB resumable chunks straight to the storage host: a dropped
+ * connection resumes instead of restarting, and progress can be shown. Small files use
+ * the normal single request.
+ */
+async function putArtwork(path: string, file: File, onProgress?: (pct: number) => void) {
+  if (file.size < BIG_FILE) {
+    const { error } = await supabase.storage.from("artwork").upload(path, file);
+    if (error) throw error;
+    onProgress?.(100);
+    return;
+  }
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error("Please log in to upload artwork.");
+  const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+  await new Promise<void>((resolve, reject) => {
+    const upload = new tus.Upload(file, {
+      endpoint: `https://${projectId}.storage.supabase.co/storage/v1/upload/resumable`,
+      retryDelays: [0, 1000, 3000, 5000, 10000],
+      headers: { authorization: `Bearer ${session.access_token}`, "x-upsert": "false" },
+      uploadDataDuringCreation: true,
+      removeFingerprintOnSuccess: true,
+      chunkSize: BIG_FILE,
+      metadata: {
+        bucketName: "artwork",
+        objectName: path,
+        contentType: file.type || "application/octet-stream",
+        cacheControl: "3600",
+      },
+      onError: reject,
+      onProgress: (sent, total) => onProgress?.(Math.round((sent / total) * 100)),
+      onSuccess: () => resolve(),
+    });
+    upload.findPreviousUploads().then((prev) => {
+      if (prev.length) upload.resumeFromPreviousUpload(prev[0]);
+      upload.start();
+    });
+  });
+}
 import {
   buildManualArtworkPreviewPath,
   createFlatArtworkPreviewFromArtwork,
@@ -16,6 +59,8 @@ export interface UploadArtworkArgs {
   notes?: string;
   /** Optional hand-made preview image; a flat preview is generated for PDFs when absent. */
   previewFile?: File | null;
+  /** Upload progress 0–100 for the main file. */
+  onProgress?: (pct: number) => void;
 }
 
 /**
@@ -59,8 +104,7 @@ async function uploadArtworkFileInner(args: UploadArtworkArgs): Promise<void> {
   const fileExt = file.name.split(".").pop();
   const fileName = `${sku}/${Date.now()}.${fileExt}`;
 
-  const { error: uploadError } = await supabase.storage.from("artwork").upload(fileName, file);
-  if (uploadError) throw uploadError;
+  await putArtwork(fileName, file, args.onProgress);
 
   const { data: { publicUrl: artworkUrl } } = supabase.storage.from("artwork").getPublicUrl(fileName);
 
