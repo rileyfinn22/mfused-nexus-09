@@ -27,7 +27,28 @@ export interface UploadArtworkArgs {
  *
  * Throws on failure; callers own the toast.
  */
+// Uploads keep running while you move around the portal; only closing or refreshing the
+// tab stops them. While any are in flight, the browser asks before leaving.
+let pendingUploads = 0;
+const warnBeforeLeave = (e: BeforeUnloadEvent) => {
+  e.preventDefault();
+  e.returnValue = "Artwork is still uploading. Leaving now will cancel it.";
+  return e.returnValue;
+};
+export const artworkUploadsInProgress = () => pendingUploads > 0;
+
 export async function uploadArtworkFile(args: UploadArtworkArgs): Promise<void> {
+  if (pendingUploads++ === 0) window.addEventListener("beforeunload", warnBeforeLeave);
+  (window as any).__artworkUploads = pendingUploads;
+  try {
+    await uploadArtworkFileInner(args);
+  } finally {
+    if (--pendingUploads === 0) window.removeEventListener("beforeunload", warnBeforeLeave);
+    (window as any).__artworkUploads = pendingUploads;
+  }
+}
+
+async function uploadArtworkFileInner(args: UploadArtworkArgs): Promise<void> {
   const { file, companyId, artworkType, notes, previewFile } = args;
   const sku = args.sku.trim();
   if (!sku) throw new Error("This product has no SKU, so artwork cannot be attached to it.");
