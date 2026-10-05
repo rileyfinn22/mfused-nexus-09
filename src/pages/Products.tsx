@@ -152,7 +152,8 @@ const Products = () => {
   const [customerQuickAddOpen, setCustomerQuickAddOpen] = useState(false);
   // Top-level "Add products": brand + category -> folder (created or reused) -> SKUs.
   const [customerFolderOpen, setCustomerFolderOpen] = useState(false);
-  const canCustomerAddProduct = !isVibeAdmin && !!kindConfig && !!brandCompanyId;
+  // Brand → category → folder flow: customers and VibePKG staff both use it for companies set up with categories (e.g. Nutrastrips).
+  const canCustomerAddProduct = !!kindConfig && !!brandCompanyId;
 
   // A folder's kind: its own product_type, else the most common type of what it holds.
   const templateProductType = (template: ProductTemplate): string | null => {
