@@ -35,7 +35,7 @@ type AlertRow = {
   status: string;
 };
 
-type Message = { subject: string; html: string; to?: string[] };
+type Message = { subject: string; html: string; to?: string[]; cc?: string[] };
 
 const money = (n: unknown) =>
   `$${Number(n ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -217,7 +217,7 @@ async function artworkUploaded(admin: ReturnType<typeof createClient>, alert: Al
 async function artworkRejected(admin: ReturnType<typeof createClient>, alert: AlertRow): Promise<Message> {
   const { data: rej, error } = await admin
     .from("rejected_artwork_files")
-    .select("id, sku, filename, rejection_reason, company_id, rejected_at, artwork_type")
+    .select("id, sku, filename, rejection_reason, company_id, rejected_at, artwork_type, rejected_by")
     .eq("id", alert.record_id)
     .maybeSingle();
   if (error) throw new Error(`rejected_artwork_files: ${error.message}`);
@@ -232,7 +232,49 @@ async function artworkRejected(admin: ReturnType<typeof createClient>, alert: Al
     productName = product?.name ?? null;
   }
 
-  // Recipients: the customer's own portal users (never VibePKG staff-only addresses).
+  // VibePKG staff on every rejection: Carrie, Taz and the company's salesperson.
+  const staff = new Set(["carrie@vibepkg.com", "taz@vibepkg.com"]);
+  if (companyId) {
+    const { data: c } = await admin.from("companies").select("sales_rep_email").eq("id", companyId).maybeSingle();
+    if (c?.sales_rep_email) staff.add(c.sales_rep_email.toLowerCase());
+  }
+
+  let rejectedBy = "";
+  if (rej.rejected_by) {
+    const { data } = await admin.auth.admin.getUserById(rej.rejected_by);
+    rejectedBy = (data?.user?.user_metadata?.full_name as string) || data?.user?.email || "";
+  }
+
+  const isProof = rej.artwork_type === "vibe_proof";
+  const url = `${PORTAL_URL}/artwork?tab=${isProof ? "proofs" : "customer"}&sku=${encodeURIComponent(rej.sku)}`;
+  const baseRows = [
+    { label: "Customer", value: escapeHtml(company), emphasis: true },
+    ...(productName ? [{ label: "Product", value: escapeHtml(productName) }] : []),
+    { label: "SKU", value: escapeHtml(rej.sku), mono: true },
+    { label: "File", value: escapeHtml(rej.filename || "(unnamed file)") },
+    { label: "Reason", value: escapeHtml(rej.rejection_reason || ""), danger: true },
+    ...(rejectedBy ? [{ label: "Rejected by", value: escapeHtml(rejectedBy) }] : []),
+    { label: "When", value: escapeHtml(when(rej.rejected_at)) },
+  ];
+
+  // A rejected Vibe proof came from the customer: tell VibePKG staff only.
+  if (isProof) {
+    return {
+      subject: `Proof rejected by ${company}: ${productName || rej.sku}`,
+      html: renderEmail({
+        documentLabel: "PROOF REJECTED",
+        heading: `${company} rejected the proof for ${productName || rej.sku}`,
+        bodyHtml:
+          paragraph("The customer rejected this proof. Review their note and upload a revised proof.") +
+          detailCard(baseRows) +
+          buttons([{ label: "Open proofs", url }]),
+        noReply: true,
+      }),
+      to: [...staff],
+    };
+  }
+
+  // Rejected customer art: email the customer's portal users, with VibePKG staff copied.
   const to = new Set<string>();
   if (companyId) {
     const { data: roles } = await admin.from("user_roles").select("user_id, role").eq("company_id", companyId);
@@ -242,9 +284,9 @@ async function artworkRejected(admin: ReturnType<typeof createClient>, alert: Al
       for (const u of data?.users ?? []) if (ids.has(u.id) && u.email && !u.email.endsWith("@vendor.local")) to.add(u.email.toLowerCase());
     }
   }
+  for (const e of to) staff.delete(e);
+  const recipients = to.size ? [...to] : [...staff];
 
-  const tab = rej.artwork_type === "vibe_proof" ? "proofs" : "customer";
-  const url = `${PORTAL_URL}/artwork?tab=${tab}&sku=${encodeURIComponent(rej.sku)}`;
   return {
     subject: `Artwork needs changes: ${productName || rej.sku}`,
     html: renderEmail({
@@ -252,17 +294,12 @@ async function artworkRejected(admin: ReturnType<typeof createClient>, alert: Al
       heading: `Please resubmit artwork for ${productName || rej.sku}`,
       bodyHtml:
         paragraph(`VibePKG reviewed the artwork ${escapeHtml(company)} submitted and it needs changes before we can proof it. The file has been moved to your rejected archive.`) +
-        detailCard([
-          ...(productName ? [{ label: "Product", value: escapeHtml(productName), emphasis: true }] : []),
-          { label: "SKU", value: escapeHtml(rej.sku), mono: true },
-          { label: "File", value: escapeHtml(rej.filename || "(unnamed file)") },
-          { label: "Reason", value: escapeHtml(rej.rejection_reason || ""), danger: true },
-          { label: "Returned", value: escapeHtml(when(rej.rejected_at)) },
-        ]) +
+        detailCard(baseRows.filter((r) => r.label !== "Rejected by")) +
         buttons([{ label: "Upload new artwork", url }]),
       noReply: true,
     }),
-    to: [...to],
+    to: recipients,
+    cc: to.size ? [...staff] : undefined,
   };
 }
 
@@ -450,12 +487,12 @@ Deno.serve(async (req) => {
     }
 
     const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
-    const sent = await resend.emails.send({ from: FROM, to: recipients, subject: message.subject, html: message.html });
+    const sent = await resend.emails.send({ from: FROM, to: recipients, ...(message.cc?.length ? { cc: message.cc } : {}), subject: message.subject, html: message.html });
     if (sent.error) throw new Error(`Resend: ${JSON.stringify(sent.error)}`);
 
     await admin
       .from("internal_alert_log")
-      .update({ status: "sent", recipients, sent_at: new Date().toISOString(), error: null })
+      .update({ status: "sent", recipients: [...recipients, ...(message.cc ?? [])], sent_at: new Date().toISOString(), error: null })
       .eq("id", alert.id);
 
     return json({ success: true, recipients: recipients.length, messageId: sent.data?.id });
