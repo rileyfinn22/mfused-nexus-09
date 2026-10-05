@@ -283,6 +283,7 @@ export type Database = {
       }
       companies: {
         Row: {
+          artwork_contact_email: string | null
           billing_city: string | null
           billing_email: string | null
           billing_name: string | null
@@ -310,6 +311,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          artwork_contact_email?: string | null
           billing_city?: string | null
           billing_email?: string | null
           billing_name?: string | null
@@ -337,6 +339,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          artwork_contact_email?: string | null
           billing_city?: string | null
           billing_email?: string | null
           billing_name?: string | null
