@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useListFilters } from "@/hooks/useListFilters";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge, badgeVariants } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -65,17 +66,23 @@ interface Company {
 
 export default function Production() {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  // Filters survive opening an order and coming back; company is also in the URL (?company=).
+  const { filters, set: setFilter } = useListFilters(
+    "production",
+    { company: "all", search: "" },
+    { company: "company" }
+  );
   const [orders, setOrders] = useState<ProductionOrder[]>([]);
   const [completedOrders, setCompletedOrders] = useState<ProductionOrder[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
+  const searchQuery = filters.search;
+  const setSearchQuery = (value: string) => setFilter("search", value);
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);
   const [isVendor, setIsVendor] = useState(false);
   const [vendorId, setVendorId] = useState<string | null>(null);
   const [roleChecked, setRoleChecked] = useState(false);
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>(searchParams.get('company') || 'all');
+  const selectedCompanyId = filters.company;
   const [syncDialogOpen, setSyncDialogOpen] = useState(false);
   const [syncSpreadsheetId, setSyncSpreadsheetId] = useState("");
   const [syncSheetName, setSyncSheetName] = useState("");
@@ -200,15 +207,7 @@ export default function Production() {
     fetchProductionOrders();
   }, [roleChecked, hasVibeAdminRole, isVibeAdmin, isVendor, vendorId, selectedCompanyId, activeCompanyId]);
 
-  const handleCompanyChange = (value: string) => {
-    setSelectedCompanyId(value);
-    if (value === 'all') {
-      searchParams.delete('company');
-    } else {
-      searchParams.set('company', value);
-    }
-    setSearchParams(searchParams);
-  };
+  const handleCompanyChange = (value: string) => setFilter("company", value);
 
   const fetchCompanies = async () => {
     try {

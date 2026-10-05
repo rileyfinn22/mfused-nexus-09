@@ -23,7 +23,8 @@ import {
   Receipt
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useListFilters } from "@/hooks/useListFilters";
 import { toast } from "@/hooks/use-toast";
 import { exportToCSV } from "@/lib/exportUtils";
 import { generateInvoicePDF } from "@/lib/invoicePdfUtils";
@@ -45,12 +46,20 @@ import { cn, formatDocDate } from "@/lib/utils";
 
 const Invoices = () => {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
   const { activeCompanyId, isVibeAdmin, loading: activeCompanyLoading } = useActiveCompany();
-  const [searchQuery, setSearchQuery] = useState(() => new URLSearchParams(window.location.search).get("q") || "");
-  const [statusFilter, setStatusFilter] = useState("all");
-  // Read company filter from URL, default to "all" (only for vibe admins)
-  const companyFilter = searchParams.get("company") || "all";
+  // Filters survive opening an invoice and coming back; company and search are also in the
+  // URL (?company=, ?q=) so global search can land here with a query.
+  const { filters, set: setFilter } = useListFilters(
+    "invoices",
+    { company: "all", status: "all", search: "", tab: "invoices" },
+    { company: "company", search: "q" }
+  );
+  const searchQuery = filters.search;
+  const setSearchQuery = (value: string) => setFilter("search", value);
+  const statusFilter = filters.status;
+  const setStatusFilter = (value: string) => setFilter("status", value);
+  const companyFilter = filters.company;
+  const setCompanyFilter = (value: string) => setFilter("company", value);
   const [isCompanyUser, setIsCompanyUser] = useState(false);
   const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
   const [userCompanyName, setUserCompanyName] = useState<string>("");
@@ -72,17 +81,6 @@ const Invoices = () => {
     });
   };
   const [collapsedWhileFiltering, setCollapsedWhileFiltering] = useState<Set<string>>(new Set());
-  
-
-  // Update URL when company filter changes
-  const setCompanyFilter = (value: string) => {
-    if (value === "all") {
-      searchParams.delete("company");
-    } else {
-      searchParams.set("company", value);
-    }
-    setSearchParams(searchParams, { replace: true });
-  };
 
   useEffect(() => {
     // For customer/company users, wait until the active company is resolved before fetching.
@@ -551,7 +549,7 @@ const Invoices = () => {
         }
       />
 
-      <Tabs defaultValue="invoices" className="space-y-6">
+      <Tabs value={filters.tab} onValueChange={(value) => setFilter("tab", value)} className="space-y-6">
         <TabsList>
           <TabsTrigger value="invoices">
             <FileText className="h-4 w-4 mr-2" />

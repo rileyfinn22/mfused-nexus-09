@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useListFilters } from "@/hooks/useListFilters";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
@@ -47,11 +48,18 @@ export default function VendorStatus() {
   const cached = getCached<Row[]>(CACHE_KEY);
   const [rows, setRows] = useState<Row[]>(cached || []);
   const [loading, setLoading] = useState(!cached);
-  const [search, setSearch] = useState("");
-  const [vendorFilter, setVendorFilter] = useState<string>(ALL);
-  const [companyFilter, setCompanyFilter] = useState<string>(ALL);
+  // Filters survive opening a PO and coming back.
+  const { filters, set: setFilter } = useListFilters("vendor-status", { search: "", vendor: ALL, company: ALL });
+  const search = filters.search;
+  const setSearch = (value: string) => setFilter("search", value);
+  const vendorFilter = filters.vendor;
+  const setVendorFilter = (value: string) => setFilter("vendor", value);
+  const companyFilter = filters.company;
+  const setCompanyFilter = (value: string) => setFilter("company", value);
   const { toast } = useToast();
   const navigate = useNavigate();
+  // This sheet is reachable as /production (admins) and /vendor-status; return to whichever one we're on.
+  const { pathname } = useLocation();
 
   useEffect(() => {
     fetchRows();
@@ -227,7 +235,7 @@ export default function VendorStatus() {
         showInvoice
         editable
         storageKey="vendor-status-sheet"
-        onOpenPo={(po) => navigate(`/vendor-pos/${po.id}?returnTo=/vendor-status`)}
+        onOpenPo={(po) => navigate(`/vendor-pos/${po.id}?returnTo=${encodeURIComponent(pathname)}`)}
         onSaveShipDate={(po, text) => {
           // Save exactly what was typed; quietly sync the real date column when it parses.
           const parsed = parseDateInput(text);

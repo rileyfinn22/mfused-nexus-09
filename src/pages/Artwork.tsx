@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import SignedImage from "@/components/SignedImage";
 import { useSearchParams, useNavigate } from "react-router-dom";
+import { useListFilters } from "@/hooks/useListFilters";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -105,9 +106,22 @@ interface ArtworkFile {
 const Artwork = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [stateFilter, setStateFilter] = useState("all");
+  // Filters (and the active tab) survive leaving for the rejected archive / reconcile pages
+  // and coming back. Kept out of the URL on purpose: the fetch effect below re-runs on any
+  // query-string change.
+  const { filters, set: setFilter } = useListFilters("artwork", {
+    search: "",
+    status: "all",
+    state: "all",
+    company: "all",
+    tab: "proofs",
+  });
+  const searchQuery = filters.search;
+  const setSearchQuery = (value: string) => setFilter("search", value);
+  const statusFilter = filters.status;
+  const setStatusFilter = (value: string) => setFilter("status", value);
+  const stateFilter = filters.state;
+  const setStateFilter = (value: string) => setFilter("state", value);
   const [availableStates, setAvailableStates] = useState<string[]>([]);
   const [statePopoverOpen, setStatePopoverOpen] = useState(false);
   const [statePopoverOpen2, setStatePopoverOpen2] = useState(false);
@@ -116,7 +130,8 @@ const Artwork = () => {
     'MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC',
     'SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'
   ];
-  const [companyFilter, setCompanyFilter] = useState("all");
+  const companyFilter = filters.company;
+  const setCompanyFilter = (value: string) => setFilter("company", value);
   const [companies, setCompanies] = useState<any[]>([]);
   const { activeCompanyId, isVibeAdmin: isVibeAdminFromCtx, loading: companyCtxLoading } = useActiveCompany();
   const [isVibeAdmin, setIsVibeAdmin] = useState<boolean | null>(null);
@@ -1915,7 +1930,11 @@ const Artwork = () => {
       <PageHeader title="Artwork" />
 
       {/* Tabs for Vibe Proofs and Customer Art */}
-      <Tabs defaultValue={searchParams.get("tab") === "customer" ? "customer" : "proofs"} className="space-y-6">
+      <Tabs
+        defaultValue={searchParams.get("tab") === "customer" ? "customer" : filters.tab}
+        onValueChange={(value) => setFilter("tab", value)}
+        className="space-y-6"
+      >
         <TabsList>
           <TabsTrigger value="proofs" className="flex items-center gap-2">
             <FolderOpen className="h-4 w-4" />

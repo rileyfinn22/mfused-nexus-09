@@ -1680,13 +1680,12 @@ const InvoiceDetail = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <Button variant="ghost" size="sm" onClick={() => {
+           // Always a fixed destination, never history-relative: after "Edit Shipped" or a
+           // sibling-invoice hop, history(-1) would land on the wrong page. The invoices list
+           // remembers its own filters, so a bare /invoices restores where the user was.
            const params = new URLSearchParams(window.location.search);
            const returnTo = params.get('returnTo');
-           if (returnTo) {
-             navigate(returnTo);
-           } else {
-             navigate(-1);
-           }
+           navigate(returnTo || '/invoices');
          }}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           {new URLSearchParams(window.location.search).get('returnTo') ? 'Back to Project' : 'Back to Invoices'}

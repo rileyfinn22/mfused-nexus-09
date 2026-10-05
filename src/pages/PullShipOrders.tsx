@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useListFilters } from "@/hooks/useListFilters";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,8 +13,12 @@ import { approvePullShipOrder } from "@/lib/pullShipApproval";
 
 const PullShipOrders = () => {
   const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  // Filters survive opening an order and coming back.
+  const { filters, set: setFilter } = useListFilters("pull-ship-orders", { search: "", status: "all" });
+  const searchQuery = filters.search;
+  const setSearchQuery = (value: string) => setFilter("search", value);
+  const statusFilter = filters.status;
+  const setStatusFilter = (value: string) => setFilter("status", value);
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isVibeAdmin, setIsVibeAdmin] = useState(false);

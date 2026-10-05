@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useListFilters } from "@/hooks/useListFilters";
 import { Badge } from "@/components/ui/badge";
 import { StatusDot, type StatusTone } from "@/components/StatusDot";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -52,12 +53,19 @@ import { cn, formatDocDate } from "@/lib/utils";
 
 const Orders = () => {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
   const { activeCompanyId, isVibeAdmin } = useActiveCompany();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  // Read company filter from URL, default to "all" (only for vibe admins)
-  const companyFilter = searchParams.get("company") || "all";
+  // Filters survive opening an order and coming back; company is also in the URL (?company=).
+  const { filters, set: setFilter } = useListFilters(
+    "orders",
+    { company: "all", status: "all", search: "" },
+    { company: "company" }
+  );
+  const searchQuery = filters.search;
+  const setSearchQuery = (value: string) => setFilter("search", value);
+  const statusFilter = filters.status;
+  const setStatusFilter = (value: string) => setFilter("status", value);
+  const companyFilter = filters.company;
+  const setCompanyFilter = (value: string) => setFilter("company", value);
   const [orders, setOrders] = useState<any[]>([]);
   // Identifies the newest in-flight paged fetch so a stale one can't overwrite the list.
   const ordersRequestRef = useRef(0);
@@ -73,16 +81,6 @@ const Orders = () => {
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
-  };
-
-  // Update URL when company filter changes
-  const setCompanyFilter = (value: string) => {
-    if (value === "all") {
-      searchParams.delete("company");
-    } else {
-      searchParams.set("company", value);
-    }
-    setSearchParams(searchParams, { replace: true });
   };
 
   useEffect(() => {

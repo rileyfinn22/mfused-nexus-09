@@ -253,7 +253,8 @@ const InvoiceShippedEdit = () => {
       }
 
       toast({ title: "Saved", description: `Blanket total: ${formatCurrency(written)}` });
-      navigate(`/invoices/${invoiceId}`);
+      // Replace, so the edit page doesn't sit behind the invoice in browser history.
+      navigate(`/invoices/${invoiceId}`, { replace: true });
     } catch (err: any) {
       toast({ title: "Error", description: err.message || "Failed to save", variant: "destructive" });
     } finally {
@@ -277,7 +278,7 @@ const InvoiceShippedEdit = () => {
     <div className="container mx-auto p-6 space-y-6 max-w-6xl">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => navigate(`/invoices/${invoiceId}`)}>
+          <Button variant="ghost" size="sm" onClick={() => navigate(`/invoices/${invoiceId}`, { replace: true })}>
             <ArrowLeft className="h-4 w-4 mr-1.5" /> Back to Invoice
           </Button>
           <div>
@@ -290,7 +291,7 @@ const InvoiceShippedEdit = () => {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => navigate(`/invoices/${invoiceId}`)} disabled={saving}>
+          <Button variant="outline" onClick={() => navigate(`/invoices/${invoiceId}`, { replace: true })} disabled={saving}>
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={saving}>

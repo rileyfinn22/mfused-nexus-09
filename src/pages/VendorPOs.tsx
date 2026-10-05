@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, Fragment } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useListFilters } from "@/hooks/useListFilters";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -37,18 +38,28 @@ import { formatDocDate } from "@/lib/utils";
 
 const VendorPOs = () => {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
   const [pos, setPOs] = useState<any[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [paymentStatusFilter, setPaymentStatusFilter] = useState("all");
-  const vendorFilter = searchParams.get("vendor") || "all";
+  // Filters and the active tab survive opening a PO and coming back; vendor is also in the URL (?vendor=).
+  const { filters, set: setFilter } = useListFilters(
+    "vendor-pos",
+    { vendor: "all", type: "all", payment: "all", search: "", tab: "bills" },
+    { vendor: "vendor" }
+  );
+  const searchQuery = filters.search;
+  const setSearchQuery = (value: string) => setFilter("search", value);
+  const typeFilter = filters.type;
+  const setTypeFilter = (value: string) => setFilter("type", value);
+  const paymentStatusFilter = filters.payment;
+  const setPaymentStatusFilter = (value: string) => setFilter("payment", value);
+  const vendorFilter = filters.vendor;
+  const setVendorFilter = (value: string) => setFilter("vendor", value);
   const [loading, setLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [poToDelete, setPOToDelete] = useState<any>(null);
   const [isVibeAdmin, setIsVibeAdmin] = useState<boolean | null>(null);
   const [showExpenseDialog, setShowExpenseDialog] = useState(false);
-  const [activeTab, setActiveTab] = useState("bills");
+  const activeTab = filters.tab;
+  const setActiveTab = (value: string) => setFilter("tab", value);
   const [expandedDetailRows, setExpandedDetailRows] = useState<Set<string>>(new Set());
   const toggleDetailRow = (id: string) => {
     setExpandedDetailRows((prev) => {
@@ -56,15 +67,6 @@ const VendorPOs = () => {
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
-  };
-
-  const setVendorFilter = (value: string) => {
-    if (value === "all") {
-      searchParams.delete("vendor");
-    } else {
-      searchParams.set("vendor", value);
-    }
-    setSearchParams(searchParams, { replace: true });
   };
 
   useEffect(() => {

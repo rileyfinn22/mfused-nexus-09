@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useListFilters } from "@/hooks/useListFilters";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
@@ -36,7 +37,10 @@ interface Row {
 export default function CustomerProduction({ companyId }: { companyId?: string | null } = {}) {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
+  // Search survives opening a PO / invoice and coming back.
+  const { filters, set: setFilter } = useListFilters("customer-production", { search: "" });
+  const search = filters.search;
+  const setSearch = (value: string) => setFilter("search", value);
   const { toast } = useToast();
   const navigate = useNavigate();
   const { activeCompanyId: ctxCompanyId } = useActiveCompany();
