@@ -88,7 +88,7 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { invoiceId, billingPercentage: requestedPercentage } = await req.json();
+    const { invoiceId, billingPercentage: requestedPercentage, linkOnly } = await req.json();
 
     // Note: billingPercentage from request is only used for NEW syncs
     // For re-syncs, we'll use the stored billed_percentage from the invoice
@@ -264,6 +264,36 @@ serve(async (req) => {
     }
 
     const qbApiUrl = `https://quickbooks.api.intuit.com/v3/company/${qbSettings.realm_id}`;
+
+    // Link-only refresh: read the payment link from the existing QBO invoice without touching
+    // its lines, amounts or deposit. Only the online-payment flags are set if the link is missing.
+    if (linkOnly && invoice.quickbooks_id) {
+      const qbHeaders = { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json', 'Content-Type': 'application/json' };
+      const getResp = await fetch(`${qbApiUrl}/invoice/${invoice.quickbooks_id}?minorversion=73`, { headers: qbHeaders });
+      if (!getResp.ok) throw new Error('Could not load the invoice from QuickBooks');
+      const fetched = await getResp.json();
+      let link: string | null = fetched.Invoice?.InvoiceLink || null;
+      if (!link) {
+        const upd = await fetch(`${qbApiUrl}/invoice?minorversion=73`, {
+          method: 'POST',
+          headers: qbHeaders,
+          body: JSON.stringify({
+            Id: invoice.quickbooks_id,
+            SyncToken: fetched.Invoice.SyncToken,
+            sparse: true,
+            AllowOnlinePayment: true,
+            AllowOnlineCreditCardPayment: false,
+            AllowOnlineACHPayment: true,
+          }),
+        });
+        if (upd.ok) link = (await upd.json()).Invoice?.InvoiceLink || null;
+      }
+      await supabase.from('invoices').update({ quickbooks_payment_link: link }).eq('id', invoiceId);
+      return new Response(
+        JSON.stringify({ success: true, linkOnly: true, payment_link: link, qb_balance: fetched.Invoice?.Balance }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Validate QB "Project" reference as a Customer Job (sub-customer)
     // (The /project API is not supported for some realms even if Projects UI is enabled.)
