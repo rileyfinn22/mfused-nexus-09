@@ -71,6 +71,12 @@ export function SendInvoiceNoticeDialog({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isBilled = noticeType === "billed";
+  // Amount actually due: an unpaid deposit (billed_percentage < 100) bills only that share.
+  const depositPct = Number((invoice as any)?.billed_percentage ?? 100) || 100;
+  const invoiceTotal = Number(invoice?.total || 0);
+  const paidSoFar = Number(invoice?.total_paid || 0);
+  const depositAmount = Math.round(invoiceTotal * depositPct) / 100;
+  const amountDue = Math.max(0, (depositPct < 99.99 ? depositAmount : invoiceTotal) - paidSoFar);
   const title = isBilled ? "Send Billed Notice" : "Send Payment Due Reminder";
   const icon = isBilled ? <Bell className="h-5 w-5 text-primary" /> : <AlertCircle className="h-5 w-5 text-destructive" />;
 
