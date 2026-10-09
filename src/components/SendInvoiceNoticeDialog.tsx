@@ -71,6 +71,12 @@ export function SendInvoiceNoticeDialog({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isBilled = noticeType === "billed";
+  // Amount actually due: an unpaid deposit (billed_percentage < 100) bills only that share.
+  const depositPct = Number((invoice as any)?.billed_percentage ?? 100) || 100;
+  const invoiceTotal = Number(invoice?.total || 0);
+  const paidSoFar = Number(invoice?.total_paid || 0);
+  const depositAmount = Math.round(invoiceTotal * depositPct) / 100;
+  const amountDue = Math.max(0, (depositPct < 99.99 ? depositAmount : invoiceTotal) - paidSoFar);
   const title = isBilled ? "Send Billed Notice" : "Send Payment Due Reminder";
   const icon = isBilled ? <Bell className="h-5 w-5 text-primary" /> : <AlertCircle className="h-5 w-5 text-destructive" />;
 
@@ -303,7 +309,6 @@ export function SendInvoiceNoticeDialog({
 
     let finalY = (doc as any).lastAutoTable.finalY + 10;
     const totalPaid = invoice.total_paid || 0;
-    const balance = (invoice.total || 0) - totalPaid;
     const hasPayments = totalPaid > 0;
     const hasShipping = (invoice.shipping_cost || 0) > 0;
 
@@ -313,15 +318,18 @@ export function SendInvoiceNoticeDialog({
     if (hasShipping) {
       totalsRows.push({ label: 'Shipping', value: formatCurrency(invoice.shipping_cost || 0) });
     }
+    if (depositPct < 99.99) {
+      totalsRows.push({ label: `${Math.round(depositPct)}% Deposit Due`, value: formatCurrency(depositAmount) });
+    }
     if (hasPayments) {
-      totalsRows.push({ label: 'Less Deposit', value: `(${formatCurrency(totalPaid)})` });
+      totalsRows.push({ label: 'Less Paid', value: `(${formatCurrency(totalPaid)})` });
     }
 
     finalY = ensureRoom(doc, finalY, totalsRows.length * 9 + 16);
     drawTotals(doc, finalY + 5, {
       rows: totalsRows,
-      grandLabel: 'BALANCE DUE',
-      grandValue: formatCurrency(hasPayments ? balance : (invoice.total || 0)),
+      grandLabel: depositPct < 99.99 ? 'DEPOSIT DUE' : 'BALANCE DUE',
+      grandValue: formatCurrency(amountDue),
       width: 85,
     });
 
@@ -334,7 +342,7 @@ export function SendInvoiceNoticeDialog({
     ? formatDocDate(invoice.due_date, "long")
     : "Upon Receipt";
 
-  const formattedAmount = formatCurrency(invoice?.total || 0);
+  const formattedAmount = formatCurrency(amountDue);
 
   const previewHtml = buildBrandedEmailPreview({
     documentLabel: isBilled ? "INVOICE" : "PAYMENT DUE",
@@ -383,7 +391,7 @@ export function SendInvoiceNoticeDialog({
           senderEmail: senderEmail || 'info@vibepkg.com',
           invoiceNumber: invoice.invoice_number,
           dueDate: invoice.due_date,
-          totalAmount: invoice.total || 0,
+          totalAmount: amountDue,
           customerName: customerDisplayName,
           portalUrl,
           pdfBase64,
