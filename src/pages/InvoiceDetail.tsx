@@ -1209,15 +1209,11 @@ const InvoiceDetail = () => {
         }
       }
 
-      // Re-sync to get updated payment link.
-      // billed_percentage is a one-shot deposit flag — once an invoice already exists in QBO,
-      // refreshing the link should always bill the full remaining balance (100%), otherwise
-      // the QBO invoice/link stays stuck at the original deposit amount.
+      // Re-sync to get updated payment link. Don't force a percentage: the sync uses the stored
+      // deposit (billed_percentage), which is auto-cleared once the deposit is paid. Forcing 100
+      // here wiped unpaid deposits in QBO (11132 billed 1,500 instead of its 50% deposit).
       const { error } = await supabase.functions.invoke('quickbooks-sync-invoice', {
-        body: {
-          invoiceId,
-          billingPercentage: 100
-        }
+        body: { invoiceId }
       });
       if (error) throw error;
       toast({
