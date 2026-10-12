@@ -420,137 +420,75 @@ export const VendorAssignmentDialog = ({
 
       if (!order) throw new Error("Order not found");
 
-      // Process each selected item
+      // Batched: a handful of requests for the whole selection instead of ~5 per line.
       const items = freshOrderItems.length > 0 ? freshOrderItems : orderItems;
-      for (const itemId of Array.from(selectedItems)) {
-        const item = items.find(i => i.id === itemId);
-        if (!item) continue;
+      const cost = parseFloat(bulkCost);
+      const selected = Array.from(selectedItems)
+        .map(id => items.find(i => i.id === id))
+        .filter(Boolean) as any[];
+      const ids = selected.map(i => i.id);
+      if (ids.length === 0) throw new Error("No lines selected");
 
-        // Check if item was previously assigned to a different vendor
-        const oldVendorId = item.vendor_id;
-        const isVendorChange = oldVendorId && oldVendorId !== bulkVendorId;
-
-        // Remove from old vendor's PO if vendor changed
-        if (isVendorChange) {
-          const { data: oldPOItem } = await supabase
-            .from('vendor_po_items')
-            .select('id, vendor_po_id, total')
-            .eq('order_item_id', itemId)
-            .maybeSingle();
-
-          if (oldPOItem) {
-            await supabase
-              .from('vendor_po_items')
-              .delete()
-              .eq('id', oldPOItem.id);
-
-            // Totals on the old PO are recalculated by the vendor_po_recalc trigger.
-          }
-        }
-
-        // Update order item with vendor info
-        // Vendor cost/id moved to companion table order_item_costs
-        await (supabase as any)
-          .from('order_item_costs')
-          .upsert({
-            order_item_id: itemId,
-            vendor_id: bulkVendorId,
-            vendor_cost: parseFloat(bulkCost)
-          }, { onConflict: 'order_item_id' });
-
-        // Check if vendor PO exists for this vendor and order
-        let vendorPO;
-        const { data: existingPO } = await supabase
+      // 1) Find (or create) this vendor's PO on the order
+      let { data: vendorPO } = await supabase
+        .from('vendor_pos')
+        .select('*')
+        .eq('order_id', orderId)
+        .eq('vendor_id', bulkVendorId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!vendorPO) {
+        const poNumber = await generatePONumber();
+        const { data: newPO, error: poError } = await supabase
           .from('vendor_pos')
-          .select('*')
-          .eq('order_id', orderId)
-          .eq('vendor_id', bulkVendorId)
-          .maybeSingle();
-
-        const newItemTotal = parseFloat(bulkCost) * item.quantity;
-
-        if (existingPO) {
-          vendorPO = existingPO;
-          
-          // Check if this item already has a PO item for this vendor
-          const { data: existingPOItem } = await supabase
-            .from('vendor_po_items')
-            .select('*')
-            .eq('vendor_po_id', existingPO.id)
-            .eq('order_item_id', itemId)
-            .maybeSingle();
-
-          if (existingPOItem) {
-            await supabase
-              .from('vendor_po_items')
-              .update({
-                unit_cost: parseFloat(bulkCost),
-                total: newItemTotal
-              })
-              .eq('id', existingPOItem.id);
-          } else {
-            // Create new PO item
-            await supabase
-              .from('vendor_po_items')
-              .insert({
-                vendor_po_id: vendorPO.id,
-                order_item_id: itemId,
-                sku: item.sku,
-                name: item.name,
-                description: item.description || null,
-                quantity: item.quantity,
-                shipped_quantity: null,
-                unit_cost: parseFloat(bulkCost),
-                total: newItemTotal
-              } as any);
-          }
-        } else {
-          // Create new vendor PO
-          const poNumber = await generatePONumber();
-          const { data: newPO, error: poError } = await supabase
-            .from('vendor_pos')
-            .insert({
-              company_id: order.company_id,
-              order_id: orderId,
-              vendor_id: bulkVendorId,
-              po_number: poNumber,
-              total: newItemTotal,
-              status: 'draft'
-            })
-            .select()
-            .single();
-
-          if (poError) throw poError;
-          vendorPO = newPO;
-
-          // Create vendor PO item
-          await supabase
-            .from('vendor_po_items')
-            .insert({
-              vendor_po_id: vendorPO.id,
-              order_item_id: itemId,
-              sku: item.sku,
-              name: item.name,
-              description: item.description || null,
-              quantity: item.quantity,
-              shipped_quantity: null,
-              unit_cost: parseFloat(bulkCost),
-              total: newItemTotal
-            } as any);
-        }
-
-        // Mark as assigned
-        setAssignments(prev => ({
-          ...prev,
-          [itemId]: { 
-            vendorId: bulkVendorId,
-            vendorCost: bulkCost,
-            assigned: true,
-            vendorPoId: vendorPO.id,
-            vendorPoNumber: vendorPO.po_number
-          }
-        }));
+          .insert({ company_id: order.company_id, order_id: orderId, vendor_id: bulkVendorId, po_number: poNumber, total: 0, status: 'draft' })
+          .select()
+          .single();
+        if (poError) throw poError;
+        vendorPO = newPO;
       }
+
+      // 2) Existing PO lines for the selection (any vendor), in one query
+      const { data: existingPoItems } = await supabase
+        .from('vendor_po_items')
+        .select('id, vendor_po_id, order_item_id')
+        .in('order_item_id', ids);
+      const onThisPo = new Map<string, string>();
+      const toRemove: string[] = [];
+      for (const p of existingPoItems || []) {
+        if (p.vendor_po_id === vendorPO!.id) onThisPo.set(p.order_item_id as string, p.id);
+        else toRemove.push(p.id); // line moved from another vendor's PO
+      }
+
+      // 3) Save costs for all lines at once
+      const { error: costErr } = await (supabase as any)
+        .from('order_item_costs')
+        .upsert(ids.map(id => ({ order_item_id: id, vendor_id: bulkVendorId, vendor_cost: cost })), { onConflict: 'order_item_id' });
+      if (costErr) throw costErr;
+
+      // 4) Remove moved lines, update existing ones, insert new ones (one request each)
+      if (toRemove.length) await supabase.from('vendor_po_items').delete().in('id', toRemove);
+      const updates = selected.filter(i => onThisPo.has(i.id));
+      if (updates.length) {
+        await supabase.from('vendor_po_items').upsert(
+          updates.map(i => ({ id: onThisPo.get(i.id), vendor_po_id: vendorPO!.id, order_item_id: i.id, sku: i.sku, name: i.name, quantity: i.quantity, unit_cost: cost, total: cost * i.quantity })) as any,
+          { onConflict: 'id' }
+        );
+      }
+      const inserts = selected.filter(i => !onThisPo.has(i.id));
+      if (inserts.length) {
+        const { error: insErr } = await supabase.from('vendor_po_items').insert(
+          inserts.map(i => ({ vendor_po_id: vendorPO!.id, order_item_id: i.id, sku: i.sku, name: i.name, description: i.description || null, quantity: i.quantity, shipped_quantity: null, unit_cost: cost, total: cost * i.quantity })) as any
+        );
+        if (insErr) throw insErr;
+      }
+
+      setAssignments(prev => {
+        const next = { ...prev };
+        for (const id of ids) next[id] = { vendorId: bulkVendorId, vendorCost: bulkCost, assigned: true, vendorPoId: vendorPO!.id, vendorPoNumber: vendorPO!.po_number };
+        return next;
+      });
 
       // Refetch order items to show updated vendor assignments
       await refetchOrderItems();
