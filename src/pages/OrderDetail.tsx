@@ -1251,45 +1251,41 @@ const OrderDetail = () => {
       // PHASE 2: Update all existing items, vendor PO items, order, and invoice in parallel
       const phase2Promises: Promise<any>[] = [];
 
-      // Update existing order items in parallel
+      // Update existing order items ONE AT A TIME. Each write fires the order-totals trigger,
+      // which locks the order row; firing them all at once made them queue on that lock and
+      // time out on larger orders (11133, 16 lines: "error saving").
       for (const item of existingItems) {
         const newItemTotal = Number(item.quantity) * Number(item.unit_price);
-        phase2Promises.push(
-          (async () => {
-            const { error } = await supabase
-              .from('order_items')
-              .update({
-                quantity: item.quantity,
-                unit_price: item.unit_price,
-                total: newItemTotal,
-                description: item.description,
-                item_id: item.item_id,
-                name: item.name,
-                sku: item.sku || item.item_id,
-                product_id: item.product_id
-              })
-              .eq('id', item.id);
-            if (error) throw new Error(`Could not update "${item.name}": ${error.message}`);
-          })()
-        );
+        const { error } = await supabase
+          .from('order_items')
+          .update({
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            total: newItemTotal,
+            description: item.description,
+            item_id: item.item_id,
+            name: item.name,
+            sku: item.sku || item.item_id,
+            product_id: item.product_id
+          })
+          .eq('id', item.id);
+        if (error) throw new Error(`Could not update "${item.name}": ${error.message}`);
+      }
 
-        // Update linked vendor_po_items
+      for (const item of existingItems) {
+        // Update linked vendor_po_items (sequential: each fires the PO recalc trigger on the same PO)
         const linkedPoItems = allVendorPoItems.filter(poi => poi.order_item_id === item.id);
         for (const poItem of linkedPoItems) {
           const poItemTotal = Number(item.quantity) * Number(poItem.unit_cost);
-          phase2Promises.push(
-            (async () => {
-              await supabase
-                .from('vendor_po_items')
-                .update({
-                  quantity: item.quantity,
-                  name: item.name,
-                  sku: item.sku || item.item_id,
-                  total: poItemTotal
-                })
-                .eq('id', poItem.id);
-            })()
-          );
+          await supabase
+            .from('vendor_po_items')
+            .update({
+              quantity: item.quantity,
+              name: item.name,
+              sku: item.sku || item.item_id,
+              total: poItemTotal
+            })
+            .eq('id', poItem.id);
         }
       }
 
