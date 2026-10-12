@@ -1251,25 +1251,25 @@ const OrderDetail = () => {
       // PHASE 2: Update all existing items, vendor PO items, order, and invoice in parallel
       const phase2Promises: Promise<any>[] = [];
 
-      // Update existing order items ONE AT A TIME. Each write fires the order-totals trigger,
-      // which locks the order row; firing them all at once made them queue on that lock and
-      // time out on larger orders (11133, 16 lines: "error saving").
-      for (const item of existingItems) {
-        const newItemTotal = Number(item.quantity) * Number(item.unit_price);
+      // Update all existing lines in ONE request (single transaction). Firing one request per
+      // line made each wait on the order-row lock taken by the totals trigger and time out on
+      // larger orders (11133, 16 lines). The trigger now only runs when qty/price change.
+      if (existingItems.length > 0) {
         const { error } = await supabase
           .from('order_items')
-          .update({
+          .upsert(existingItems.map((item: any) => ({
+            id: item.id,
+            order_id: orderId,
             quantity: item.quantity,
             unit_price: item.unit_price,
-            total: newItemTotal,
+            total: Number(item.quantity) * Number(item.unit_price),
             description: item.description,
             item_id: item.item_id,
             name: item.name,
-            sku: item.sku || item.item_id,
+            sku: item.sku || item.item_id || '',
             product_id: item.product_id
-          })
-          .eq('id', item.id);
-        if (error) throw new Error(`Could not update "${item.name}": ${error.message}`);
+          })) as any, { onConflict: 'id' });
+        if (error) throw new Error(`Could not update line items: ${error.message}`);
       }
 
       for (const item of existingItems) {
