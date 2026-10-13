@@ -3184,7 +3184,7 @@ const InvoiceDetail = () => {
                       {formatCurrency(
                         (order?.order_items?.reduce((sum: number, item: any) =>
                           sum + (Number(item.shipped_quantity || 0) * Number(item.unit_price || 0)), 0) || 0)
-                        + childShippingTotal
+                        + blanketStoredShipping + childShippingTotal
                       )}
                     </p>
                   </div>
