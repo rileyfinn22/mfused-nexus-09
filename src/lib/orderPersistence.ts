@@ -21,25 +21,20 @@ export function assertOrderProcessable(lineCount: number, editing: boolean) {
   if (lineCount === 0) throw new Error('This order has no saved products. Add and save its products before processing.');
 }
 
-/** Save replacements first, check every response, then remove only obsolete lines. */
+/** Persist the complete line set atomically, including reordering and removals. */
 export async function persistOrderLines(client: SupabaseClient, orderId: string, desired: Line[]) {
   const { data: existing, error: readError } = await client.from('order_items')
     .select('id, product_id, sku').eq('order_id', orderId);
   if (readError) throw readError;
   const { rows, deleteIds } = reconcileOrderLines(existing || [], desired);
-  if (rows.length) {
-    const { data: saved, error } = await client.from('order_items')
-      .upsert(rows as any, { onConflict: 'id' }).select('id');
-    if (error) throw error;
-    if (saved?.length !== rows.length) throw new Error('Not all product lines saved. Please retry before leaving this page.');
-  }
-  if (deleteIds.length) {
-    const { error } = await client.from('order_items').delete().in('id', deleteIds);
-    if (error) throw error;
-  }
+  const { data: subtotal, error: saveError } = await client.rpc('save_order_lines', {
+    p_order_id: orderId,
+    p_lines: rows.map((line, index) => ({ ...line, line_number: index + 1 })),
+  });
+  if (saveError) throw saveError;
   const { data: verified, error } = await client.from('order_items')
     .select('id, quantity, unit_price').eq('order_id', orderId);
   if (error) throw error;
   if (verified?.length !== desired.length) throw new Error('The saved product count does not match. Please retry.');
-  return (verified || []).reduce((sum, line) => sum + Number(line.quantity) * Number(line.unit_price), 0);
+  return Number(subtotal);
 }
