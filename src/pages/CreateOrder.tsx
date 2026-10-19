@@ -18,6 +18,7 @@ import { Plus, Minus, X, Save, Send, Search, Upload, FileText, Loader2, Check, C
 import { SalesRepSelect } from "@/components/SalesRepSelect";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { persistOrderLines } from "@/lib/orderPersistence";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
 import { useActiveCompany } from "@/hooks/useActiveCompany";
@@ -317,6 +318,7 @@ const CreateOrder = () => {
   const [isAutoSaving, setIsAutoSaving] = useState(false);
   const [syncingSpecs, setSyncingSpecs] = useState(false);
   const autoSaveIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const saveInFlightRef = useRef(false);
 
   const [formData, setFormData] = useState({
     customerName: "",
@@ -630,6 +632,32 @@ const CreateOrder = () => {
     })();
   }, [isVibeAdmin, roleChecked, selectedCompanyId, activeCompanyId]);
 
+  const buildSavedLines = (savedOrderId: string) => [
+    ...selectedItems.map((item, idx) => {
+      const product = products.find(p => p.id === item.productId);
+      const price = item.unit_price ?? 0;
+      return {
+        order_id: savedOrderId, product_id: item.productId,
+        sku: product?.item_id || item.item_id || `SKU-${item.productId.substring(0, 8)}`,
+        item_id: product?.item_id || item.item_id || null,
+        name: product?.name || item.name || '(unnamed product)',
+        description: product?.description || item.description || null,
+        quantity: item.quantity, unit_price: price, total: price * item.quantity,
+        line_number: idx + 1,
+      };
+    }),
+    ...unmatchedPoItems.map((item, idx) => ({
+      order_id: savedOrderId, product_id: null,
+      sku: item.sku || item.catalogItemId || 'UNKNOWN',
+      item_id: item.catalogItemId || item.item_id || null,
+      name: item.name || item.description || 'Unmatched Item',
+      description: item.description || null,
+      quantity: Number(item.quantity) || 0, unit_price: Number(item.unit_price) || 0,
+      total: (Number(item.quantity) || 0) * (Number(item.unit_price) || 0),
+      line_number: selectedItems.length + idx + 1,
+    })),
+  ];
+
   // Auto-save draft every 1 minute - ONLY for new orders (not editing existing)
   const performAutoSave = useCallback(async () => {
     // Skip auto-save if editing an existing order (orderId is set from URL params)
@@ -647,8 +675,8 @@ const CreateOrder = () => {
     if (!hasItems && !hasAddress) return;
     // Addresses auto-filled from a scope-preset company aren't user input yet.
     if (!hasItems && companyPresetRef.current) return;
-    if (loading || isAutoSaving) return;
-    
+    if (loading || isAutoSaving || saveInFlightRef.current) return;
+    saveInFlightRef.current = true;
     setIsAutoSaving(true);
     
     try {
@@ -677,11 +705,11 @@ const CreateOrder = () => {
       }
       const subtotalCalc = matchedSubtotal + unmatchedSubtotalCalc;
 
-      const currentOrderId = orderId || autoSavedOrderId;
+      let currentOrderId = orderId || autoSavedOrderId;
       
       if (currentOrderId) {
         // Update existing draft
-        await supabase
+        const { error: updateError } = await supabase
           .from('orders')
           .update({
             po_number: formData.poNumber || null,
@@ -705,6 +733,8 @@ const CreateOrder = () => {
             due_date: formData.dueDate || null,
           })
           .eq('id', currentOrderId);
+
+        if (updateError) throw updateError;
       } else {
         // Create new draft
         const { data: recentOrders } = await supabase
@@ -757,39 +787,20 @@ const CreateOrder = () => {
           .select()
           .single();
 
-        if (!error && newOrder) {
-          setAutoSavedOrderId(newOrder.id);
-          setExistingOrderNumber(newOrder.order_number);
-          
-          // Insert order items for the new draft
-          const orderItems = selectedItems.map((item, idx) => {
-            const product = products.find(p => p.id === item.productId);
-            const price = item.unit_price ?? 0;
-            return {
-              order_id: newOrder.id,
-              product_id: item.productId,
-              sku: product?.item_id || `SKU-${product?.id.substring(0, 8)}`,
-              item_id: product?.item_id || null,
-              name: product?.name || "",
-              description: product?.description || null,
-              quantity: item.quantity,
-              shipped_quantity: null,
-              unit_price: price,
-              total: price * item.quantity,
-              line_number: idx + 1,
-            };
-          });
-
-          if (orderItems.length > 0) {
-            await supabase.from('order_items').insert(orderItems);
-          }
-        }
+        if (error) throw error;
+        if (!newOrder) throw new Error('Could not create draft');
+        currentOrderId = newOrder.id;
+        setAutoSavedOrderId(newOrder.id);
+        setExistingOrderNumber(newOrder.order_number);
       }
-      
+      await persistOrderLines(supabase, currentOrderId, buildSavedLines(currentOrderId));
+
       setLastAutoSave(new Date());
     } catch (error) {
       console.error('Auto-save error:', error);
+      toast({ title: 'Draft not saved', description: 'Your latest products could not be saved. Stay on this page and use Save Draft to retry.', variant: 'destructive' });
     } finally {
+      saveInFlightRef.current = false;
       setIsAutoSaving(false);
     }
   }, [selectedItems, unmatchedPoItems, formData, products, isVibeAdmin, selectedCompanyId, loading, isAutoSaving, orderId, autoSavedOrderId, sameAsBilling]);
@@ -1909,6 +1920,10 @@ const CreateOrder = () => {
   };
 
   const saveOrder = async (isDraft: boolean) => {
+    if (saveInFlightRef.current) {
+      toast({ title: 'Saving draft', description: 'Please wait for the current save to finish, then retry.' });
+      return;
+    }
     if (selectedItems.length === 0) {
       toast({
         title: "No Items Selected",
@@ -1932,6 +1947,7 @@ const CreateOrder = () => {
       }
     }
 
+    saveInFlightRef.current = true;
     setLoading(true);
 
     try {
@@ -2034,7 +2050,7 @@ const CreateOrder = () => {
 
       let order;
       let orderNumber = existingOrderNumber;
-      let existingItemsMap: Map<string, any> | null = null;
+
 
       // Promote any auto-saved draft instead of creating a duplicate order
       const effectiveOrderId = orderId || autoSavedOrderId;
@@ -2073,18 +2089,6 @@ const CreateOrder = () => {
         if (orderError) throw orderError;
         order = updatedOrder;
 
-        // Fetch existing order items to preserve vendor assignments
-        const { data: existingItems } = await supabase
-          .from('order_items')
-          .select('*')
-          .eq('order_id', effectiveOrderId);
-
-        // Track existing items by their ID to preserve them during update
-        existingItemsMap = new Map(
-          (existingItems || [])
-            .filter(item => item.product_id !== null)
-            .map(item => [item.id, item])
-        );
       } else {
         // Create new order with sequential number - get max existing order number
         // Fetch recent orders and find the highest numeric order number
@@ -2144,172 +2148,11 @@ const CreateOrder = () => {
         order = newOrder;
       }
 
-      // Helper: resolve a product, fetching directly if it's not in the cached list
-      const resolveProduct = async (productId: string) => {
-        const cached = products.find(p => p.id === productId);
-        if (cached && (cached.item_id || cached.name)) return cached;
-        const { data } = await supabase
-          .from('products')
-          .select('id, item_id, name, description')
-          .eq('id', productId)
-          .maybeSingle();
-        return data || cached || null;
-      };
-
-      if (effectiveOrderId && existingItemsMap) {
-        // Update existing items and add new ones, preserving vendor assignments
-        for (const [idx, item] of selectedItems.entries()) {
-          const product = await resolveProduct(item.productId);
-          const price = item.unit_price ?? 0;
-          const itemTotal = price * item.quantity;
-          
-          const existingItem = existingItemsMap.get(item.productId);
-          
-          if (existingItem) {
-            // Update existing item, preserving vendor data and shipped_quantity
-            await supabase
-              .from('order_items')
-              .update({
-                quantity: item.quantity,
-                unit_price: price,
-                total: itemTotal,
-                line_number: idx + 1,
-                sku: product?.item_id || existingItem.sku,
-                item_id: product?.item_id || existingItem.item_id,
-                name: product?.name || existingItem.name,
-                description: product?.description || existingItem.description,
-              })
-              .eq('id', existingItem.id);
-            
-            // Remove from map so we know it's been handled
-            existingItemsMap.delete(item.productId);
-          } else {
-            // Insert new item
-            await supabase
-              .from('order_items')
-              .insert({
-                order_id: order.id,
-                product_id: item.productId,
-                sku: product?.item_id || `SKU-${item.productId.substring(0, 8)}`,
-                item_id: product?.item_id || null,
-                name: product?.name || "(unnamed product)",
-                description: product?.description || null,
-                quantity: item.quantity,
-                shipped_quantity: null,
-                unit_price: price,
-                total: itemTotal,
-                line_number: idx + 1,
-              });
-          }
-        }
-        
-        // Delete items that are no longer in the order (matched items that were removed)
-        const itemsToDelete = Array.from(existingItemsMap.values());
-        if (itemsToDelete.length > 0) {
-          const deleteIds = itemsToDelete.map(i => i.id);
-          // Detach vendor PO lines first so they survive (defense in depth — FK is also SET NULL)
-          await supabase
-            .from('vendor_po_items')
-            .update({ order_item_id: null })
-            .in('order_item_id', deleteIds);
-          await supabase
-            .from('order_items')
-            .delete()
-            .in('id', deleteIds);
-        }
-
-        // Keep unmatched (product_id is null) line items in sync with the UI.
-        // Detach any vendor PO lines linked to them first.
-        const { data: unmatchedExisting } = await supabase
-          .from('order_items')
-          .select('id')
-          .eq('order_id', order.id)
-          .is('product_id', null);
-        const unmatchedIds = (unmatchedExisting || []).map((r: any) => r.id);
-        if (unmatchedIds.length > 0) {
-          await supabase
-            .from('vendor_po_items')
-            .update({ order_item_id: null })
-            .in('order_item_id', unmatchedIds);
-        }
-        await supabase
-          .from('order_items')
-          .delete()
-          .eq('order_id', order.id)
-          .is('product_id', null);
-
-
-        if (unmatchedPoItems.length > 0) {
-          const unmatchedOrderItems = unmatchedPoItems.map((item) => {
-            const qty = Number(item.quantity) || 0;
-            const unit = Number(item.unit_price) || 0;
-
-            return {
-              order_id: order.id,
-              product_id: null,
-              sku: item.sku || item.catalogItemId || 'UNKNOWN',
-              item_id: item.catalogItemId || item.item_id || null,
-              name: item.name || item.description || 'Unmatched Item',
-              description: item.description || null,
-              quantity: qty,
-              shipped_quantity: null,
-              unit_price: unit,
-              total: qty * unit,
-            };
-          });
-
-          const { error: unmatchedInsertError } = await supabase
-            .from('order_items')
-            .insert(unmatchedOrderItems);
-
-          if (unmatchedInsertError) throw unmatchedInsertError;
-        }
-      } else {
-        // New order - insert all items
-        const orderItems = selectedItems.map((item, idx) => {
-          const product = products.find(p => p.id === item.productId);
-          const price = item.unit_price ?? 0;
-          const itemTotal = price * item.quantity;
-          
-          return {
-            order_id: order.id,
-            product_id: item.productId,
-            sku: product?.item_id || `SKU-${product?.id.substring(0, 8)}`,
-            item_id: product?.item_id || null,
-            name: product?.name || "",
-            description: product?.description || null,
-            quantity: item.quantity,
-            shipped_quantity: null,
-            unit_price: price,
-            total: itemTotal,
-            line_number: idx + 1,
-          };
-        });
-
-        const unmatchedOrderItems = unmatchedPoItems.map((item) => {
-          const qty = Number(item.quantity) || 0;
-          const unit = Number(item.unit_price) || 0;
-
-          return {
-            order_id: order.id,
-            product_id: null,
-            sku: item.sku || item.catalogItemId || 'UNKNOWN',
-            item_id: item.catalogItemId || item.item_id || null,
-            name: item.name || item.description || 'Unmatched Item',
-            description: item.description || null,
-            quantity: qty,
-            shipped_quantity: null,
-            unit_price: unit,
-            total: qty * unit,
-          };
-        });
-
-        const { error: itemsError } = await supabase
-          .from('order_items')
-          .insert([...orderItems, ...unmatchedOrderItems]);
-
-        if (itemsError) throw itemsError;
-      }
+      // One checked reconciliation for explicit saves and autosaved drafts.
+      const savedSubtotal = await persistOrderLines(supabase, order.id, buildSavedLines(order.id));
+      const { error: totalsError } = await supabase.from('orders')
+        .update({ subtotal: savedSubtotal, total: savedSubtotal }).eq('id', order.id);
+      if (totalsError) throw totalsError;
 
       // Upload Customer PO attachment if provided
       if (customerPoFile) {
@@ -2334,6 +2177,7 @@ const CreateOrder = () => {
         variant: "destructive",
       });
     } finally {
+      saveInFlightRef.current = false;
       setLoading(false);
     }
   };
