@@ -27,6 +27,7 @@ import { formatDocDate, cn } from "@/lib/utils";
 import SignedImage from "@/components/SignedImage";
 import { getSignedArtworkUrl } from "@/lib/signedArtworkUrl";
 
+import { assertOrderProcessable } from "@/lib/orderPersistence";
 import { generateInvoiceNumber } from "@/lib/invoiceUtils";
 import { generateInvoicePDF } from "@/lib/invoicePdfUtils";
 import { fetchChildPdfInputs } from "@/lib/invoiceBalance";
@@ -103,6 +104,8 @@ const OrderDetail = () => {
   const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
 
   const [isSaving, setIsSaving] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const processingRef = useRef(false);
   
   // Re-upload PO states
   const [showReuploadDialog, setShowReuploadDialog] = useState(false);
@@ -1056,100 +1059,57 @@ const OrderDetail = () => {
   };
 
   const handleVibeProcessed = async () => {
-
-    if (!isAdmin) return;
-    
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { error } = await supabase
-      .from('orders')
-      .update({ 
-        vibe_processed: true,
-        vibe_processed_at: new Date().toISOString(),
-        vibe_processed_by: user.id
-      })
-      .eq('id', orderId);
-
-    if (!error) {
-      // Check if a blanket invoice already exists.
-      // Use limit(1) + array — .maybeSingle() ERRORS when >1 rows exist and
-      // returns data=null, which the old code treated as "no invoice" and
-      // then inserted another duplicate blanket. That bug created repeat
-      // invoice numbers on this order.
-      const { data: existingInvoices } = await supabase
-        .from('invoices')
-        .select('id')
-        .eq('order_id', orderId)
-        .is('deleted_at', null)
-        .limit(1);
-
-      if (!existingInvoices || existingInvoices.length === 0) {
-        // Create invoice with status "Final Review" using order number
-        const invoiceNumber = generateInvoiceNumber(order.order_number, 1);
-        const { error: invoiceError } = await supabase
-          .from('invoices')
-          .insert({
-            company_id: order.company_id,
-            order_id: orderId,
-            invoice_number: invoiceNumber,
-            status: 'open',
-            subtotal: order.subtotal,
-            tax: order.tax,
-            total: order.total,
-            created_by: user.id
-          });
-
-        if (invoiceError) {
-          toast({
-            title: "Warning",
-            description: "Order processed but invoice creation failed",
-            variant: "destructive"
-          });
-        } else {
-          toast({
-            title: "Order Processed",
-            description: "Order marked as Vibe Processed and invoice created with Final Review status."
-          });
-        }
-      } else {
-        toast({
-          title: "Order Processed",
-          description: "Order has been marked as Vibe Processed."
+    if (!isVibeAdmin || !orderId || processingRef.current) return;
+    processingRef.current = true;
+    setIsProcessing(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Please sign in again.');
+      const { data: fresh, error: orderError } = await supabase.from('orders')
+        .select('*, order_items(id)').eq('id', orderId).single();
+      if (orderError) throw orderError;
+      assertOrderProcessable(fresh.order_items.length, isEditModeRef.current || isSaving);
+      const { data: existing, error: lookupError } = await supabase.from('invoices')
+        .select('id').eq('order_id', orderId).is('deleted_at', null).limit(1);
+      if (lookupError) throw lookupError;
+      if (!existing?.length) {
+        const { error } = await supabase.from('invoices').insert({
+          company_id: fresh.company_id, order_id: orderId,
+          invoice_number: generateInvoiceNumber(fresh.order_number, 1),
+          invoice_type: 'full', shipment_number: 1, status: 'open',
+          subtotal: fresh.subtotal, tax: fresh.tax, total: fresh.total,
+          shipping_cost: fresh.shipping_cost || 0, created_by: user.id,
         });
+        if (error) throw error;
       }
-      
-      setVibeProcessed(true);
-      fetchOrder();
+      const { error } = await supabase.from('orders').update({
+        status: 'in production', vibe_processed: true,
+        vibe_processed_at: new Date().toISOString(), vibe_processed_by: user.id,
+      }).eq('id', orderId);
+      if (error) throw error;
+      await Promise.all([fetchOrder(), fetchInvoices()]);
+      toast({ title: 'Order Processed', description: 'Order moved to production. Its invoice is listed below.' });
+    } catch (error: any) {
+      toast({ title: 'Order not processed', description: error.message, variant: 'destructive' });
+    } finally {
+      processingRef.current = false;
+      setIsProcessing(false);
     }
   };
 
   const handleStatusChange = async (newStatus: string) => {
     if (!isAdmin) return;
-
-    const { error } = await supabase
-      .from('orders')
-      .update({ status: newStatus })
-      .eq('id', orderId);
-
-    if (!error) {
-      // If moving to production, automatically create invoice and mark as vibe processed
-      if (newStatus === 'in production' && isVibeAdmin) {
-        await handleVibeProcessed();
-      }
-      
-      toast({
-        title: "Status Updated",
-        description: `Order status changed to ${newStatus}`
-      });
-      fetchOrder();
-    } else {
-      toast({
-        title: "Error",
-        description: "Failed to update order status",
-        variant: "destructive"
-      });
+    if (newStatus === 'in production' && isVibeAdmin) {
+      await handleVibeProcessed();
+      return;
     }
+    const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'Status Updated', description: `Order status changed to ${newStatus}` });
+    fetchOrder();
   };
 
   const handleSaveOrder = async () => {
@@ -1814,6 +1774,7 @@ const OrderDetail = () => {
               <Button 
                 size="lg"
                 className="bg-info hover:bg-info text-info-foreground"
+                disabled={isProcessing || isSaving || isEditMode}
                 onClick={() => handleStatusChange('in production')}
               >
                 <CheckCircle2 className="h-5 w-5 mr-2" />
