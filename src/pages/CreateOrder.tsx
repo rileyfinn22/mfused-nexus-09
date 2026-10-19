@@ -146,6 +146,7 @@ const fetchAllOrderProducts = async (companyId?: string | null): Promise<Product
 };
 
 interface OrderItem {
+  id?: string;
   productId: string;
   quantity: number;
   unit_price?: number; // Preserve PO prices
@@ -637,7 +638,7 @@ const CreateOrder = () => {
       const product = products.find(p => p.id === item.productId);
       const price = item.unit_price ?? 0;
       return {
-        order_id: savedOrderId, product_id: item.productId,
+        id: item.id, order_id: savedOrderId, product_id: item.productId,
         sku: product?.item_id || item.item_id || `SKU-${item.productId.substring(0, 8)}`,
         item_id: product?.item_id || item.item_id || null,
         name: product?.name || item.name || '(unnamed product)',
@@ -647,7 +648,7 @@ const CreateOrder = () => {
       };
     }),
     ...unmatchedPoItems.map((item, idx) => ({
-      order_id: savedOrderId, product_id: null,
+      id: item.id, order_id: savedOrderId, product_id: null,
       sku: item.sku || item.catalogItemId || 'UNKNOWN',
       item_id: item.catalogItemId || item.item_id || null,
       name: item.name || item.description || 'Unmatched Item',
@@ -1487,6 +1488,7 @@ const CreateOrder = () => {
         .sort((a: any, b: any) => (a.line_number ?? 9999) - (b.line_number ?? 9999))
         .filter((item: any) => item.product_id !== null) // Only load items with matching products
         .map((item: any) => ({
+          id: item.id,
           productId: item.product_id,
           quantity: item.quantity,
           unit_price: item.unit_price, // Preserve PO prices
@@ -1494,7 +1496,7 @@ const CreateOrder = () => {
           item_id: item.item_id || null,
           description: item.description || null,
         }));
-      setSelectedItems(mergeOrderItems([], items));
+      setSelectedItems(items);
       
       // Store unmatched items from PO for display
       const unmatchedItems = order.order_items

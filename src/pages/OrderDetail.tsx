@@ -27,7 +27,7 @@ import { formatDocDate, cn } from "@/lib/utils";
 import SignedImage from "@/components/SignedImage";
 import { getSignedArtworkUrl } from "@/lib/signedArtworkUrl";
 
-import { assertOrderProcessable } from "@/lib/orderPersistence";
+import { assertOrderProcessable, persistOrderLines } from "@/lib/orderPersistence";
 import { generateInvoiceNumber } from "@/lib/invoiceUtils";
 import { generateInvoicePDF } from "@/lib/invoicePdfUtils";
 import { fetchChildPdfInputs } from "@/lib/invoiceBalance";
@@ -1141,96 +1141,50 @@ const OrderDetail = () => {
         }
       }
 
-      // PHASE 1: Delete, Insert, and fetch vendor PO items in parallel
-      const phase1Promises: Promise<any>[] = [];
-
-      // Delete removed items
-      if (itemsToDelete.length > 0) {
-        phase1Promises.push(
-          (async () => {
-            await supabase
-              .from('vendor_po_items')
-              .update({ order_item_id: null })
-              .in('order_item_id', itemsToDelete);
-            const { error } = await supabase.from('order_items').delete().in('id', itemsToDelete);
-            if (error) throw new Error(`Could not remove line items: ${error.message}`);
-          })()
-        );
-      }
-
-      // Insert new items
-      if (newItems.length > 0) {
-        const itemsToInsert = newItems.map(item => ({
-          order_id: orderId,
-          product_id: item.product_id,
-          sku: item.sku || item.item_id || item.name,
-          item_id: item.item_id,
-          name: item.name,
-          description: item.description,
-          quantity: Number(item.quantity) || 0,
-          unit_price: Number(item.unit_price) || 0,
-          total: Number(item.quantity) * Number(item.unit_price) || 0,
-          shipped_quantity: null
-        }));
-        phase1Promises.push(
-          (async () => {
-            const { data, error } = await supabase
-              .from('order_items')
-              .insert(itemsToInsert)
-              .select('id');
-            if (error) throw new Error(`Could not add line items: ${error.message}`);
-            if ((data?.length || 0) !== itemsToInsert.length) {
-              throw new Error('Some line items were not saved — nothing was added. Please retry.');
-            }
-          })()
-        );
-      }
-
-      // Fetch all vendor PO items for existing order items in one query
       const existingItemIds = existingItems.map(item => item.id);
       let allVendorPoItems: any[] = [];
-      if (existingItemIds.length > 0) {
-        phase1Promises.push(
-          (async () => {
-            const { data } = await supabase
-              .from('vendor_po_items')
-              .select('id, vendor_po_id, unit_cost, order_item_id')
-              .in('order_item_id', existingItemIds);
-            allVendorPoItems = data || [];
-          })()
-        );
-      }
-
-      await Promise.all(phase1Promises);
-
-      // NOTE: totals are NOT computed here. Item writes below run in parallel and
-      // each one fires the DB recalc trigger, which can read a partial snapshot.
-      // We recompute authoritatively from the DB after every item write settles.
-
-
-      // PHASE 2: Update all existing items, vendor PO items, order, and invoice in parallel
-      const phase2Promises: Promise<any>[] = [];
-
-      // Update all existing lines in ONE request (single transaction). Firing one request per
-      // line made each wait on the order-row lock taken by the totals trigger and time out on
-      // larger orders (11133, 16 lines). The trigger now only runs when qty/price change.
-      if (existingItems.length > 0) {
-        const { error } = await supabase
-          .from('order_items')
-          .upsert(existingItems.map((item: any) => ({
-            id: item.id,
-            order_id: orderId,
-            quantity: item.quantity,
-            unit_price: item.unit_price,
+      if (isVibeAdmin) {
+        if (!orderId) throw new Error('Order not found');
+        await persistOrderLines(supabase, orderId, editedItems.map((item, index) => ({
+          ...(item.isNew ? {} : { id: item.id }),
+          order_id: orderId, product_id: item.product_id,
+          sku: item.sku || item.item_id || item.name,
+          item_id: item.item_id, name: item.name, description: item.description,
+          quantity: Number(item.quantity) || 0, unit_price: Number(item.unit_price) || 0,
+          line_number: index + 1,
+        })));
+      } else {
+        // Company-side edits keep their existing RLS-controlled writes.
+        if (newItems.length) {
+          const { error } = await supabase.from('order_items').insert(newItems.map(item => ({
+            order_id: orderId, product_id: item.product_id, sku: item.sku || item.item_id || item.name,
+            item_id: item.item_id, name: item.name, description: item.description,
+            quantity: Number(item.quantity) || 0, unit_price: Number(item.unit_price) || 0,
+            total: Number(item.quantity) * Number(item.unit_price) || 0, shipped_quantity: null,
+          })));
+          if (error) throw error;
+        }
+        if (existingItems.length) {
+          const { error } = await supabase.from('order_items').upsert(existingItems.map(item => ({
+            id: item.id, order_id: orderId, product_id: item.product_id, sku: item.sku || item.item_id || '',
+            item_id: item.item_id, name: item.name, description: item.description,
+            quantity: item.quantity, unit_price: item.unit_price,
             total: Number(item.quantity) * Number(item.unit_price),
-            description: item.description,
-            item_id: item.item_id,
-            name: item.name,
-            sku: item.sku || item.item_id || '',
-            product_id: item.product_id
           })) as any, { onConflict: 'id' });
-        if (error) throw new Error(`Could not update line items: ${error.message}`);
+          if (error) throw error;
+        }
+        if (itemsToDelete.length) {
+          const { error } = await supabase.from('order_items').delete().in('id', itemsToDelete);
+          if (error) throw error;
+        }
       }
+      if (isVibeAdmin && existingItemIds.length) {
+        const { data, error } = await supabase.from('vendor_po_items')
+          .select('id, vendor_po_id, unit_cost, order_item_id').in('order_item_id', existingItemIds);
+        if (error) throw error;
+        allVendorPoItems = data || [];
+      }
+      const phase2Promises: Promise<any>[] = [];
 
       for (const item of existingItems) {
         // Update linked vendor_po_items (sequential: each fires the PO recalc trigger on the same PO)
