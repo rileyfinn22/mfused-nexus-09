@@ -26,7 +26,7 @@ export async function persistOrderLines(client: SupabaseClient, orderId: string,
   const { data: existing, error: readError } = await client.from('order_items')
     .select('id, product_id, sku').eq('order_id', orderId);
   if (readError) throw readError;
-  const { rows, deleteIds } = reconcileOrderLines(existing || [], desired);
+  const { rows } = reconcileOrderLines(existing || [], desired);
   const { data: subtotal, error: saveError } = await client.rpc('save_order_lines', {
     p_order_id: orderId,
     p_lines: rows.map((line, index) => ({ ...line, line_number: index + 1 })),
