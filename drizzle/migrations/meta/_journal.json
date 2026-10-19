@@ -113,6 +113,13 @@
       "when": 1791825678042,
       "tag": "0015_order_totals_trigger_only_on_price_qty",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1792428021039,
+      "tag": "0016_atomic_order_line_save",
+      "breakpoints": true
     }
   ]
 }

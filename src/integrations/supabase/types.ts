@@ -4732,6 +4732,10 @@ export type Database = {
         Returns: Json
       }
       retry_internal_alerts: { Args: never; Returns: number }
+      save_order_lines: {
+        Args: { p_lines: Json; p_order_id: string }
+        Returns: number
+      }
       set_product_brand: {
         Args: { p_brand_id: string; p_product_id: string }
         Returns: undefined
