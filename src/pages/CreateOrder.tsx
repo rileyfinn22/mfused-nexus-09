@@ -3249,10 +3249,11 @@ const CreateOrder = () => {
                               className="cursor-pointer hover:bg-muted/50"
                               onClick={() => toggleProductSelection(product.id)}
                             >
-                              <TableCell>
+                              {/* The row click toggles; stop the checkbox click from toggling twice. */}
+                              <TableCell onClick={(e) => { e.stopPropagation(); toggleProductSelection(product.id); }}>
                                 <Checkbox
                                   checked={tempSelectedProducts.includes(product.id)}
-                                  onCheckedChange={() => toggleProductSelection(product.id)}
+                                  className="pointer-events-none"
                                 />
                               </TableCell>
                               <TableCell className="font-mono text-xs">{product.item_id || '-'}</TableCell>

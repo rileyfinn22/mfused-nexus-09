@@ -12,6 +12,7 @@ import { DashboardLayout } from "./components/DashboardLayout";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
+import { UpdateAvailableBanner } from "./components/UpdateAvailableBanner";
 
 // Every page used to be in one 4 MB bundle, together with the PDF, spreadsheet and image
 // libraries, so the first load pulled everything. Pages now load on demand; the shell,
@@ -82,6 +83,7 @@ const App = () => (
          <CompanyScopeProvider>
           <Toaster />
           <Sonner />
+          <UpdateAvailableBanner />
           <BrowserRouter>
             <Suspense fallback={<RouteFallback />}>
             <Routes>
