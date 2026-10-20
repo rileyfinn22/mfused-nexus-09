@@ -258,6 +258,9 @@ const Invoices = () => {
         if (allChildrenPaid && childrenCoverBlanket) {
           return 'paid';
         }
+        // Blanket with shipment invoices: what's been shipped is billed (and paid) on the
+        // children; the rest is not yet shipped, so the blanket itself is never "due".
+        return 'open';
       }
     }
     
