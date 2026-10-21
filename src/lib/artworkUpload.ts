@@ -37,7 +37,11 @@ async function putArtwork(path: string, file: File, onProgress?: (pct: number) =
       onSuccess: () => resolve(),
     });
     upload.findPreviousUploads().then((prev) => {
-      if (prev.length) upload.resumeFromPreviousUpload(prev[0]);
+      // tus fingerprints match on the file + endpoint only, not the target path.
+      // Resuming an upload aimed at a different objectName would write this file
+      // to the other product's path while we record the new one — broken file.
+      const sameTarget = prev.find((p) => p.metadata?.objectName === path);
+      if (sameTarget) upload.resumeFromPreviousUpload(sameTarget);
       upload.start();
     });
   });
