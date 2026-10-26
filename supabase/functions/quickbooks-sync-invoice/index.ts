@@ -109,6 +109,10 @@ serve(async (req) => {
       throw new Error('Invoice not found');
     }
 
+    // Credit card payments are allowed only for Best 365 invoices; everyone else stays ACH-only.
+    const CARD_PAYMENT_COMPANY_IDS = ['bc2b6ac5-63fa-4408-9e42-7f9134beadad'];
+    const allowCard = CARD_PAYMENT_COMPANY_IDS.includes(invoice.company_id);
+
     // Get the company's primary user email from user_roles
     const { data: companyUser } = await supabase
       .from('user_roles')
@@ -282,7 +286,7 @@ serve(async (req) => {
             SyncToken: fetched.Invoice.SyncToken,
             sparse: true,
             AllowOnlinePayment: true,
-            AllowOnlineCreditCardPayment: false,
+            AllowOnlineCreditCardPayment: allowCard,
             AllowOnlineACHPayment: true,
           }),
         });
@@ -1198,7 +1202,7 @@ serve(async (req) => {
       },
       // Enable ACH only (no credit card) for payment
       AllowOnlinePayment: true,
-      AllowOnlineCreditCardPayment: false,
+      AllowOnlineCreditCardPayment: allowCard,
       AllowOnlineACHPayment: true,
     };
 
@@ -1529,7 +1533,7 @@ serve(async (req) => {
         SyncToken: qbData.Invoice.SyncToken,
         sparse: true,
         AllowOnlinePayment: true,
-        AllowOnlineCreditCardPayment: false,  // ACH only
+        AllowOnlineCreditCardPayment: allowCard,  // ACH only
         AllowOnlineACHPayment: true,
         BillEmail: customerEmail ? { Address: customerEmail } : undefined,
       };
