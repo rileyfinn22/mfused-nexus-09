@@ -1,5 +1,8 @@
 # Order 11145 recovery
 ## Product to template conversion
+## Best 365 customer catalog
+- [ ] Enable brand/product creation with Labels, Tubes, Tinctures, Closures and Other; verify customer access.
+
 - [x] Add staff conversion from standalone product to template, preserving original SKU, artwork and historical references.
 - [x] Verify signed-in conversion, original product fields/ID, exact cost and price, repeat-call safety, and adding a second SKU; temporary test data removed. Nine focused tests passed.
 
