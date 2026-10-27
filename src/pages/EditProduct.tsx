@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { FileImage, CheckCircle, Clock, Eye, Upload, Trash2 } from "lucide-react";
 import AddArtworkDialog from "@/components/AddArtworkDialog";
 import SignedImage from "@/components/SignedImage";
+import { ConvertProductToTemplateButton } from "@/components/ConvertProductToTemplateButton";
 
 const EditProduct = () => {
   const navigate = useNavigate();
@@ -30,6 +31,7 @@ const EditProduct = () => {
   const productsListPath = productTemplateId ? `/products?template=${productTemplateId}` : "/products";
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
   const [originalItemId, setOriginalItemId] = useState<string>("");
+  const savedForm = useRef("");
   
   const [formData, setFormData] = useState({
     item_id: "",
@@ -61,13 +63,12 @@ const EditProduct = () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { data: userRole } = await supabase
+    const { data: userRoles } = await supabase
       .from('user_roles')
       .select('role')
-      .eq('user_id', user.id)
-      .single();
+      .eq('user_id', user.id);
 
-    setIsVibeAdmin(userRole?.role === 'vibe_admin');
+    setIsVibeAdmin(userRoles?.some((entry) => entry.role === 'vibe_admin') ?? false);
   };
 
   useEffect(() => {
@@ -107,7 +108,7 @@ const EditProduct = () => {
       setProductCompanyId(data.company_id);
       setProductTemplateId(data.template_id || null);
       setOriginalItemId(data.item_id || "");
-      setFormData({
+      const loadedForm = {
         item_id: data.item_id || "",
         customer_item_id: (data as any).customer_item_id || "",
         product_type: data.product_type || "",
@@ -119,7 +120,9 @@ const EditProduct = () => {
         cost: costData?.cost?.toString() || "",
         price: data.price?.toString() || "",
         preferred_vendor_id: costData?.preferred_vendor_id || ""
-      });
+      };
+      savedForm.current = JSON.stringify(loadedForm);
+      setFormData(loadedForm);
     } catch (error) {
       console.error('Error fetching product:', error);
       toast.error("Failed to load product");
@@ -288,6 +291,14 @@ const EditProduct = () => {
           <p className="text-sm text-muted-foreground mt-1">{isVibeAdmin ? "Update product details and specifications" : "View product information"}</p>
           <p className="text-xs text-muted-foreground mt-1 font-mono">ID: {id}</p>
         </div>
+        {isVibeAdmin && id && !productTemplateId && (
+          <ConvertProductToTemplateButton
+            productId={id}
+            productName={formData.name}
+            disabled={saving || JSON.stringify(formData) !== savedForm.current}
+            onConverted={(templateId) => navigate(`/products?template=${templateId}`, { replace: true })}
+          />
+        )}
       </div>
 
       <form onSubmit={isVibeAdmin ? handleSubmit : (e) => e.preventDefault()} className="space-y-8">
