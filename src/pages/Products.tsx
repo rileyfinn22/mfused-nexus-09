@@ -49,6 +49,7 @@ import { AnalyzePOProductsDialog } from "@/components/AnalyzePOProductsDialog";
 import { QuickAddProductsDialog } from "@/components/QuickAddProductsDialog";
 import { TemplateProductsView } from "@/components/TemplateProductsView";
 import { AssignTemplateDropdown } from "@/components/AssignTemplateDropdown";
+import { ConvertProductToTemplateButton } from "@/components/ConvertProductToTemplateButton";
 import SignedImage from "@/components/SignedImage";
 import { useToast } from "@/hooks/use-toast";
 import { isLegacyGeneratedTemplateMockupUrl, isUsableArtworkPreviewUrl } from "@/lib/artworkPreview";
@@ -1191,6 +1192,16 @@ const Products = () => {
 
                     {isVibeAdmin && (
                       <div className="absolute bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <ConvertProductToTemplateButton
+                          productId={product.id}
+                          productName={product.name}
+                          iconOnly
+                          onConverted={(templateId) => {
+                            fetchProducts();
+                            fetchTemplates();
+                            navigate(`/products?template=${templateId}`);
+                          }}
+                        />
                         <AssignTemplateDropdown
                           productId={product.id}
                           currentTemplateId={product.template_id || null}
@@ -1354,6 +1365,18 @@ const Products = () => {
                         <div className="col-span-1 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                           {isVibeAdmin && (
                             <>
+                              {!product.template_id && (
+                                <ConvertProductToTemplateButton
+                                  productId={product.id}
+                                  productName={product.name}
+                                  iconOnly
+                                  onConverted={(templateId) => {
+                                    fetchProducts();
+                                    fetchTemplates();
+                                    navigate(`/products?template=${templateId}`);
+                                  }}
+                                />
+                              )}
                               <AssignTemplateDropdown
                                 productId={product.id}
                                 currentTemplateId={product.template_id || null}
