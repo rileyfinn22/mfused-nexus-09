@@ -11,7 +11,8 @@ describe('product to template conversion', () => {
   it('passes the original product ID to one atomic conversion without replacing it', async () => {
     rpc.mockResolvedValue({ data: 'new-template', error: null });
     expect(await convertProductToTemplate('original-sku-product', ' Pink Fox Can ')).toBe('new-template');
-    expect(rpc).toHaveBeenCalledExactlyOnceWith('convert_product_to_template', {
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith('convert_product_to_template', {
       p_product_id: 'original-sku-product', p_template_name: 'Pink Fox Can',
     });
     expect(clearCached).toHaveBeenCalledWith('products:');
