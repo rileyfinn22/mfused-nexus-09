@@ -1,7 +1,7 @@
 # Order 11145 recovery
 ## Product to template conversion
-- [ ] Add staff conversion from standalone product to template, preserving original SKU, artwork and historical references.
-- [ ] Verify conversion and subsequent SKU creation.
+- [x] Add staff conversion from standalone product to template, preserving original SKU, artwork and historical references.
+- [x] Verify signed-in conversion, original product fields/ID, exact cost and price, repeat-call safety, and adding a second SKU; temporary test data removed. Nine focused tests passed.
 
 - [x] Identify live-site old ID/product-key mismatch and sequence collisions; replace preview staff saves with atomic line transaction. Six tests and signed-in four-line save/reorder/rollback/reload verified.
 - [ ] Restore 11146 missing three lines — blocked: no PO or saved recovery copy; needs original product quantities/prices. Live site still needs publishing before the corrected save is available there.
