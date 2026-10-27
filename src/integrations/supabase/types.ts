@@ -4566,6 +4566,10 @@ export type Database = {
           user_id: string
         }[]
       }
+      convert_product_to_template: {
+        Args: { p_product_id: string; p_template_name?: string }
+        Returns: string
+      }
       create_company_invitation: {
         Args: { p_company_id: string; p_email: string }
         Returns: Json
