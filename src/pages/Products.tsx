@@ -1196,7 +1196,11 @@ const Products = () => {
                           productId={product.id}
                           productName={product.name}
                           iconOnly
-                          onConverted={(templateId) => navigate(`/products?template=${templateId}`)}
+                          onConverted={(templateId) => {
+                            fetchProducts();
+                            fetchTemplates();
+                            navigate(`/products?template=${templateId}`);
+                          }}
                         />
                         <AssignTemplateDropdown
                           productId={product.id}
@@ -1366,7 +1370,11 @@ const Products = () => {
                                   productId={product.id}
                                   productName={product.name}
                                   iconOnly
-                                  onConverted={(templateId) => navigate(`/products?template=${templateId}`)}
+                                  onConverted={(templateId) => {
+                                    fetchProducts();
+                                    fetchTemplates();
+                                    navigate(`/products?template=${templateId}`);
+                                  }}
                                 />
                               )}
                               <AssignTemplateDropdown
