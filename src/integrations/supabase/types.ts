@@ -3610,6 +3610,279 @@ export type Database = {
         }
         Relationships: []
       }
+      studio_designs: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          scene_path: string | null
+          status: string
+          template_id: string | null
+          thumb_path: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          scene_path?: string | null
+          status?: string
+          template_id?: string | null
+          thumb_path?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          scene_path?: string | null
+          status?: string
+          template_id?: string | null
+          thumb_path?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "studio_designs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "studio_designs_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "studio_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      studio_dielines: {
+        Row: {
+          archived_at: string | null
+          created_at: string
+          created_by: string | null
+          cuts_confirmed_at: string | null
+          depth_in: number | null
+          height_in: number | null
+          id: string
+          name: string
+          notes: string | null
+          product_type: string | null
+          scene_path: string | null
+          source_path: string | null
+          thumb_path: string | null
+          vendor: string | null
+          width_in: number | null
+        }
+        Insert: {
+          archived_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          cuts_confirmed_at?: string | null
+          depth_in?: number | null
+          height_in?: number | null
+          id?: string
+          name: string
+          notes?: string | null
+          product_type?: string | null
+          scene_path?: string | null
+          source_path?: string | null
+          thumb_path?: string | null
+          vendor?: string | null
+          width_in?: number | null
+        }
+        Update: {
+          archived_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          cuts_confirmed_at?: string | null
+          depth_in?: number | null
+          height_in?: number | null
+          id?: string
+          name?: string
+          notes?: string | null
+          product_type?: string | null
+          scene_path?: string | null
+          source_path?: string | null
+          thumb_path?: string | null
+          vendor?: string | null
+          width_in?: number | null
+        }
+        Relationships: []
+      }
+      studio_submissions: {
+        Row: {
+          admin_note: string | null
+          check_failures: number
+          check_warnings: number
+          company_id: string
+          customer_notes: string | null
+          design_id: string
+          id: string
+          print_pdf_path: string | null
+          proof_path: string | null
+          quantity: number | null
+          status: string
+          submitted_at: string
+          submitted_by: string | null
+          template_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          admin_note?: string | null
+          check_failures?: number
+          check_warnings?: number
+          company_id: string
+          customer_notes?: string | null
+          design_id: string
+          id?: string
+          print_pdf_path?: string | null
+          proof_path?: string | null
+          quantity?: number | null
+          status?: string
+          submitted_at?: string
+          submitted_by?: string | null
+          template_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          admin_note?: string | null
+          check_failures?: number
+          check_warnings?: number
+          company_id?: string
+          customer_notes?: string | null
+          design_id?: string
+          id?: string
+          print_pdf_path?: string | null
+          proof_path?: string | null
+          quantity?: number | null
+          status?: string
+          submitted_at?: string
+          submitted_by?: string | null
+          template_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "studio_submissions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "studio_submissions_design_id_fkey"
+            columns: ["design_id"]
+            isOneToOne: false
+            referencedRelation: "studio_designs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "studio_submissions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "studio_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      studio_template_companies: {
+        Row: {
+          company_id: string
+          template_id: string
+        }
+        Insert: {
+          company_id: string
+          template_id: string
+        }
+        Update: {
+          company_id?: string
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "studio_template_companies_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "studio_template_companies_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "studio_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      studio_templates: {
+        Row: {
+          archived_at: string | null
+          category: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          dieline_id: string | null
+          id: string
+          kind: string
+          name: string
+          scene_path: string | null
+          status: string
+          thumb_path: string | null
+          updated_at: string
+          visibility: string
+        }
+        Insert: {
+          archived_at?: string | null
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          dieline_id?: string | null
+          id?: string
+          kind?: string
+          name: string
+          scene_path?: string | null
+          status?: string
+          thumb_path?: string | null
+          updated_at?: string
+          visibility?: string
+        }
+        Update: {
+          archived_at?: string | null
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          dieline_id?: string | null
+          id?: string
+          kind?: string
+          name?: string
+          scene_path?: string | null
+          status?: string
+          thumb_path?: string | null
+          updated_at?: string
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "studio_templates_dieline_id_fkey"
+            columns: ["dieline_id"]
+            isOneToOne: false
+            referencedRelation: "studio_dielines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           company_id: string
@@ -4756,6 +5029,24 @@ export type Database = {
         }
         Returns: string
       }
+      studio_can_read_object: {
+        Args: { _name: string; _user_id: string }
+        Returns: boolean
+      }
+      studio_can_see_template: {
+        Args: { _template_id: string; _user_id: string }
+        Returns: boolean
+      }
+      studio_can_write_object: {
+        Args: { _name: string; _user_id: string }
+        Returns: boolean
+      }
+      studio_is_admin: { Args: { _user_id: string }; Returns: boolean }
+      studio_member: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
+      studio_open_to_customers: { Args: never; Returns: boolean }
       submit_customer_order: {
         Args: {
           p_billing_city?: string
