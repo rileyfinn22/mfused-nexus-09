@@ -110,7 +110,7 @@ serve(async (req) => {
     }
 
     // Credit card payments are allowed only for Best 365 invoices; everyone else stays ACH-only.
-    const CARD_PAYMENT_COMPANY_IDS = ['bc2b6ac5-63fa-4408-9e42-7f9134beadad'];
+    const CARD_PAYMENT_COMPANY_IDS = ['bc2b6ac5-63fa-4408-9e42-7f9134beadad', 'ebb9bdd0-9163-45aa-b854-425009aa74b5'];
     const allowCard = CARD_PAYMENT_COMPANY_IDS.includes(invoice.company_id);
 
     // Get the company's primary user email from user_roles
