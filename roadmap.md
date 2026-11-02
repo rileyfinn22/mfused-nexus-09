@@ -1,4 +1,6 @@
 # Order 11145 recovery
+## Login recovery
+- [ ] Fix successful sign-ins stuck on login; defer and deduplicate company loads, ignore stale responses, verify signed-in navigation and regression tests.
 ## Product to template conversion
 ## Best 365 customer catalog
 - [x] Enable Best 365 brand/product creation with Labels, Tubes, Tinctures, Closures and Other; verified as Best 365 customer by creating a brand and Tube SKU and reading it back in the portal. Nine routing tests passed; temporary test records removed.

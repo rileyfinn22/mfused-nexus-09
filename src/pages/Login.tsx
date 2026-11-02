@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useCompany } from "@/contexts/CompanyContext";
 
 export default function Login() {
   const [searchParams] = useSearchParams();
@@ -16,6 +17,7 @@ export default function Login() {
   const [isSignUp, setIsSignUp] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { currentUserId, loading: companyLoading } = useCompany();
 
   // Check for invoice redirect context
   const invoiceId = searchParams.get("invoice");
@@ -31,30 +33,13 @@ export default function Login() {
     }
   }, [invoiceId, redirectTo]);
 
-  // If the user is already logged in and this is an invoice deep-link, skip the login screen.
+  // A restored session should leave ordinary login pages too, but only once
+  // company access is resolved. The submit handler owns invoice association.
   useEffect(() => {
-    if (!redirectTo) return;
-
-    let active = true;
-
-    const go = () => {
-      if (!active) return;
-      navigate(redirectTo);
-    };
-
-    void supabase.auth.getSession().then(({ data }) => {
-      if (data.session) go();
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) go();
-    });
-
-    return () => {
-      active = false;
-      subscription.unsubscribe();
-    };
-  }, [redirectTo, navigate]);
+    if (!currentUserId || companyLoading || loading) return;
+    if (sessionStorage.getItem("pendingInvoiceAccess")) return;
+    navigate(redirectTo || sessionStorage.getItem("pendingRedirect") || "/dashboard", { replace: true });
+  }, [currentUserId, companyLoading, loading, redirectTo, navigate]);
 
   const associateWithInvoice = async (userEmail: string) => {
     const pendingInvoiceId = sessionStorage.getItem("pendingInvoiceAccess");
@@ -95,6 +80,7 @@ export default function Login() {
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setLoading(true);
 
     try {
@@ -192,25 +178,9 @@ export default function Login() {
         } else if (pendingRedirect) {
           navigate(pendingRedirect);
         } else {
-          // Route finance-only users to /financing; never let this lookup
-          // strand a signed-in user on the login page.
-          let target = "/dashboard";
-          try {
-            const { data: { user: currentUser } } = await supabase.auth.getUser();
-            if (currentUser) {
-              const { data: roles } = await supabase
-                .from("user_roles")
-                .select("role")
-                .eq("user_id", currentUser.id);
-              const roleList = (roles || []).map((r: any) => r.role);
-              if (roleList.length === 1 && roleList[0] === "finance") {
-                target = "/financing";
-              }
-            }
-          } catch {
-            // fall through to dashboard
-          }
-          navigate(target);
+          // DashboardLayout applies the existing role precedence after the
+          // shared company load, without another auth request during sign-in.
+          navigate("/dashboard", { replace: true });
         }
       }
     } catch (error: any) {
