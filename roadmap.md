@@ -1,4 +1,6 @@
 # Order 11145 recovery
+## Login recovery
+- [x] Fix successful sign-ins stuck on login; deferred/deduplicated company loads and stale-response guards added. Riley's real signed-in session reaches the dashboard on initial and repeated login visits with no refresh requests; three regression tests passed, build OK. Preview change requires publishing for the live site.
 ## Product to template conversion
 ## Best 365 customer catalog
 - [x] Enable Best 365 brand/product creation with Labels, Tubes, Tinctures, Closures and Other; verified as Best 365 customer by creating a brand and Tube SKU and reading it back in the portal. Nine routing tests passed; temporary test records removed.

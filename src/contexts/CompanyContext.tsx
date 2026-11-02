@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { createCompanyAuthLoader } from "@/lib/companyAuthLoader";
 
 interface Company {
   id: string;
@@ -36,6 +37,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const [hasVibeAdminRole, setHasVibeAdminRole] = useState(false);
   const [hasForwarderRole, setHasForwarderRole] = useState(false);
   const [hasVendorRole, setHasVendorRole] = useState(false);
+  const loadSequence = useRef(0);
 
   // Highest privilege first. If a user has multiple role rows for the same company,
   // we pick the most privileged one to keep UI + permissions stable.
@@ -48,14 +50,16 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   ];
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      loadCompanies(data.session?.user?.id ?? null);
+    const loader = createCompanyAuthLoader(loadCompanies, () => {
+      // Invalidate old queries immediately, before the deferred load starts.
+      loadSequence.current += 1;
+      setLoading(true);
     });
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_IN") {
-        loadCompanies(session?.user?.id ?? null);
+      if (event === "INITIAL_SESSION" || event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+        loader.update(session?.user?.id ?? null);
       } else if (event === "SIGNED_OUT") {
+        loader.update(null);
         setCurrentUserId(null);
         setCompanies([]);
         setActiveCompanyState(null);
@@ -64,14 +68,18 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         setHasForwarderRole(false);
         setHasVendorRole(false);
         localStorage.removeItem(ACTIVE_COMPANY_KEY);
-        setLoading(false);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      loader.dispose();
+      loadSequence.current += 1;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const loadCompanies = async (userId: string | null) => {
+    const sequence = ++loadSequence.current;
     try {
       setCurrentUserId(userId);
 
@@ -99,6 +107,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         `)
         .eq("user_id", userId);
 
+      if (sequence !== loadSequence.current) return;
       if (error) {
         console.error("Error fetching user companies:", error);
         setCompanies([]);
@@ -166,6 +175,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         setActiveCompanyState(null);
       }
     } catch (err) {
+      if (sequence !== loadSequence.current) return;
       console.error("Error loading companies:", err);
       setCompanies([]);
       setActiveCompanyState(null);
@@ -174,7 +184,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       setHasForwarderRole(false);
       setHasVendorRole(false);
     } finally {
-      setLoading(false);
+      if (sequence === loadSequence.current) setLoading(false);
     }
   };
 
