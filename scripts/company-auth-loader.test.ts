@@ -13,7 +13,8 @@ describe('company session loading', () => {
     expect(pending).toHaveBeenCalledTimes(1);
     expect(load).not.toHaveBeenCalled();
     vi.runAllTimers();
-    expect(load).toHaveBeenCalledExactlyOnceWith('riley');
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(load).toHaveBeenCalledWith('riley');
   });
   it('loads only the latest session when sign-out and sign-in overlap', () => {
     vi.useFakeTimers();
@@ -23,7 +24,8 @@ describe('company session loading', () => {
     loader.update(null);
     loader.update('new-user');
     vi.runAllTimers();
-    expect(load).toHaveBeenCalledExactlyOnceWith('new-user');
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(load).toHaveBeenCalledWith('new-user');
   });
   it('does not load after unmount', () => {
     vi.useFakeTimers();
