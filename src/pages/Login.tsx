@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
-import { detectClockSkewMs, isClockSkewed, describeSkew } from "@/lib/clockSkew";
 
 export default function Login() {
   const [searchParams] = useSearchParams();
@@ -19,13 +18,6 @@ export default function Login() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { currentUserId, loading: companyLoading } = useCompany();
-  const [clockSkewMs, setClockSkewMs] = useState<number | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    detectClockSkewMs().then((skew) => { if (active) setClockSkewMs(skew); });
-    return () => { active = false; };
-  }, []);
 
   // Check for invoice redirect context
   const invoiceId = searchParams.get("invoice");
@@ -219,12 +211,6 @@ export default function Login() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {clockSkewMs !== null && isClockSkewed(clockSkewMs) && (
-            <div role="alert" className="mb-4 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
-              Your device clock is about {describeSkew(clockSkewMs)}. This will sign you straight back out.
-              Turn on "Set time automatically" in your device's date &amp; time settings, then reload this page.
-            </div>
-          )}
           <form onSubmit={handleAuth} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
