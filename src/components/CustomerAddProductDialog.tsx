@@ -224,12 +224,12 @@ export function CustomerAddProductDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="cust-product-description">Description</Label>
+            <Label htmlFor="cust-product-description">Specs / notes (optional)</Label>
             <Textarea
               id="cust-product-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Size, material, finish, anything VibePKG should know"
+              placeholder="Size, material, finish, colors — anything VibePKG should know. You can skip this and we'll fill it in."
               rows={4}
             />
           </div>

@@ -81,6 +81,8 @@ interface Product {
   template_id?: string | null;
   brand_id?: string | null;
   product_type?: string | null;
+  /** 'customer' when the buyer created it in the portal; null = staff/legacy. */
+  created_by?: string | null;
 }
 
 interface ProductState {
@@ -1243,6 +1245,9 @@ const Products = () => {
                     {brandName(product.brand_id) && (
                       <p className="text-xs text-muted-foreground truncate">{brandName(product.brand_id)}</p>
                     )}
+                    {isVibeAdmin && product.created_by === 'customer' && (
+                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Customer added</Badge>
+                    )}
                     <p className="text-sm font-medium">
                       {isVibeAdmin
                         ? (product.cost ? `$${product.cost.toFixed(3)}` : '—')
@@ -1351,6 +1356,9 @@ const Products = () => {
                         <span className="text-sm font-medium truncate block">{product.name}</span>
                         {brandName(product.brand_id) && (
                           <span className="text-xs text-muted-foreground truncate block">{brandName(product.brand_id)}</span>
+                        )}
+                        {isVibeAdmin && product.created_by === 'customer' && (
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0 w-fit">Customer added</Badge>
                         )}
                       </div>
                       <div className="col-span-2">

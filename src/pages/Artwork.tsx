@@ -35,7 +35,8 @@ import {
   ImageIcon,
   FolderOpen,
   Upload,
-  Loader2
+  Loader2,
+  Mail
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { downloadStorageObject, normalizeStorageObjectPath } from "@/lib/storageUrl";
@@ -85,6 +86,10 @@ interface Product {
   image_url: string | null;
   brand_id?: string | null;
   product_type?: string | null;
+  /** Customer's spec notes from the portal ("Specs / notes" box). */
+  description?: string | null;
+  /** Last time staff emailed the customer that proofs are ready. */
+  proof_notified_at?: string | null;
 }
 
 // Artwork status types
@@ -220,6 +225,7 @@ const Artwork = () => {
   
   // Download zip loading state
   const [downloadingZip, setDownloadingZip] = useState(false);
+  const [notifyingCustomer, setNotifyingCustomer] = useState(false);
   
   // Dialogs
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
@@ -586,7 +592,7 @@ const Artwork = () => {
     try {
       let query = supabase
         .from('products')
-        .select('id, name, item_id, template_id, company_id, image_url')
+        .select('id, name, item_id, template_id, company_id, image_url, description, proof_notified_at')
         .eq('template_id', selectedTemplate.id)
         .order('name');
       
@@ -1178,6 +1184,35 @@ const Artwork = () => {
     return null;
   };
 
+  // "Notify customer" (staff only): emails the company's users that proofs are ready to
+  // review. The edge function owns recipients and content; the button just passes the product.
+  const handleNotifyCustomer = async () => {
+    if (!selectedProduct || notifyingCustomer) return;
+    setNotifyingCustomer(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-proof-notification', {
+        body: { product_id: selectedProduct.id },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      const sentAt = new Date().toISOString();
+      setSelectedProduct((prev) => (prev ? { ...prev, proof_notified_at: sentAt } : prev));
+      toast({
+        title: "Customer notified",
+        description: `Proof review email sent to ${data?.recipients ?? 0} recipient${data?.recipients === 1 ? "" : "s"}.`,
+      });
+    } catch (e) {
+      console.error('Proof notification failed:', e);
+      toast({
+        title: "Could not notify customer",
+        description: (e as Error)?.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setNotifyingCustomer(false);
+    }
+  };
+
   // Get all artwork stats
   const totalArtwork = Object.values(artworkCounts).reduce((sum, c) => sum + c.total, 0);
   const approvedArtwork = Object.values(artworkCounts).reduce((sum, c) => sum + c.approved, 0);
@@ -1235,13 +1270,45 @@ const Artwork = () => {
               </Button>
             )}
             {isVibeAdmin && (
+              <Button
+                variant="outline"
+                onClick={handleNotifyCustomer}
+                disabled={notifyingCustomer || artworkFiles.length === 0}
+                title={artworkFiles.length === 0 ? "Upload a proof first" : "Email the customer that proofs are ready to review"}
+              >
+                {notifyingCustomer ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Mail className="h-4 w-4 mr-2" />
+                )}
+                Notify customer
+              </Button>
+            )}
+            {isVibeAdmin && (
               <Button onClick={() => setUploadDialogOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
-                Add Art
+                 Add Art
               </Button>
             )}
           </div>
         </div>
+
+        {/* Customer spec notes (staff only) + last proof notification */}
+        {isVibeAdmin && (selectedProduct.description || selectedProduct.proof_notified_at) && (
+          <Card className="p-4 space-y-1">
+            {selectedProduct.description && (
+              <p className="text-sm whitespace-pre-wrap">
+                <span className="font-medium">Customer specs / notes: </span>
+                {selectedProduct.description}
+              </p>
+            )}
+            {selectedProduct.proof_notified_at && (
+              <p className="text-xs text-muted-foreground">
+                Customer last notified about proofs: {new Date(selectedProduct.proof_notified_at).toLocaleString()}
+              </p>
+            )}
+          </Card>
+        )}
 
         {/* Status Filter */}
         <div className="flex gap-4">

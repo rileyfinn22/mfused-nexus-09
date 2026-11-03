@@ -67,6 +67,8 @@ interface Product {
   company_id: string;
   image_url: string | null;
   brand_id?: string | null;
+  /** Customer's spec notes from the portal ("Specs / notes" box). */
+  description?: string | null;
 }
 
 interface ArtworkFile {
@@ -417,7 +419,7 @@ export function CustomerArtworkTab({
     try {
       let query = supabase
         .from('products')
-        .select('id, name, item_id, template_id, company_id, image_url')
+        .select('id, name, item_id, template_id, company_id, image_url, description')
         .eq('template_id', selectedTemplate.id)
         .order('name');
       
@@ -831,6 +833,16 @@ export function CustomerArtworkTab({
           </div>
         </div>
         {tileFileInput}
+
+        {/* Customer spec notes, so staff see them next to the files */}
+        {isVibeAdmin && selectedProduct.description && (
+          <Card className="p-4">
+            <p className="text-sm whitespace-pre-wrap">
+              <span className="font-medium">Customer specs / notes: </span>
+              {selectedProduct.description}
+            </p>
+          </Card>
+        )}
 
         {/* Artwork Grid */}
         {artworkFiles.length === 0 ? (
