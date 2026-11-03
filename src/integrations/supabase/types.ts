@@ -2843,6 +2843,7 @@ export type Database = {
           company_id: string
           cost: number | null
           created_at: string
+          created_by: string | null
           customer_item_id: string | null
           description: string | null
           id: string
@@ -2853,6 +2854,7 @@ export type Database = {
           price: number | null
           print_template_id: string | null
           product_type: string | null
+          proof_notified_at: string | null
           quickbooks_id: string | null
           quickbooks_sync_status: string | null
           quickbooks_synced_at: string | null
@@ -2869,6 +2871,7 @@ export type Database = {
           company_id: string
           cost?: number | null
           created_at?: string
+          created_by?: string | null
           customer_item_id?: string | null
           description?: string | null
           id?: string
@@ -2879,6 +2882,7 @@ export type Database = {
           price?: number | null
           print_template_id?: string | null
           product_type?: string | null
+          proof_notified_at?: string | null
           quickbooks_id?: string | null
           quickbooks_sync_status?: string | null
           quickbooks_synced_at?: string | null
@@ -2895,6 +2899,7 @@ export type Database = {
           company_id?: string
           cost?: number | null
           created_at?: string
+          created_by?: string | null
           customer_item_id?: string | null
           description?: string | null
           id?: string
@@ -2905,6 +2910,7 @@ export type Database = {
           price?: number | null
           print_template_id?: string | null
           product_type?: string | null
+          proof_notified_at?: string | null
           quickbooks_id?: string | null
           quickbooks_sync_status?: string | null
           quickbooks_synced_at?: string | null
@@ -5002,6 +5008,10 @@ export type Database = {
           p_only_invoice_id?: string
           p_order_id: string
         }
+        Returns: undefined
+      }
+      rekey_product_sku: {
+        Args: { p_new_sku: string; p_product_id: string }
         Returns: undefined
       }
       reorder_shipment_leg_public: {

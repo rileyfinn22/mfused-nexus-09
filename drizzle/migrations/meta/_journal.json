@@ -134,6 +134,13 @@
       "when": 1793119728088,
       "tag": "0018_preserve_converted_template_cost_precision",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793729407622,
+      "tag": "0019_customer_product_flow",
+      "breakpoints": true
     }
   ]
 }
