@@ -85,6 +85,10 @@ interface Product {
   image_url: string | null;
   brand_id?: string | null;
   product_type?: string | null;
+  /** Customer's spec notes from the portal ("Specs / notes" box). */
+  description?: string | null;
+  /** Last time staff emailed the customer that proofs are ready. */
+  proof_notified_at?: string | null;
 }
 
 // Artwork status types
@@ -586,7 +590,7 @@ const Artwork = () => {
     try {
       let query = supabase
         .from('products')
-        .select('id, name, item_id, template_id, company_id, image_url')
+        .select('id, name, item_id, template_id, company_id, image_url, description, proof_notified_at')
         .eq('template_id', selectedTemplate.id)
         .order('name');
       
