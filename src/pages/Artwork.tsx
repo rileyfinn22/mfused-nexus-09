@@ -1270,13 +1270,45 @@ const Artwork = () => {
               </Button>
             )}
             {isVibeAdmin && (
+              <Button
+                variant="outline"
+                onClick={handleNotifyCustomer}
+                disabled={notifyingCustomer || artworkFiles.length === 0}
+                title={artworkFiles.length === 0 ? "Upload a proof first" : "Email the customer that proofs are ready to review"}
+              >
+                {notifyingCustomer ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Mail className="h-4 w-4 mr-2" />
+                )}
+                Notify customer
+              </Button>
+            )}
+            {isVibeAdmin && (
               <Button onClick={() => setUploadDialogOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
-                Add Art
+                 Add Art
               </Button>
             )}
           </div>
         </div>
+
+        {/* Customer spec notes (staff only) + last proof notification */}
+        {isVibeAdmin && (selectedProduct.description || selectedProduct.proof_notified_at) && (
+          <Card className="p-4 space-y-1">
+            {selectedProduct.description && (
+              <p className="text-sm whitespace-pre-wrap">
+                <span className="font-medium">Customer specs / notes: </span>
+                {selectedProduct.description}
+              </p>
+            )}
+            {selectedProduct.proof_notified_at && (
+              <p className="text-xs text-muted-foreground">
+                Customer last notified about proofs: {new Date(selectedProduct.proof_notified_at).toLocaleString()}
+              </p>
+            )}
+          </Card>
+        )}
 
         {/* Status Filter */}
         <div className="flex gap-4">
