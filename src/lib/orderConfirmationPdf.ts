@@ -1,4 +1,5 @@
 import jsPDF from "jspdf";
+import { sortOrderLines } from "@/lib/orderLineSort";
 import autoTable from "jspdf-autotable";
 import { pdfItemDescription } from "@/lib/pdfItemText";
 import { formatCurrency, formatDocDate, formatUnitPrice } from "@/lib/utils";
@@ -30,6 +31,7 @@ interface OrderConfirmationData {
 }
 
 interface ConfirmationItem {
+  line_number?: number | null;
   name: string;
   sku: string;
   quantity: number;
@@ -41,6 +43,7 @@ export async function generateOrderConfirmationPdf(
   order: OrderConfirmationData,
   items: ConfirmationItem[]
 ): Promise<{ blob: Blob; base64: string }> {
+  items = sortOrderLines(items);
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
 

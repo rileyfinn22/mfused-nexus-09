@@ -1,4 +1,5 @@
 import jsPDF from "jspdf";
+import { sortOrderLines } from "@/lib/orderLineSort";
 import { pdfItemDescription } from "@/lib/pdfItemText";
 import autoTable from "jspdf-autotable";
 import { formatCurrency, formatDocDate, formatUnitPrice } from "@/lib/utils";
@@ -65,6 +66,7 @@ interface OrderData {
 }
 
 export interface OrderItem {
+  line_number?: number | null;
   sku: string;
   name: string;
   description?: string | null;
@@ -122,7 +124,7 @@ const renderInvoiceToDoc = async (
   yPos = Math.max(billY + 8, detailY + 10);
 
   // ============ ITEMS TABLE ============
-  const items = order.order_items || [];
+  const items = sortOrderLines(order.order_items || []);
   // Use shipped quantity as the source of truth when ANY item has shipped
   // (matches the footer/DB logic). When nothing has shipped on the invoice,
   // fall back to ordered qty so deposit/blanket invoices still display lines.
