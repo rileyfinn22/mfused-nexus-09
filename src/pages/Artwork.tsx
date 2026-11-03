@@ -35,7 +35,8 @@ import {
   ImageIcon,
   FolderOpen,
   Upload,
-  Loader2
+  Loader2,
+  Mail
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { downloadStorageObject, normalizeStorageObjectPath } from "@/lib/storageUrl";
@@ -224,6 +225,7 @@ const Artwork = () => {
   
   // Download zip loading state
   const [downloadingZip, setDownloadingZip] = useState(false);
+  const [notifyingCustomer, setNotifyingCustomer] = useState(false);
   
   // Dialogs
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
