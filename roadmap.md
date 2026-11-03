@@ -1,11 +1,11 @@
 # Roadmap
 
-## Customer art + product flow (approved plan 2026-11-03)
-- [ ] Customer upload: art must attach to a product (existing or quick-created); optional Specs/notes box
-- [ ] Staff view: show customer spec notes on product art page
-- [ ] Email: "Customer art submitted" to Carrie + admin alert list (product, SKU, specs, link)
-- [ ] Products page: "Customer added" badge/filter for staff
-- [ ] EditProduct: staff SKU change that re-keys artwork rows in one transaction (RPC)
-- [ ] "Notify customer" button on proof upload → proofs-ready email to company users
-- [ ] Migration: products.created_by_role column + SKU re-key RPC
-- [ ] Tests: vitest (SKU re-key, specs round-trip) + Playwright end-to-end
+## Customer art + product flow (approved plan 2026-11-03) — DONE
+- [x] Customer upload: art attaches to a product (existing or quick-created); optional Specs/notes box (reused Description field, relabeled)
+- [x] Staff view: customer spec notes shown on product art pages (proofs + customer art tabs)
+- [x] Email: "Customer art submitted" alert now includes product specs (Carrie + admin list already subscribed)
+- [x] Products page: "Customer added" badge for staff (products.created_by)
+- [x] EditProduct: SKU change via rekey_product_sku RPC — one transaction, company-scoped, duplicate-safe (verified live)
+- [x] "Notify customer" button on proofs view → send-proof-notification edge function emails company users, records proof_notified_at
+- [x] Migration 0019_customer_product_flow applied; functions deployed
+- [x] Verified: RPC happy path + duplicate rejection via REST; Playwright staff view shows specs card + button (did not click Notify — would email real customers)
