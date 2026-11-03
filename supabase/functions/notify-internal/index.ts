@@ -172,21 +172,24 @@ async function artworkUploaded(admin: ReturnType<typeof createClient>, alert: Al
   const company = await companyName(admin, art.company_id ?? alert.company_id);
 
   let productName: string | null = null;
+  let productSpecs: string | null = null;
   if (art.company_id) {
     const { data: product } = await admin
       .from("products")
-      .select("name")
+      .select("name, description")
       .eq("company_id", art.company_id)
       .eq("item_id", art.sku)
       .limit(1)
       .maybeSingle();
     productName = product?.name ?? null;
+    productSpecs = product?.description ?? null;
   }
 
   const rows = [
     { label: "Customer", value: escapeHtml(company), emphasis: true },
     ...(productName ? [{ label: "Product", value: escapeHtml(productName) }] : []),
     { label: "SKU", value: escapeHtml(art.sku), mono: true },
+    ...(productSpecs ? [{ label: "Customer specs / notes", value: escapeHtml(productSpecs) }] : []),
     { label: "File", value: escapeHtml(art.filename || "(unnamed file)") },
     ...(art.notes ? [{ label: "Notes", value: escapeHtml(art.notes) }] : []),
     { label: "Uploaded", value: escapeHtml(when(art.created_at)) },
