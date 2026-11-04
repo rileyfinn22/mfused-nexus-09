@@ -18,6 +18,7 @@ import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { X, Mail, Plus, Send, Loader2, Eye, FileText, Paperclip, Upload, Trash2, Image, CheckCircle2, AlertCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { resolveEmailRecipients } from "@/lib/emailRecipients";
 
 export interface AdditionalAttachment {
   file: File;
@@ -263,7 +264,18 @@ export function EmailPreviewDialog({
   };
 
   const handleSend = async () => {
-    if (emails.length === 0) {
+    let recipients: string[];
+    try {
+      recipients = resolveEmailRecipients(emails, currentEmail);
+    } catch (error) {
+      toast({
+        title: "Invalid email",
+        description: error instanceof Error ? error.message : "Please enter a valid email address",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (recipients.length === 0) {
       toast({
         title: "No recipients",
         description: "Please add at least one email address",
@@ -273,7 +285,7 @@ export function EmailPreviewDialog({
     }
 
     await onSend({
-      to: emails,
+      to: recipients,
       subject,
       message,
       additionalAttachments: additionalAttachments.length > 0 ? additionalAttachments : undefined,
@@ -576,7 +588,7 @@ export function EmailPreviewDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={sending}>
             Cancel
           </Button>
-          <Button onClick={handleSend} disabled={sending || emails.length === 0}>
+          <Button onClick={handleSend} disabled={sending || (emails.length === 0 && !currentEmail.trim())}>
             {sending ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
