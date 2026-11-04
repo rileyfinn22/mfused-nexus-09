@@ -695,7 +695,7 @@ ${row("Total", formattedAmount, true)}
             </Button>
             <Button
               onClick={handleOpenEmailDialog}
-              disabled={loading || !vendor?.contact_email || isEditing}
+              disabled={loading || !po || !vendor || isEditing}
             >
               <Send className="h-4 w-4 mr-2" />
               Compose Email & Send

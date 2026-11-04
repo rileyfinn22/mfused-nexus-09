@@ -643,7 +643,7 @@ Thank you for your business.`;
 
   // Auto-open send dialog when navigated with ?send=true
   useEffect(() => {
-    if (autoSend && po && vendor?.contact_email && !showEmailPreview) {
+    if (autoSend && po && vendor && !showEmailPreview) {
       setShowEmailPreview(true);
     }
   }, [autoSend, po, vendor]);
@@ -757,7 +757,7 @@ Thank you for your business.`;
               Mark as Sent
             </Button>
           )}
-          {vendor?.contact_email && (
+          {isAdmin && vendor && (
             <Button onClick={handleOpenEmailDialog}>
               <Send className="h-4 w-4 mr-2" />
               Send to Vendor
