@@ -737,31 +737,12 @@ const CreateOrder = () => {
 
         if (updateError) throw updateError;
       } else {
-        // Create new draft
-        const { data: recentOrders } = await supabase
-          .from('orders')
-          .select('order_number')
-          .order('created_at', { ascending: false })
-          .limit(100);
-        
-        let maxOrderNum = 10699;
-        if (recentOrders && recentOrders.length > 0) {
-          for (const order of recentOrders) {
-            const match = order.order_number.match(/(\d+)$/);
-            if (match) {
-              const num = parseInt(match[1], 10);
-              if (!isNaN(num) && num > maxOrderNum) {
-                maxOrderNum = num;
-              }
-            }
-          }
-        }
-        const orderNumber = String(maxOrderNum + 1);
+        // The database assigns the shared sequential number during insertion.
 
         const { data: newOrder, error } = await supabase
           .from('orders')
           .insert({
-            order_number: orderNumber,
+            order_number: '',
             po_number: formData.poNumber || null,
             company_id: companyId,
             customer_name: formData.customerName || 'Draft Order',
@@ -2092,33 +2073,12 @@ const CreateOrder = () => {
         order = updatedOrder;
 
       } else {
-        // Create new order with sequential number - get max existing order number
-        // Fetch recent orders and find the highest numeric order number
-        const { data: recentOrders } = await supabase
-          .from('orders')
-          .select('order_number')
-          .order('created_at', { ascending: false })
-          .limit(100);
-        
-        // Find the highest numeric order number from recent orders
-        let maxOrderNum = 10699; // Starting point (will increment to 10700)
-        if (recentOrders && recentOrders.length > 0) {
-          for (const order of recentOrders) {
-            const match = order.order_number.match(/(\d+)$/);
-            if (match) {
-              const num = parseInt(match[1], 10);
-              if (!isNaN(num) && num > maxOrderNum) {
-                maxOrderNum = num;
-              }
-            }
-          }
-        }
-        orderNumber = String(maxOrderNum + 1);
+        // The database assigns the shared sequential number during insertion.
 
         const { data: newOrder, error: orderError } = await supabase
           .from('orders')
           .insert({
-            order_number: orderNumber,
+            order_number: '',
             po_number: formData.poNumber || null,
             company_id: companyId,
             customer_name: formData.customerName,
@@ -2149,6 +2109,7 @@ const CreateOrder = () => {
         if (orderError) throw orderError;
         order = newOrder;
       }
+      orderNumber = order.order_number;
 
       // One checked reconciliation for explicit saves and autosaved drafts.
       const savedSubtotal = await persistOrderLines(supabase, order.id, buildSavedLines(order.id));
