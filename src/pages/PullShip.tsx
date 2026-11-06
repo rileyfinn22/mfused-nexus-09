@@ -727,12 +727,10 @@ const PullShip = () => {
         };
       });
 
-      // Generate order number - sequential starting from 10700
-      const { count } = await supabase
-        .from('orders')
-        .select('*', { count: 'exact', head: true });
-      const orderNum = 10699 + ((count || 0) + 1);
-      const orderNumber = String(orderNum);
+      // Reserve from the shared counter; shipment approval still assigns its child suffix.
+      const { data: orderNumber, error: numberError } = await supabase.rpc('next_order_number');
+      if (numberError) throw numberError;
+      if (!orderNumber) throw new Error('Unable to assign an order number');
 
       // Get prices from all linked blanket orders
       let priceMap: Record<string, number> = {};
