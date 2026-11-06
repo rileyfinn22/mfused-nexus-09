@@ -428,23 +428,10 @@ const QuoteDetail = () => {
   };
 
   const generateOrderNumber = async () => {
-    const { data, error } = await supabase
-      .from('orders')
-      .select('order_number')
-      .order('created_at', { ascending: false })
-      .limit(1);
-    
+    const { data, error } = await supabase.rpc('next_order_number');
     if (error) throw error;
-    
-    const lastNumber = data?.[0]?.order_number;
-    if (lastNumber) {
-      const match = lastNumber.match(/ORD-(\d+)/);
-      if (match) {
-        const nextNum = parseInt(match[1]) + 1;
-        return `ORD-${nextNum.toString().padStart(5, '0')}`;
-      }
-    }
-    return 'ORD-00001';
+    if (!data) throw new Error('Unable to assign an order number');
+    return data;
   };
 
   const generateInvoiceNumber = async () => {

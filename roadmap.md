@@ -1,5 +1,10 @@
 # Roadmap
 
+## Incorrect order numbering
+- [x] Restore the shared counter and prevent timestamp-sized numbers from advancing it.
+- [x] Remove browser numbering from the order editor and other creation paths.
+- [x] Correct the three affected orders and their unsynced invoice numbers; verify the displayed result.
+
 ## Customer art + product flow (approved plan 2026-11-03) — DONE
 - [x] Customer upload: art attaches to a product (existing or quick-created); optional Specs/notes box (reused Description field, relabeled)
 - [x] Staff view: customer spec notes shown on product art pages (proofs + customer art tabs)
