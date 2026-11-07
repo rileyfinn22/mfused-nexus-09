@@ -24,7 +24,7 @@ export function calculateFinanceFee(financedAmount: number, financedDate: string
   feeTier = 'Flat 5%';
 
   const feeAmount = Math.round(financedAmount * feePercent) / 100;
-  const balance = Math.round((financedAmount + feeAmount - paidBackAmount) * 100) / 100;
+  const balance = Math.round((financedAmount + feeAmount - paidBackAmount) * 100) / 100 || 0;
 
   return { daysAging, feeTier, feePercent, feeAmount, balance, dailyRate };
 }
