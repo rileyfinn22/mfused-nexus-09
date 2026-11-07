@@ -301,7 +301,7 @@ export default function FinancedInvoiceDetail() {
   const currentFinanced = parseFloat(financedAmount) || 0;
   const currentPaidBack = parseFloat(paidBackAmount) || 0;
   const fee = calculateFinanceFee(currentFinanced, financedDate || record.financed_date, currentPaidBack, record.paid_back_date);
-  const balance = currentFinanced + fee.feeAmount - currentPaidBack;
+  const balance = Math.round((currentFinanced + fee.feeAmount - currentPaidBack) * 100) / 100 || 0;
 
   return (
     <div className="space-y-6">
