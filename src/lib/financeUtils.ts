@@ -7,7 +7,8 @@ export function calculateFinanceFee(financedAmount: number, financedDate: string
   balance: number;
   dailyRate: number;
 } {
-  const balanceCheck = financedAmount - paidBackAmount;
+  // Flat 5% fee on the financed principal; payoff = principal + fee.
+  const balanceCheck = financedAmount * 1.05 - paidBackAmount;
   // If fully paid and we have a paid-back date, stop the clock there.
   const now = balanceCheck <= 0 && paidBackDate
     ? new Date(String(paidBackDate).split("T")[0] + "T00:00:00")
@@ -15,8 +16,6 @@ export function calculateFinanceFee(financedAmount: number, financedDate: string
   const dateStr = String(financedDate).split("T")[0];
   const start = new Date(dateStr + "T00:00:00");
   const daysAging = Math.max(0, Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
-  const balance = financedAmount - paidBackAmount;
-
   let feePercent: number;
   let feeTier: string;
   let dailyRate = 0;
@@ -24,7 +23,8 @@ export function calculateFinanceFee(financedAmount: number, financedDate: string
   feePercent = 5;
   feeTier = 'Flat 5%';
 
-  const feeAmount = balance * (feePercent / 100);
+  const feeAmount = Math.round(financedAmount * feePercent) / 100;
+  const balance = Math.round((financedAmount + feeAmount - paidBackAmount) * 100) / 100;
 
   return { daysAging, feeTier, feePercent, feeAmount, balance, dailyRate };
 }
