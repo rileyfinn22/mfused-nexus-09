@@ -148,6 +148,13 @@
       "when": 1794004991490,
       "tag": "0020_guard_order_number_counter",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1794260260914,
+      "tag": "0021_recalculate_invoices_on_shipped_quantity_edit",
+      "breakpoints": true
     }
   ]
 }
