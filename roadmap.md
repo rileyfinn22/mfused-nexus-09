@@ -1,5 +1,10 @@
 # Roadmap
 
+## Shipped quantity invoice drift
+- [ ] Include shipped-quantity changes in automatic invoice recalculation.
+- [ ] Verify a 400-piece reduction at $0.218 reduces the invoice by $87.20.
+- [ ] Reconcile invoice 11052 and confirm its total through the portal.
+
 ## Incorrect order numbering
 - [x] Restore the shared counter and prevent timestamp-sized numbers from advancing it.
 - [x] Remove browser numbering from the order editor and other creation paths.
