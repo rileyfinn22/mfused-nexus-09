@@ -1,9 +1,9 @@
 # Roadmap
 
 ## Shipped quantity invoice drift
-- [ ] Include shipped-quantity changes in automatic invoice recalculation.
-- [ ] Verify a 400-piece reduction at $0.218 reduces the invoice by $87.20.
-- [ ] Reconcile invoice 11052 and confirm its total through the portal.
+- [x] Include shipped-quantity changes in automatic invoice recalculation.
+- [x] Verify a 400-piece reduction at $0.218 reduces the invoice by $87.20 (rollback-only regression failed before, passed after).
+- [x] Reconcile invoice 11052 and confirm $13,217.30 through the signed-in portal; QuickBooks update remains a staff action.
 
 ## Incorrect order numbering
 - [x] Restore the shared counter and prevent timestamp-sized numbers from advancing it.
