@@ -155,6 +155,13 @@
       "when": 1794260260914,
       "tag": "0021_recalculate_invoices_on_shipped_quantity_edit",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1794421860685,
+      "tag": "0022_vendor_po_totals_use_shipped_qty",
+      "breakpoints": true
     }
   ]
 }
