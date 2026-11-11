@@ -162,6 +162,13 @@
       "when": 1794421860685,
       "tag": "0022_vendor_po_totals_use_shipped_qty",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1794437745220,
+      "tag": "0023_scope_product_images_storage",
+      "breakpoints": true
     }
   ]
 }
